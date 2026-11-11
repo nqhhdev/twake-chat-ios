@@ -146,5 +146,57 @@ put "$r" TwakeChat/App/Two.swift "$good"
 expect "the committed .swift-format is used (2-space file fails)" nonzero \
   bash -c "cd '$work' && '$r/scripts/lint.sh'"
 
+# 14. A file that does not parse is a failure, not silently skipped.
+r=$(new_repo parse-error)
+put "$r" Packages/Core/Sources/Core/Good.swift "$good"
+put "$r" Packages/Core/Sources/Core/Broken.swift $'struct Broken {\n  let value: Int\n'
+expect "a file that does not parse fails" nonzero "$r/scripts/lint.sh"
+
+# 15. Lint only checks: a misformatted file is left byte-for-byte unchanged.
+r=$(new_repo check-only)
+put "$r" Packages/Core/Sources/Core/Bad.swift "$bad"
+expect "lint reports the misformatted file" nonzero "$r/scripts/lint.sh"
+expect "lint did not rewrite the file" 0 \
+  diff "$work/bad.swift" "$r/Packages/Core/Sources/Core/Bad.swift"
+
+# 16. --fix and lint hand swift-format the same pruned file list. A fake `xcrun` on PATH records its
+# arguments, so this runs even where swift-format cannot save in place (case 9 is then skipped).
+fake="$work/fake-bin"
+mkdir -p "$fake"
+cat > "$fake/xcrun" <<'EOF'
+#!/bin/bash
+printf '%s\n' "$@" > "$FAKE_XCRUN_LOG"
+exit "${FAKE_XCRUN_EXIT:-0}"
+EOF
+chmod +x "$fake/xcrun"
+r=$(new_repo same-list)
+put "$r" Packages/Core/Sources/Core/A.swift "$good"
+put "$r" "Packages/My Package/Sources/B File.swift" "$good"
+put "$r" TwakeChat/App/C.swift "$good"
+put "$r" scripts/D.swift "$good"
+put "$r" Packages/Core/.build/E.swift "$good"
+put "$r" Packages/Core/.swiftpm/F.swift "$good"
+put "$r" TwakeChat/DerivedData/G.swift "$good"
+put "$r" proposals/H.swift "$good"
+printf '%s\n' Packages/Core/Sources/Core/A.swift "Packages/My Package/Sources/B File.swift" \
+  TwakeChat/App/C.swift scripts/D.swift | sort > "$work/expected.files"
+expect "lint calls swift-format through the fake" 0 \
+  env PATH="$fake:$PATH" FAKE_XCRUN_LOG="$work/lint.args" "$r/scripts/lint.sh"
+expect "--fix calls swift-format through the fake" 0 \
+  env PATH="$fake:$PATH" FAKE_XCRUN_LOG="$work/fix.args" "$r/scripts/lint.sh" --fix
+expect "lint runs 'swift-format lint --strict'" 0 \
+  bash -c "head -3 '$work/lint.args' | tr '\n' ' ' | grep -q '^swift-format lint --strict '"
+expect "--fix runs 'swift-format format --in-place'" 0 \
+  bash -c "head -3 '$work/fix.args' | tr '\n' ' ' | grep -q '^swift-format format --in-place '"
+sed '1,/^--$/d' "$work/lint.args" | sort > "$work/lint.files"
+sed '1,/^--$/d' "$work/fix.args" | sort > "$work/fix.files"
+expect "lint gets exactly the unpruned files under the three roots" 0 \
+  diff "$work/expected.files" "$work/lint.files"
+expect "--fix gets the same file list as lint" 0 diff "$work/lint.files" "$work/fix.files"
+
+# 17. A swift-format failure in --fix mode (for example, a file it cannot save) makes the script fail.
+expect "--fix fails when swift-format fails" nonzero \
+  env PATH="$fake:$PATH" FAKE_XCRUN_LOG="$work/fail.args" FAKE_XCRUN_EXIT=1 "$r/scripts/lint.sh" --fix
+
 echo "$((cases - failures))/$cases passed"
 [ "$failures" -eq 0 ]
