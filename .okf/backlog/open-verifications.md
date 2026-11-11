@@ -17,4 +17,4 @@ status: draft
 | The push gateway's existing registration works unchanged for the native app | [ADR 0009](../adr/0009-push-gateway-and-nse-decryption.md) | Register a pusher from a test build and send a message |
 | Where the Flutter app leaves its files and Keychain items, and that the old session can be signed out with them | [ADR 0012](../adr/0012-reuse-flutter-bundle-identifier.md) | Install the Flutter app, sign in, then inspect the containers and Keychain |
 | SwiftUI can scroll a long timeline smoothly | [ADR 0004](../adr/0004-swiftui-observable-coordinators.md) | A throwaway prototype |
-| Snapshot tool, linter, crash reporting, CI service | [Build](../workflows/build.md), [Test](../workflows/test.md) | Decide and record as ADRs |
+| Snapshot tool, crash reporting (the linter and CI service are decided in [ADR 0014](../adr/0014-ci-github-actions-swift-format.md)) | [Build](../workflows/build.md), [Test](../workflows/test.md) | Decide and record as ADRs |

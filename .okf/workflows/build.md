@@ -15,7 +15,8 @@ status: draft
 | Resolve dependencies | Swift Package Manager through Xcode; `Package.resolved` is committed |
 | Build the app | `xcodebuild` for the `TwakeChat` scheme, on an iOS 26 simulator and an iOS 18 simulator |
 | Build one package alone | `swift build` inside `Packages/<Name>` where the package has no iOS-only dependency, otherwise `xcodebuild` |
-| Format and lint | Not chosen (swift-format or SwiftLint) |
+| Format and lint | swift-format, which ships with Xcode 26 ([ADR 0014](../adr/0014-ci-github-actions-swift-format.md)) |
+| CI | GitHub Actions on GitHub-hosted macOS runners ([ADR 0014](../adr/0014-ci-github-actions-swift-format.md)); no workflow file yet |
 | Release build and signing | Not designed; the Flutter app uses fastlane |
 
 ## Requirements
