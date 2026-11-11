@@ -24,6 +24,7 @@ status: draft
 |---|---|
 | Lint; exits non-zero on any finding | `scripts/lint.sh` |
 | Format the same files in place | `scripts/lint.sh --fix` |
+| Test the lint script itself | `scripts/tests/lint_test.sh` (throwaway trees under `$TMPDIR`; reports the `--fix` cases as skipped where swift-format cannot save in place) |
 
 - The style is `.swift-format` at the repository root. It is exactly swift-format's defaults
   (`xcrun swift-format dump-configuration`, swift-format 6.2.3 from Xcode 26.2): no rule is turned off or changed.
