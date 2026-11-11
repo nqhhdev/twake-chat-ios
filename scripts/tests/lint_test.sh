@@ -128,5 +128,23 @@ expect "unknown argument did not format" 0 \
 xcrun swift-format dump-configuration > "$work/defaults.json" 2> /dev/null
 expect ".swift-format equals the toolchain defaults" 0 diff "$work/defaults.json" "$repo/.swift-format"
 
+# 12. A lint-only finding, one `format` cannot repair (a naming rule), still fails: --strict applies to
+# every rule, not only to whitespace.
+r=$(new_repo lint-only)
+put "$r" Packages/Core/Sources/Core/Naming.swift $'let Bad_name = 1\n'
+expect "a lint-only (naming) finding fails" nonzero "$r/scripts/lint.sh"
+
+# 13. The script lints against the repository's own .swift-format, not swift-format's built-in defaults,
+# also when run from another directory. A 4-space style makes the 4-space file clean and the 2-space one a finding.
+r=$(new_repo own-config)
+sed 's/"spaces" : 2/"spaces" : 4/' "$repo/.swift-format" > "$r/.swift-format"
+four=$'struct Sample {\n    let value: Int\n}\n'
+put "$r" Packages/Core/Sources/Core/Four.swift "$four"
+expect "the committed .swift-format is used (4-space file passes)" 0 \
+  bash -c "cd '$work' && '$r/scripts/lint.sh'"
+put "$r" TwakeChat/App/Two.swift "$good"
+expect "the committed .swift-format is used (2-space file fails)" nonzero \
+  bash -c "cd '$work' && '$r/scripts/lint.sh'"
+
 echo "$((cases - failures))/$cases passed"
 [ "$failures" -eq 0 ]
