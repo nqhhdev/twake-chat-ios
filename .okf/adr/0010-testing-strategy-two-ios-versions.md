@@ -8,6 +8,7 @@ status: draft
 # ADR 0010: Test logic with fakes and UI on both iOS versions
 
 **Status:** Accepted by the project owner, 2026-11-11.
+**Amended by [ADR 0017](0017-opt-in-local-staging-integration-tests.md), 2026-11-12.**
 
 ## Context
 The project rule is that every change in behaviour comes with a test. The SDK cannot be driven in unit tests without a
