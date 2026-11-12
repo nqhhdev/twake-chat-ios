@@ -105,8 +105,10 @@ check "no Matrix SDK name in Swift sources, manifests or the project file" bash 
   "! grep -rnE 'MatrixRust|matrix-rust|MatrixSDK' --include='*.swift' --include='*.pbxproj' --include='*.xcscheme' TwakeChat Packages TwakeChat.xcodeproj"
 check "project has no remote package reference" bash -c "! grep -q XCRemoteSwiftPackageReference '$PBX'"
 check "project has no .xcconfig base configuration (out of scope)" bash -c "! grep -q baseConfigurationReference '$PBX'"
+# scripts/tests/architecture-fixtures holds the architecture check's own test trees: some break the rules on purpose.
+# Only that folder is skipped, not any folder with the same name.
 check "no version check anywhere in the repository's Swift code" bash -c \
-  "! grep -rnE --include='*.swift' '#(un)?available|@available' --exclude-dir=.build --exclude-dir=DerivedData ."
+  "! { grep -rnE --include='*.swift' '#(un)?available|@available' --exclude-dir=.build --exclude-dir=DerivedData . | grep -v '^\./scripts/tests/architecture-fixtures/'; }"
 
 # The project graph, followed by object id: the app's sources come in through the synchronized TwakeChat folder
 # (the Sources phase is empty), and every package product is really in the target's Frameworks phase.
@@ -163,10 +165,13 @@ if [ "$MODE" = full ]; then
                 PRODUCT_BUNDLE_IDENTIFIER=app.twake.ios.chat GENERATE_INFOPLIST_FILE=YES SDKROOT=iphoneos \
                 DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS= SWIFT_SUPPRESS_WARNINGS=NO; do
         key="${kv%%=*}"; want="${kv#*=}"; got="$(setting "$key")"
+        # Newer Xcode prints SDKROOT as the SDK's path and leaves SWIFT_SUPPRESS_WARNINGS empty when it is not set (NO).
+        case "$key=$got" in SDKROOT=*/iPhoneOS*.sdk) got=iphoneos ;; SWIFT_SUPPRESS_WARNINGS=) got=NO ;; esac
         [ "$got" = "$want" ] && pass "$config: resolved $key = '$want'" || fail "$config: resolved $key = '$got', expected '$want'"
       done
+      # The iOS 26 SDK or a newer one: the deployment target, not the SDK, is what ADR 0002 keeps at 18.0.
       sdkver="$(setting SDK_VERSION)"
-      case "$sdkver" in 26*) pass "$config: built with the iOS 26 SDK ($sdkver)" ;; *) fail "$config: SDK_VERSION '$sdkver', ADR 0002 needs iOS 26" ;; esac
+      [ "${sdkver%%.*}" -ge 26 ] 2>/dev/null && pass "$config: built with an iOS 26 or newer SDK ($sdkver)" || fail "$config: SDK_VERSION '$sdkver', ADR 0002 needs iOS 26 or newer"
     else
       fail "$config: xcodebuild -showBuildSettings ($(grep -m1 -i error "$WORK/settings-$config.err"))"
     fi
@@ -217,8 +222,9 @@ if [ "$MODE" = full ]; then
       || fail "built app: CFBundleIdentifier '$(plist CFBundleIdentifier)'"
     [ "$(plist MinimumOSVersion)" = 18.0 ] && pass "built app: MinimumOSVersion 18.0" \
       || fail "built app: MinimumOSVersion '$(plist MinimumOSVersion)'"
-    case "$(plist DTSDKName)" in iphonesimulator26*) pass "built app: built with the iOS 26 SDK ($(plist DTSDKName))" ;;
-      *) fail "built app: DTSDKName '$(plist DTSDKName)', ADR 0002 needs iOS 26" ;; esac
+    sdkname="$(plist DTSDKName)"; sdkmajor="${sdkname#iphonesimulator}"; sdkmajor="${sdkmajor%%.*}"
+    case "$sdkname" in iphonesimulator*) [ "$sdkmajor" -ge 26 ] 2>/dev/null ;; *) false ;; esac \
+      && pass "built app: built with an iOS 26 or newer SDK ($sdkname)" || fail "built app: DTSDKName '$sdkname', ADR 0002 needs iOS 26 or newer"
     check "built app: no app extension or entitlements (out of scope)" bash -c \
       "[ ! -d '$APP/PlugIns' ] && ! codesign -d --entitlements - '$APP' 2>/dev/null | grep -q 'application-groups\|keychain-access-groups'"
   else

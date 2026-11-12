@@ -1,7 +1,8 @@
 #!/bin/bash
 # Runs every unit test and stops with a non-zero exit code on the first failure.
-#   1. `swift test` in Packages/Domain and Packages/AppShared, on the macOS host (no simulator).
-#   2. `xcodebuild test` with the TwakeChat test plan (TwakeChatTests, DesignSystemTests, MatrixDataTests)
+#   1. scripts/check-architecture.sh on the repository, then its fixture tests (TWAK-36).
+#   2. `swift test` in Packages/Domain and Packages/AppShared, on the macOS host (no simulator).
+#   3. `xcodebuild test` with the TwakeChat test plan (TwakeChatTests, DesignSystemTests, MatrixDataTests)
 #      on one iOS 26 simulator.
 # Usage: scripts/test.sh
 #        SIMULATOR_NAME='iPhone 17 Pro' scripts/test.sh    any installed iOS 26.x simulator; default iPhone 17
@@ -10,6 +11,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 SIMULATOR_NAME="${SIMULATOR_NAME:-iPhone 17}"
+
+echo "==> scripts/check-architecture.sh"
+scripts/check-architecture.sh
+echo "==> scripts/tests/check_architecture_test.sh"
+scripts/tests/check_architecture_test.sh
 
 host_start=$SECONDS
 for package in Packages/Domain Packages/AppShared; do

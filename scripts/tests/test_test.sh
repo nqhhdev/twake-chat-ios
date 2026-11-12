@@ -44,8 +44,14 @@ chmod +x "$work/bin/"*
 # run_case <name> <FAIL_ON pattern> [VAR=value ...]: runs a copy of test.sh; sets $status and $calls.
 run_case() {
   local dir="$work/$1" fail_on="$2"; shift 2
-  mkdir -p "$dir/scripts"
+  mkdir -p "$dir/scripts/tests"
   cp "$repo/scripts/test.sh" "$dir/scripts/test.sh"
+  # The architecture check and its fixture test are stubs too: test.sh only has to run them, in order.
+  for script in check-architecture.sh tests/check_architecture_test.sh; do
+    printf '#!/bin/bash\necho "%s" >> "$CALLS"\npwd -P >> "$CALLS.pwd"\ncase "%s" in $FAIL_ON) exit 1 ;; esac\n' \
+      "${script#tests/}" "${script#tests/}" > "$dir/scripts/$script"
+    chmod +x "$dir/scripts/$script"
+  done
   : > "$dir/calls"
   env PATH="$work/bin:$PATH" CALLS="$dir/calls" FAIL_ON="$fail_on" "$@" \
     bash "$dir/scripts/test.sh" > "$dir/out" 2>&1
@@ -59,13 +65,17 @@ expect() {  # expect <case name> <description> <condition...>
   if "$@"; then echo "ok   $name: $what"; else echo "FAIL $name: $what"; failures=$((failures + 1)); fi
 }
 
-all="swift test --package-path Packages/Domain
+arch="check-architecture.sh
+check_architecture_test.sh"
+all="$arch
+swift test --package-path Packages/Domain
 swift test --package-path Packages/AppShared
 xcodebuild test -project TwakeChat.xcodeproj -scheme TwakeChat -testPlan TwakeChat -destination platform=iOS Simulator,id=F9559607-AC2C-41AF-B42B-015C217AA835"
 
 run_case pass 'none'
 expect pass "exits 0" test "$status" -eq 0
-expect pass "runs both host packages, then the test plan on the iOS 26 iPhone 17" test "$calls" = "$all"
+expect pass "runs the architecture check and its tests, both host packages, then the test plan on the iOS 26 iPhone 17" \
+  test "$calls" = "$all"
 # run_case starts test.sh from this script's working directory, not from the copy's root, so this shows the cd.
 expect pass "runs every tool from the repository root, wherever it is started" bash -c \
   "[ \"\$(sort -u '$work/pass/calls.pwd')\" = \"\$(cd '$work/pass' && pwd -P)\" ]"
@@ -73,7 +83,16 @@ expect pass "prints how long the host-only part took" grep -qE '^==> Host tests 
 
 run_case domain-fails 'swift test --package-path Packages/Domain'
 expect domain-fails "exits non-zero" test "$status" -ne 0
-expect domain-fails "runs nothing after Domain" test "$calls" = "swift test --package-path Packages/Domain"
+expect domain-fails "runs nothing after Domain" test "$calls" = "$arch
+swift test --package-path Packages/Domain"
+
+run_case architecture-fails 'check-architecture.sh'
+expect architecture-fails "exits non-zero" test "$status" -ne 0
+expect architecture-fails "runs nothing after the check" test "$calls" = "check-architecture.sh"
+
+run_case fixtures-fail 'check_architecture_test.sh'
+expect fixtures-fail "exits non-zero" test "$status" -ne 0
+expect fixtures-fail "runs no unit test" test "$calls" = "$arch"
 
 run_case appshared-fails 'swift test --package-path Packages/AppShared'
 expect appshared-fails "exits non-zero" test "$status" -ne 0

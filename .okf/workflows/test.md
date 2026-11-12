@@ -17,16 +17,20 @@ Run every command from the repository root.
 | Host-only tests, no simulator | `swift test --package-path Packages/Domain`, then the same for `Packages/AppShared` |
 | Simulator tests only | `xcodebuild test -project TwakeChat.xcodeproj -scheme TwakeChat -testPlan TwakeChat -destination 'platform=iOS Simulator,OS=26.0.1,name=iPhone 17'` (`OS=` must match the installed runtime exactly; `xcrun simctl list devices available` shows it) |
 | Test the test script itself | `scripts/tests/test_test.sh` (stub `swift`, `xcrun` and `xcodebuild`; no Xcode needed) |
+| Architecture rules only (ADRs 0002, 0003, 0005, 0006; see [Constraints](../engineering/constraints.md)) | `scripts/check-architecture.sh [ROOT]` |
+| Test the architecture check on its fixture trees | `scripts/tests/check_architecture_test.sh` (trees in `scripts/tests/architecture-fixtures/`) |
 
 `scripts/test.sh` runs in this order:
-1. `swift test` in `Packages/Domain` and `Packages/AppShared` on the macOS host. Both packages declare macOS 15, so no
+1. `scripts/check-architecture.sh` on the repository, then `scripts/tests/check_architecture_test.sh`. Both are text
+   scans and take well under a second.
+2. `swift test` in `Packages/Domain` and `Packages/AppShared` on the macOS host. Both packages declare macOS 15, so no
    simulator boots. The script prints how long this part took: about 10 s from a clean `.build` (SwiftPM reported
    5.1 s and 3.8 s of build on an Apple silicon Mac, 2026-11-12), and about 1 s each when nothing changed.
-2. `xcodebuild test` with the `TwakeChat` test plan on the first available simulator named `$SIMULATOR_NAME` under an
+3. `xcodebuild test` with the `TwakeChat` test plan on the first available simulator named `$SIMULATOR_NAME` under an
    iOS 26.x runtime. If there is none, the script exits non-zero and says so. The test run itself took about 15 s
    after the build.
 
-A failure in step 1 stops the script before step 2. There is no iOS 18 test run (owner decision 2026-11-12).
+A failure in any step stops the script before the next one. There is no iOS 18 test run (owner decision 2026-11-12).
 
 ## Test targets
 | Target | Lives in | Runs with |
