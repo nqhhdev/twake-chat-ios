@@ -1,0 +1,18 @@
+# Knowledge Base Update Log
+
+## 2026-11-11
+* **Creation**: First draft of the architecture, eleven ADRs, constraints, workflows and glossary, written before any app code exists. Every page is a draft awaiting the project owner's review.
+* **Decision**: The app reuses the Flutter app's bundle identifier (ADR 0012); the bundle identifier backlog item is closed and ADRs 0007, 0008, 0009 are updated to match. The project owner also accepted ADR 0012's first-launch cleanup and release rule.
+* **Decision**: The project owner accepted ADRs 0001 and 0004 to 0010 as written. Pages stay `status: draft` until code exists to check them against.
+* **Decision**: The project owner accepted the remaining rules in ADR 0002 (version checks only in DesignSystem) and ADR 0003 (exact SDK version pinning). All twelve ADRs are accepted.
+
+## 2026-11-12
+* **Decision**: Recorded the project owner's answers to TWAK-37 and TWAK-38 as ADR 0014 (GitHub Actions on GitHub-hosted macOS runners, swift-format) and ADR 0015 (pin matrix-rust-components-swift at exactly 26.04.01, filling in ADR 0003). Build and Open Verifications now point to ADR 0014; the snapshot tool and crash reporting stay open (TWAK-45).
+* **Change**: Added `.swift-format` (swift-format defaults, unchanged) and `scripts/lint.sh` (lint, `--fix` to format) per ADR 0014 (TWAK-46). Build lists the commands. No Swift code existed yet, so nothing was reformatted.
+* **Change**: Build lists `scripts/tests/lint_test.sh`, the test of `scripts/lint.sh` (TWAK-46). `Packages/` does not exist yet (TWAK-34 has not added code), so the package build/test loop has nothing to run.
+* **Change**: `scripts/tests/lint_test.sh` also checks that a lint-only (naming) finding fails and that the repository's own `.swift-format` is used (TWAK-46). The package build/test loop still cannot run: no branch (including `factos/twak-34`) has `Packages/` yet.
+* **Change**: `scripts/tests/lint_test.sh` also checks that an unparsable file fails, that lint never rewrites files, and that `--fix` gets the same pruned file list as lint and fails when swift-format fails (TWAK-46). The package build/test loop still fails with "chdir error: Packages/*": `factos/integration` and `factos/twak-34` have no `Packages/` (TWAK-34's code is uncommitted in its worktree).
+* **Build**: The repository has an Xcode project: the `TwakeChat` app target (empty root view) and the `Domain`, `AppShared`, `DesignSystem` and `MatrixData` local packages wired as ADR 0005 says (TWAK-34). The Build page now lists the real commands and settings. The App and Constraints pages now say which parts exist.
+* **Build**: The app build failed because Xcode passed `-suppress-warnings` to the local packages, which conflicts with their warnings-as-errors setting (TWAK-34). Each package folder is now also a folder reference in the project, so Xcode builds them as project packages and their warnings fail the app build. The Build page records this and the `LM_SKIP_METADATA_EXTRACTION` setting.
+* **Build**: The Build page no longer lists an iOS 18 build command or asks for an iOS 18 simulator runtime: builds, tests and launches run on iOS 26 only (owner decision 2026-11-12, TWAK-34). The deployment target stays 18.0 as ADR 0002 says until the owner supersedes it.
+* **Change**: Reformatted TWAK-34's Swift files (the app and the four `Package.swift` and source files) to the default `.swift-format` style: 2-space indentation and no trailing comma after the last element of a multi-line list, nothing else (TWAK-46). `scripts/lint.sh` now passes on the repository. The lint test now accepts a newer swift-format whose defaults list more options than the committed file.
