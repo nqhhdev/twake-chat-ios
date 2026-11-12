@@ -74,7 +74,8 @@ check "MatrixData target depends on the Domain and AppShared products only" bash
 [ "$(platforms_of MatrixData)" = ".iOS(.v18)" ] && pass "MatrixData: iOS 18 only" || fail "MatrixData platforms: $(platforms_of MatrixData)"
 
 check "no Matrix SDK import anywhere" bash -c "! grep -rnE --include='*.swift' 'import[[:space:]]+(MatrixRustSDK|MatrixRustComponents|MatrixSDK|MatrixSDKCrypto)' TwakeChat Packages"
-check "no #available or @available anywhere" bash -c "! grep -rnE --include='*.swift' '#available|#unavailable|@available' TwakeChat Packages"
+# .build is excluded: `swift test` (TWAK-35) generates a test entry point there that uses @available.
+check "no #available or @available anywhere" bash -c "! grep -rnE --include='*.swift' --exclude-dir=.build '#available|#unavailable|@available' TwakeChat Packages"
 check "no Features package (ADR 0011: created with its first feature)" test ! -e Packages/Features
 
 # App target
@@ -86,7 +87,11 @@ only_value() { # every occurrence of setting $1 has value $2, and there is at le
   local values; values="$(grep -E "^[[:space:]]*$1 = " "$PBX" | sed -E "s/^[[:space:]]*$1 = \"?([^\";]*)\"?;.*/\1/" | sort -u)"
   [ "$values" = "$2" ]
 }
-check "PRODUCT_BUNDLE_IDENTIFIER is app.twake.ios.chat (ADR 0012)" only_value PRODUCT_BUNDLE_IDENTIFIER app.twake.ios.chat
+# The test bundles (TWAK-35) use app.twake.ios.chat.tests and app.twake.ios.chat.tests.<module>; every other value
+# must be the app's.
+check "PRODUCT_BUNDLE_IDENTIFIER is app.twake.ios.chat (ADR 0012)" bash -c \
+  "[ \"\$(grep -E '^[[:space:]]*PRODUCT_BUNDLE_IDENTIFIER = ' '$PBX' | grep -vE 'app\.twake\.ios\.chat\.tests(\.[a-z]+)?;' \
+     | sed -E 's/.*= \"?([^\";]*)\"?;.*/\1/' | sort -u)\" = app.twake.ios.chat ]"
 # ADR 0012: version and build numbers above the Flutter app's last release, 2.26.1 (2330) in its pubspec.yaml.
 above_flutter_release() {
   local mv bn; mv="$(grep -E '^[[:space:]]*MARKETING_VERSION = ' "$PBX" | sed -E 's/.*= "?([^";]*)"?;.*/\1/' | sort -u)"
@@ -106,7 +111,11 @@ check "settings are in both Debug and Release project configurations" bash -c \
   "[ \$(grep -c 'SWIFT_TREAT_WARNINGS_AS_ERRORS = YES' '$PBX') -ge 2 ] && [ \$(grep -c 'IPHONEOS_DEPLOYMENT_TARGET = 18.0' '$PBX') -ge 2 ] && [ \$(grep -c 'SWIFT_VERSION = 6.0' '$PBX') -ge 2 ]"
 check "no development team, entitlements or extension target (out of scope)" bash -c \
   "! grep -qE 'DEVELOPMENT_TEAM|CODE_SIGN_ENTITLEMENTS|app-extension' '$PBX'"
-check "exactly one native target" bash -c "[ \$(grep -c 'isa = PBXNativeTarget' '$PBX') -eq 1 ]"
+# TWAK-35 adds the TwakeChatTests and MatrixDataTests unit-test bundles; the app stays the only application target.
+check "exactly one application target, and the two test bundles are the only other native targets" bash -c \
+  "[ \$(grep -c 'productType = \"com.apple.product-type.application\"' '$PBX') -eq 1 ] \
+   && [ \$(grep -c 'isa = PBXNativeTarget' '$PBX') -eq 3 ] \
+   && [ \$(grep -c 'productType = \"com.apple.product-type.bundle.unit-test\"' '$PBX') -eq 2 ]"
 for p in "${PACKAGES[@]}"; do
   check "project references local package Packages/$p" grep -q "relativePath = Packages/$p;" "$PBX"
   check "TwakeChat target links $p" bash -c "awk '/packageProductDependencies = \(/,/\);/' '$PBX' | grep -q '/\* $p \*/'"

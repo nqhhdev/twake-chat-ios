@@ -13,6 +13,11 @@ let package = Package(
       name: "DesignSystem",
       dependencies: [],
       swiftSettings: [.treatAllWarnings(as: .error)]
-    )
+    ),
+    .testTarget(
+      name: "DesignSystemTests",
+      dependencies: ["DesignSystem"],
+      swiftSettings: [.treatAllWarnings(as: .error)]
+    ),
   ]
 )

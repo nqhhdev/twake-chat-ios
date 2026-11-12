@@ -46,8 +46,10 @@ A build passes when it ends with `** BUILD SUCCEEDED **` and the log has no `war
 - No package dependency: swift-format ships with Xcode. Lint does not run in CI yet.
 
 ## Layout
-- `TwakeChat.xcodeproj` has one target, `TwakeChat`, and a shared scheme of the same name. The `TwakeChat/` folder is a
-  synchronized folder group, so a new Swift file in it joins the target without a project edit.
+- `TwakeChat.xcodeproj` has one app target, `TwakeChat`, and a shared scheme of the same name. The `TwakeChat/` folder is a
+  synchronized folder group, so a new Swift file in it joins the target without a project edit. The unit-test targets
+  `TwakeChatTests` and `MatrixDataTests` work the same way with `Tests/TwakeChatTests/` and `Tests/MatrixDataTests/`;
+  see [Test](test.md).
 - The packages under `Packages/` are local package references, and the app target links all four.
 - Each package folder is also a folder reference in the project's `Packages` group. Without it Xcode treats the packages as
   outside dependencies and adds `-suppress-warnings`, which conflicts with `.treatAllWarnings(as: .error)` and fails the

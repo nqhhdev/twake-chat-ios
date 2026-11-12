@@ -13,6 +13,11 @@ let package = Package(
       name: "AppShared",
       dependencies: [],
       swiftSettings: [.treatAllWarnings(as: .error)]
-    )
+    ),
+    .testTarget(
+      name: "AppSharedTests",
+      dependencies: ["AppShared"],
+      swiftSettings: [.treatAllWarnings(as: .error)]
+    ),
   ]
 )

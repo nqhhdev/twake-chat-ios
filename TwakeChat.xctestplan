@@ -1,0 +1,38 @@
+{
+  "configurations" : [
+    {
+      "id" : "5B0F3C1E-2D4A-4E8B-9C61-7A1D2E3F4B50",
+      "name" : "Default",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:TwakeChat.xcodeproj",
+        "identifier" : "A10000000000000000000067",
+        "name" : "TwakeChatTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:Packages\/DesignSystem",
+        "identifier" : "DesignSystemTests",
+        "name" : "DesignSystemTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:TwakeChat.xcodeproj",
+        "identifier" : "A10000000000000000000077",
+        "name" : "MatrixDataTests"
+      }
+    }
+  ],
+  "version" : 1
+}

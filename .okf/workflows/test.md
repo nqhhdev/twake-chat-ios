@@ -1,22 +1,61 @@
 ---
 type: Workflow
 title: "Test"
-description: "How unit and snapshot tests will be run, and on which iOS versions."
+description: "How to run every unit test with one command, where each test target lives, and which part needs a simulator."
 tags: [test, ci, ios-26]
 status: draft
 ---
 # Test
 
-> Not runnable yet: no test target exists. Replace this page with the real commands when the first one is created.
+Run every command from the repository root.
+
+## Commands
+| Step | Command |
+|---|---|
+| Every unit test; stops with a non-zero exit code on the first failure | `scripts/test.sh` |
+| Pick another iOS 26 simulator | `SIMULATOR_NAME='iPhone 17 Pro' scripts/test.sh` (default `iPhone 17`) |
+| Host-only tests, no simulator | `swift test --package-path Packages/Domain`, then the same for `Packages/AppShared` |
+| Simulator tests only | `xcodebuild test -project TwakeChat.xcodeproj -scheme TwakeChat -testPlan TwakeChat -destination 'platform=iOS Simulator,OS=26.0.1,name=iPhone 17'` (`OS=` must match the installed runtime exactly; `xcrun simctl list devices available` shows it) |
+| Test the test script itself | `scripts/tests/test_test.sh` (stub `swift`, `xcrun` and `xcodebuild`; no Xcode needed) |
+
+`scripts/test.sh` runs in this order:
+1. `swift test` in `Packages/Domain` and `Packages/AppShared` on the macOS host. Both packages declare macOS 15, so no
+   simulator boots. The script prints how long this part took: about 10 s from a clean `.build` (SwiftPM reported
+   5.1 s and 3.8 s of build on an Apple silicon Mac, 2026-11-12), and about 1 s each when nothing changed.
+2. `xcodebuild test` with the `TwakeChat` test plan on the first available simulator named `$SIMULATOR_NAME` under an
+   iOS 26.x runtime. If there is none, the script exits non-zero and says so. The test run itself took about 15 s
+   after the build.
+
+A failure in step 1 stops the script before step 2. There is no iOS 18 test run (owner decision 2026-11-12).
+
+## Test targets
+| Target | Lives in | Runs with |
+|---|---|---|
+| `DomainTests` | `Packages/Domain/Tests/DomainTests/` | `swift test`, host |
+| `AppSharedTests` | `Packages/AppShared/Tests/AppSharedTests/` | `swift test`, host |
+| `MatrixDataTests` | `Tests/MatrixDataTests/`, a synchronized folder of the project; links the `MatrixData` product, not hosted by the app | test plan, iOS 26 simulator |
+| `DesignSystemTests` | `Packages/DesignSystem/Tests/DesignSystemTests/` | test plan, iOS 26 simulator |
+| `TwakeChatTests` | `Tests/TwakeChatTests/`, a synchronized folder of the project | test plan, iOS 26 simulator, hosted by the app |
+
+- `MatrixDataTests` is a project target, not a package test target, because `MatrixData` declares iOS only (its SDK
+  binary will be iOS-only) and a package with a `Tests` folder is run with host `swift test`, which cannot build it.
+  Keep `Packages/MatrixData` without a `Tests` folder.
+- `DesignSystem` declares iOS only too, but builds on the host (SwiftUI exists on macOS), so `swift test` also passes
+  there. `scripts/test.sh` still runs it on the simulator, where the snapshot tests will run.
+- The test plan is `TwakeChat.xctestplan` at the repository root, the default plan of the `TwakeChat` scheme. It lists
+  only the three simulator targets, so `DomainTests` and `AppSharedTests` do not run twice.
+- A new package test target goes in its `Package.swift` with `swiftSettings: [.treatAllWarnings(as: .error)]`. If it
+  runs on the simulator, add it to the test plan too.
+- `TwakeChatTests` uses `@testable import TwakeChat`; package tests use plain `import` of the module's public API.
+- Swift Testing only (`import Testing`, `@Test`, `#expect`), and no mocking library
+  ([ADR 0010](../adr/0010-testing-strategy-two-ios-versions.md)).
 
 ## Planned
 | Kind | Where | Runs on |
 |---|---|---|
-| Unit tests (Swift Testing) | Each package's test target | One simulator; once per CI run |
-| Snapshot tests of `DesignSystem` | `DesignSystem` test target | One iOS 18 simulator and one iOS 26 simulator |
+| Snapshot tests of `DesignSystem` | `DesignSystem` test target; the tool is not chosen | Not decided; ADR 0010 asks for iOS 18 and iOS 26 |
+| Unit tests in CI | GitHub Actions ([ADR 0014](../adr/0014-ci-github-actions-swift-format.md)) | No workflow file yet |
 | Integration tests with a homeserver | None in v1 | - |
-
-Rules and reasoning: [ADR 0010](../adr/0010-testing-strategy-two-ios-versions.md).
 
 ## Writing a test for a view model
 1. Create fakes of the Domain protocols the view model needs.

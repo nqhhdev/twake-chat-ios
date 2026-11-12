@@ -54,8 +54,12 @@ bad += report(not remote, "every package dependency is a local path (no Matrix S
 got_platforms = sorted((x["platformName"], x["version"]) for x in m["platforms"])
 bad += report(got_platforms == platforms[name], f"platforms {got_platforms}")
 targets = m["targets"]
-bad += report([(t["name"], t["type"]) for t in targets] == [(name, "regular")],
-              f"one regular target named {name}, no test target (got {[(t['name'], t['type']) for t in targets]})")
+# TWAK-35 adds exactly one Swift Testing target, <Name>Tests, that depends on <Name> alone (ADR 0010: no mocking
+# library or other test dependency), to every package but MatrixData. MatrixData is iOS-only, so its tests are the
+# MatrixDataTests bundle of the Xcode project (Tests/MatrixDataTests), run on the simulator.
+want_targets = [(name, "regular")] + ([] if name == "MatrixData" else [(name + "Tests", "test")])
+bad += report([(t["name"], t["type"]) for t in targets] == want_targets,
+              f"targets {want_targets} (got {[(t['name'], t['type']) for t in targets]})")
 products = m["products"]
 bad += report([(x["name"], x["targets"], list(x["type"])) for x in products] == [(name, [name], ["library"])],
               f"one library product {name}")
@@ -67,20 +71,33 @@ for t in targets:
     for d in t["dependencies"]:
         kind, val = next(iter(d.items()))
         tdeps.append((kind, val[0], val[1] if kind == "product" else None))
-    want = [("product", "Domain", "Domain"), ("product", "AppShared", "AppShared")] if name == "MatrixData" else []
-    bad += report(sorted(tdeps) == sorted(want), f"target dependencies {tdeps}")
+    if t["type"] == "test":
+        want = [("byName", name, None)]
+    else:
+        want = [("product", "Domain", "Domain"), ("product", "AppShared", "AppShared")] if name == "MatrixData" else []
+    bad += report(sorted(tdeps) == sorted(want), f"{t['name']} target dependencies {tdeps}")
 sys.exit(1 if bad else 0)
 PY
   [ $? -eq 0 ] || FAILURES=$((FAILURES + 1))
 done
 
 # The card: "Each has one source file so the package compiles". Exactly one Swift file, at Sources/<Name>/<Name>.swift,
-# and no other file under Sources (no resource, no second placeholder, no Tests folder: test targets are card b).
+# and no other file under Sources (no resource, no second placeholder). Tests live in Tests/<Name>Tests (TWAK-35).
 for p in "${PACKAGES[@]}"; do
   files="$(cd "Packages/$p" && find Sources -type f ! -name .DS_Store | sort | tr '\n' ' ' | sed 's/ $//')"
   [ "$files" = "Sources/$p/$p.swift" ] && pass "$p: exactly one source file, Sources/$p/$p.swift" \
     || fail "$p: source files are '$files', the card asks for one (Sources/$p/$p.swift)"
-  check "$p: no Tests folder (test targets are card b)" test ! -e "Packages/$p/Tests"
+  # TWAK-35 (card b): the only test folder is Tests/<Name>Tests, holding Swift files only. MatrixData has none: an
+  # iOS-only package with a Tests folder would be run by host `swift test`, which cannot build it.
+  if [ "$p" = MatrixData ]; then
+    check "MatrixData: no Tests folder (its tests are Tests/MatrixDataTests in the project)" test ! -e Packages/MatrixData/Tests
+    continue
+  fi
+  tests="$(cd "Packages/$p" && find Tests -mindepth 1 -maxdepth 1 ! -name .DS_Store | sort | tr '\n' ' ' | sed 's/ $//')"
+  [ "$tests" = "Tests/${p}Tests" ] && pass "$p: the only test folder is Tests/${p}Tests" \
+    || fail "$p: test folders are '$tests', expected Tests/${p}Tests"
+  check "$p: Tests/${p}Tests holds only Swift files" bash -c \
+    "[ -z \"\$(find 'Packages/$p/Tests/${p}Tests' -type f ! -name '*.swift' ! -name .DS_Store)\" ]"
 done
 
 # Matrix SDK: no reference in any form (import kinds, @_exported, package reference, product name).

@@ -13,6 +13,11 @@ let package = Package(
       name: "Domain",
       dependencies: [],
       swiftSettings: [.treatAllWarnings(as: .error)]
-    )
+    ),
+    .testTarget(
+      name: "DomainTests",
+      dependencies: ["Domain"],
+      swiftSettings: [.treatAllWarnings(as: .error)]
+    ),
   ]
 )
