@@ -41,7 +41,7 @@ allowed_imports() {
     Domain) echo "Foundation" ;;
     AppShared) echo "Foundation Security OSLog" ;;
     DesignSystem) echo "SwiftUI" ;;
-    MatrixData) echo "Domain AppShared" ;; # the Matrix SDK is added by card e
+    MatrixData) echo "Domain AppShared MatrixRustSDK" ;; # the Matrix SDK, added by TWAK-48
   esac
 }
 platforms_of() { grep -oE '\.(iOS|macOS|tvOS|watchOS|visionOS)\(\.v[0-9_]+\)' "Packages/$1/Package.swift" | sort | tr '\n' ' ' | sed 's/ $//'; }
@@ -52,7 +52,13 @@ for p in "${PACKAGES[@]}"; do
   check "$p: swift-tools-version 6.2 (Swift 6 mode, complete concurrency)" grep -qE '^// swift-tools-version: ?6\.2' "$m"
   check "$p: warnings are errors" grep -q '\.treatAllWarnings(as: \.error)' "$m"
   check "$p: no unsafeFlags" bash -c "! grep -q unsafeFlags '$m'"
-  check "$p: no remote package dependency" bash -c "! grep -q '\.package(url:' '$m'"
+  if [ "$p" = MatrixData ]; then
+    # TWAK-48: the Matrix SDK is the only remote dependency, pinned exactly (ADR 0003, ADR 0015).
+    check "$p: the only remote package dependency is the Matrix SDK, exact 26.04.01" bash -c \
+      "[ \"\$(grep -o '\.package(url:[^)]*)' '$m')\" = '.package(url: \"https://github.com/matrix-org/matrix-rust-components-swift\", exact: \"26.04.01\")' ]"
+  else
+    check "$p: no remote package dependency" bash -c "! grep -q '\.package(url:' '$m'"
+  fi
   actual="$(grep -oE '\.package\(path: "\.\./[A-Za-z]+"\)' "$m" | sed -E 's/.*\.\.\/([A-Za-z]+).*/\1/' | sort | tr '\n' ' ' | sed 's/ $//')"
   if [ "$actual" = "$(expected_deps "$p")" ]; then pass "$p: package dependencies match ADR 0005 ('$actual')"
   else fail "$p: package dependencies '$actual', ADR 0005 expects '$(expected_deps "$p")'"; fi
@@ -65,15 +71,17 @@ for p in "${PACKAGES[@]}"; do
   if [ -z "$bad" ]; then pass "$p: imports only what ADR 0005 allows"; else fail "$p: imports not allowed by ADR 0005:$bad"; fi
 done
 
-check "MatrixData target depends on the Domain and AppShared products only" bash -c '
-  [ "$(grep -oE "\.product\(name: \"[A-Za-z]+\"" Packages/MatrixData/Package.swift | sort | tr "\n" " ")" = ".product(name: \"AppShared\" .product(name: \"Domain\" " ]'
+check "MatrixData target depends on the Domain, AppShared and MatrixRustSDK products only" bash -c '
+  [ "$(grep -oE "\.product\(name: \"[A-Za-z]+\"" Packages/MatrixData/Package.swift | sort | tr "\n" " ")" = ".product(name: \"AppShared\" .product(name: \"Domain\" .product(name: \"MatrixRustSDK\" " ]'
 
 [ "$(platforms_of Domain)" = ".iOS(.v18) .macOS(.v15)" ] && pass "Domain: iOS 18 and macOS 15" || fail "Domain platforms: $(platforms_of Domain)"
 [ "$(platforms_of AppShared)" = ".iOS(.v18) .macOS(.v15)" ] && pass "AppShared: iOS 18 and macOS 15" || fail "AppShared platforms: $(platforms_of AppShared)"
 [ "$(platforms_of DesignSystem)" = ".iOS(.v18)" ] && pass "DesignSystem: iOS 18 only" || fail "DesignSystem platforms: $(platforms_of DesignSystem)"
 [ "$(platforms_of MatrixData)" = ".iOS(.v18)" ] && pass "MatrixData: iOS 18 only" || fail "MatrixData platforms: $(platforms_of MatrixData)"
 
-check "no Matrix SDK import anywhere" bash -c "! grep -rnE --include='*.swift' 'import[[:space:]]+(MatrixRustSDK|MatrixRustComponents|MatrixSDK|MatrixSDKCrypto)' TwakeChat Packages"
+# TWAK-48: MatrixData imports the SDK; nothing else may (ADR 0006). .build holds the SDK checkout itself.
+check "no Matrix SDK import outside Packages/MatrixData" bash -c "! grep -rnE --include='*.swift' --exclude-dir=.build --exclude-dir=MatrixData 'import[[:space:]]+(MatrixRustSDK|MatrixRustComponents|MatrixSDK|MatrixSDKCrypto)' TwakeChat Packages"
+check "MatrixData imports MatrixRustSDK" grep -qE '^import MatrixRustSDK$' Packages/MatrixData/Sources/MatrixData/MatrixData.swift
 # .build is excluded: `swift test` (TWAK-35) generates a test entry point there that uses @available.
 check "no #available or @available anywhere" bash -c "! grep -rnE --include='*.swift' --exclude-dir=.build '#available|#unavailable|@available' TwakeChat Packages"
 check "no Features package (ADR 0011: created with its first feature)" test ! -e Packages/Features

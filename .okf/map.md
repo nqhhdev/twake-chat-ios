@@ -24,6 +24,8 @@ status: stable
 | [adr/0010-testing-strategy-two-ios-versions.md](adr/0010-testing-strategy-two-ios-versions.md) | ADR | View models and use cases are unit-tested against fake proxies; shared components are checked on iOS 18 and iOS 26 simulators. | [adr, testing, ios-26] |
 | [adr/0011-v1-scope-core-chat.md](adr/0011-v1-scope-core-chat.md) | ADR | v1 ships sign-in, chat list, timeline, encryption recovery and push; every other Flutter feature is deferred. | [adr, scope, roadmap] |
 | [adr/0012-reuse-flutter-bundle-identifier.md](adr/0012-reuse-flutter-bundle-identifier.md) | ADR | The native app ships as app.twake.ios.chat, so it installs over the Flutter app instead of beside it. | [adr, release, push, security] |
+| [adr/0014-ci-github-actions-swift-format.md](adr/0014-ci-github-actions-swift-format.md) | ADR | CI runs on GitHub Actions macOS runners like the Flutter app, and swift-format from Xcode formats and lints; billed macOS minutes are the price. | [adr, ci, build, lint] |
+| [adr/0015-pin-matrix-rust-components-swift-26-04-01.md](adr/0015-pin-matrix-rust-components-swift-26-04-01.md) | ADR | The SDK package is pinned to 26.04.01, the version the Flutter app's extension uses; it is older than Element X, so API names come from the pinned package. | [adr, matrix, sdk] |
 | [adr/_template-adr.md](adr/_template-adr.md) | Template | Copy this when recording an architecture decision. | [template, adr] |
 | [architecture/components/data.md](architecture/components/data.md) | Component | C4 level 3 - the only module that imports the Matrix SDK; implements the Domain repository protocols. | [c4, component, data, matrix] |
 | [architecture/components/design-system.md](architecture/components/design-system.md) | Component | C4 level 3 - colours, typography and shared components; the only place that branches on the iOS version. | [c4, component, ui, ios-26] |
@@ -49,6 +51,7 @@ status: stable
 | [glossary/repository.md](glossary/repository.md) | Term | A Domain protocol that gives features one kind of data without saying where it comes from. | [architecture] |
 | [glossary/sliding-sync.md](glossary/sliding-sync.md) | Term | The Matrix sync method that loads only the rooms in view; required by the Matrix Rust SDK. | [matrix] |
 | [glossary/state-holder.md](glossary/state-holder.md) | Term | The @Observable object that holds one screen's state and actions. | [architecture] |
+| [references/matrix-sdk-26-04-01-api.md](references/matrix-sdk-26-04-01-api.md) | Reference | The exact matrix-rust-components-swift 26.04.01 names and signatures the login, room list, timeline and send cards need, each cited from the resolved checkout. | [matrix, sdk, reference] |
 | [troubleshooting.md](troubleshooting.md) | Reference | Common failure symptoms, each mapped to its likely cause and the page that explains it. | [troubleshooting] |
 | [workflows/adapters.md](workflows/adapters.md) | Reference | Every coding agent is pointed at .okf/index.md; no agent gets its own copy of the knowledge. | [agents, okf] |
 | [workflows/add-a-feature.md](workflows/add-a-feature.md) | Workflow | The planned procedure for adding a feature across Domain, MatrixData and a feature package. | [feature, procedure] |

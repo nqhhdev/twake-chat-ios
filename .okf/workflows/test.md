@@ -32,6 +32,11 @@ Run every command from the repository root.
 
 A failure in any step stops the script before the next one. There is no iOS 18 test run (owner decision 2026-11-12).
 
+## In CI
+The `ci` job ([Build](build.md#ci)) runs `scripts/test.sh` once, on an iOS 26 simulator, on every pull request and
+push to `main`. It then compiles the app and the test plan against the iOS 18.0 deployment target without running the
+tests again. Snapshot and integration tests do not run in CI.
+
 ## Test targets
 | Target | Lives in | Runs with |
 |---|---|---|
@@ -58,7 +63,6 @@ A failure in any step stops the script before the next one. There is no iOS 18 t
 | Kind | Where | Runs on |
 |---|---|---|
 | Snapshot tests of `DesignSystem` | `DesignSystem` test target; the tool is not chosen | Not decided; ADR 0010 asks for iOS 18 and iOS 26 |
-| Unit tests in CI | GitHub Actions ([ADR 0014](../adr/0014-ci-github-actions-swift-format.md)) | No workflow file yet |
 | Integration tests with a homeserver | None in v1 | - |
 
 ## Writing a test for a view model
