@@ -1,18 +1,18 @@
 ---
 type: ADR
-title: "ADR 0017: Integration tests against staging are opt-in and local only"
+title: "ADR 0020: Integration tests against staging are opt-in and local only"
 description: "Integration tests read staging credentials at run time from a local env file or environment variables, skip when they are absent, and never run in CI."
 tags: [adr, testing, security]
 status: draft
 ---
-# ADR 0017: Integration tests against staging are opt-in and local only
+# ADR 0020: Integration tests against staging are opt-in and local only
 
 **Status:** Accepted by the project owner, 2026-11-12 (TWAK-62). Amends [ADR 0010](0010-testing-strategy-two-ios-versions.md).
 
 ## Context
 [ADR 0010](0010-testing-strategy-two-ios-versions.md) says integration tests against a real homeserver are out of scope
 until a test server exists. The staging homeserver `https://matrix.stg.lin-saas.com` is now the development
-homeserver ([ADR 0016](0016-password-login-debug-builds.md)) and has test accounts. CI must not hold account
+homeserver ([ADR 0019](0019-password-login-debug-builds.md)) and has test accounts. CI must not hold account
 credentials, and the project has no secret scanner ([Constraints](../engineering/constraints.md)).
 
 ## Decision

@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: "ADR 0016: Offer password login in Debug builds only"
+title: "ADR 0019: Offer password login in Debug builds only"
 description: "Debug builds sign in with m.login.password against the staging homeserver behind #if DEBUG; Release stays SSO-only as ADR 0008 says."
 tags: [adr, authentication, security]
 status: draft
 ---
-# ADR 0016: Offer password login in Debug builds only
+# ADR 0019: Offer password login in Debug builds only
 
 **Status:** Accepted by the project owner, 2026-11-12 (TWAK-62). Partly amends [ADR 0008](0008-authentication-sso-and-discovery.md) for Debug builds only.
 

@@ -8,7 +8,7 @@ status: draft
 # ADR 0008: Sign in with SSO after server discovery
 
 **Status:** Accepted by the project owner, 2026-11-11.
-**Partly amended by [ADR 0016](0016-password-login-debug-builds.md) (Debug builds only), 2026-11-12.**
+**Partly amended by [ADR 0019](0019-password-login-debug-builds.md) (Debug builds only), 2026-11-12.**
 
 ## Context
 Observed on `matrix.linagora.com` (2026-11-11): the homeserver offers `m.login.sso` with identity provider

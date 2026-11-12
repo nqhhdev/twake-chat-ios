@@ -26,7 +26,7 @@ no-warnings rule are enforced today by the `Package.swift` files and the build s
 | Every change in behaviour comes with a test | Review; CI job `ci` runs the tests | [Test](../workflows/test.md) |
 | Shared components pass snapshot tests on iOS 18 and iOS 26 | CI | [ADR 0010](../adr/0010-testing-strategy-two-ios-versions.md) |
 | The Matrix SDK is pinned to an exact version; upgrades are their own pull request | `Package.resolved`, review; `scripts/check-architecture.sh` rule 5 (a `Package.swift` that declares the SDK uses `exact:`) | [ADR 0003](../adr/0003-matrix-rust-sdk.md) |
-| Password login only in Debug builds | `#if DEBUG` in the app target's composition root; review | [ADR 0016](../adr/0016-password-login-debug-builds.md) |
+| Password login only in Debug builds | `#if DEBUG` in the app target's composition root; review | [ADR 0019](../adr/0019-password-login-debug-builds.md) |
 | No secrets in source or committed configuration | Review; a secret scanner is not chosen | Not written yet |
 | No public App Store release until the project owner accepts the feature gap; TestFlight and internal builds only | Review, release process | [ADR 0012](../adr/0012-reuse-flutter-bundle-identifier.md) |
 | The Flutter app's leftover session, files and Keychain items are removed on first launch | A test, once the code exists | [ADR 0012](../adr/0012-reuse-flutter-bundle-identifier.md) |

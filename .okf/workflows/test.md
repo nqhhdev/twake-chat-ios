@@ -63,7 +63,7 @@ tests again. Snapshot and integration tests do not run in CI.
 | Kind | Where | Runs on |
 |---|---|---|
 | Snapshot tests of `DesignSystem` | `DesignSystem` test target; the tool is not chosen | Not decided; ADR 0010 asks for iOS 18 and iOS 26 |
-| Integration tests with a homeserver | Opt-in, local only: staging credentials from `~/.factos/secrets/twake-chat-ios-staging.env` or the `MATRIX_HOMESERVER`, `MATRIX_USER`, `MATRIX_PASSWORD` environment variables; a test skips when they are absent ([ADR 0017](../adr/0017-opt-in-local-staging-integration-tests.md)) | A developer's machine; never CI |
+| Integration tests with a homeserver | Opt-in, local only: staging credentials from `~/.factos/secrets/twake-chat-ios-staging.env` or the `MATRIX_HOMESERVER`, `MATRIX_USER`, `MATRIX_PASSWORD` environment variables; a test skips when they are absent ([ADR 0020](../adr/0020-opt-in-local-staging-integration-tests.md)) | A developer's machine; never CI |
 
 ## Writing a test for a view model
 1. Create fakes of the Domain protocols the view model needs.
