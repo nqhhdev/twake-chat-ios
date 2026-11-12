@@ -110,4 +110,34 @@ struct KeychainSessionStoreTests {
     }
     #expect(try store.load() == nil)
   }
+
+  /// Refreshed tokens replace the saved session of the same user and device (TWAK-64, the SDK's session delegate).
+  @Test func refreshedTokensUpdateTheSameSession() throws {
+    defer { try? store.delete() }
+    try store.save(session(accessToken: "token-1", refreshToken: "refresh-1"))
+    let refreshed = session(accessToken: "token-2", refreshToken: "refresh-2")
+    #expect(try store.saveRefreshedTokens(refreshed))
+    #expect(try store.load() == refreshed)
+  }
+
+  /// A refresh that arrives after sign-out deleted the item (the race TWAK-63 deferred) does not bring it back.
+  @Test func refreshedTokensAfterSignOutAreDropped() throws {
+    try store.save(session(accessToken: "token-1", refreshToken: "refresh-1"))
+    try store.delete()
+    #expect(try !store.saveRefreshedTokens(session(accessToken: "token-2", refreshToken: "refresh-2")))
+    #expect(try store.load() == nil)
+  }
+
+  /// Refreshed tokens of another device never replace the session that is saved now.
+  @Test func refreshedTokensOfAnotherDeviceAreDropped() throws {
+    defer { try? store.delete() }
+    let saved = session(accessToken: "token-1", refreshToken: "refresh-1")
+    try store.save(saved)
+    let other = StoredSession(
+      userId: "@alice:example.org", deviceId: "OTHER",
+      homeserverURL: URL(string: "https://matrix.example.org")!,
+      accessToken: "token-2", refreshToken: "refresh-2")
+    #expect(try !store.saveRefreshedTokens(other))
+    #expect(try store.load() == saved)
+  }
 }

@@ -67,7 +67,8 @@ check "TwakeChatTests is hosted by the app, MatrixDataTests is not (Debug and Re
   "[ \$(grep -c 'TEST_HOST = \"\$(BUILT_PRODUCTS_DIR)/TwakeChat.app/' '$PBX') -eq 2 ]"
 check "the project's test targets compile the synchronized Tests/TwakeChatTests and Tests/MatrixDataTests folders" \
   bash -c "grep -q 'path = Tests/TwakeChatTests;' '$PBX' && grep -q 'path = Tests/MatrixDataTests;' '$PBX'"
-# The package products the MatrixDataTests native target depends on: MatrixData and nothing else.
+# The package products the MatrixDataTests native target depends on: MatrixData, plus Domain and AppShared whose types
+# the mapper tests use directly (TWAK-64: once TwakeChatTests links MatrixData too, Xcode builds them as frameworks).
 matrix_test_products() {
   awk 'index($0, "/* MatrixDataTests */ = {") { c = 1; next }
        c { c = 0; t = ($0 ~ /isa = PBXNativeTarget;/) }
@@ -75,7 +76,7 @@ matrix_test_products() {
        p && /\);/ { exit }
        p { print $3 }' "$PBX"
 }
-check "MatrixDataTests links the MatrixData product only" test "$(matrix_test_products)" = MatrixData
+check "MatrixDataTests links MatrixData, Domain and AppShared only" test "$(matrix_test_products | sort | tr '\n' ' ')" = "AppShared Domain MatrixData "
 # Constraints row 5: the test bundles inherit the project's Swift 6, strict concurrency, warnings-as-errors and
 # iOS 18.0 settings. Their own build configurations must not set any of them.
 test_target_settings() {
@@ -95,7 +96,8 @@ check "test bundles set none of SWIFT_VERSION, SWIFT_STRICT_CONCURRENCY, SWIFT_T
 # hosted Keychain round trips, which need the app's entitlements.
 allowed_test_imports() {
   case "$1" in
-    TwakeChat) echo "Testing Foundation TwakeChat SwiftUI AppShared" ;;
+    TwakeChat) echo "Testing Foundation TwakeChat SwiftUI AppShared Domain MatrixData" ;; # TWAK-64: hosted staging test
+    MatrixData) echo "Testing Foundation MatrixData Domain AppShared" ;; # TWAK-64: mapper tests
     *) echo "Testing Foundation $1" ;;
   esac
 }
@@ -118,8 +120,12 @@ for m in Domain AppShared MatrixData DesignSystem TwakeChat; do
   if [ -z "$bad" ]; then pass "${m}Tests: imports only $(allowed_test_imports "$m")"; else fail "${m}Tests: imports not allowed:$bad"; fi
 done
 check "TwakeChatTests reaches the app with @testable import" grep -rq '^@testable import TwakeChat$' Tests/TwakeChatTests
+# TWAK-64: MatrixDataTests may use @testable import MatrixData, for the internal mapper whose signatures name SDK types
+# and so cannot be public (ADR 0006). It still never imports the SDK.
 check "package tests use the public API (no @testable import)" bash -c \
-  "! grep -rq '@testable' Packages/*/Tests Tests/MatrixDataTests"
+  "! grep -rq '@testable' Packages/*/Tests"
+check "MatrixDataTests uses @testable only for MatrixData" bash -c \
+  "! grep -rh '@testable' Tests/MatrixDataTests | grep -vqx '@testable import MatrixData'"
 
 # ---------------------------------------------------------------- no new dependency
 # TWAK-48: the Matrix SDK, pinned exactly in MatrixData, is the only remote package (ADR 0003, ADR 0006).

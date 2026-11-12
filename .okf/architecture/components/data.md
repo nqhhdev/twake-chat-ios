@@ -9,7 +9,7 @@ status: draft
 
 | | |
 |---|---|
-| Folder | `Packages/MatrixData/` (the package exists and imports the SDK; no proxy yet) |
+| Folder | `Packages/MatrixData/`: `Proxies/ClientProxy.swift`, `Repositories/MatrixAuthenticationRepository.swift`, `Mappers/UserSessionMapper.swift` (TWAK-64) |
 | Holds | Proxies around SDK objects, repository implementations, mappers from SDK types to Domain models |
 | May import | [Domain](domain.md), `AppShared`, the Matrix SDK |
 | Must not import | [Features](ui.md), [Design System](design-system.md) |
@@ -20,12 +20,27 @@ Each long-lived SDK object is wrapped once, behind a protocol, so the rest of th
 
 | Proxy | Wraps | Responsibility |
 |---|---|---|
-| `ClientProxy` | the SDK client | Session restore, sync start and stop, sign-out, pusher registration |
+| `ClientProxy` | the SDK client | **Implemented (TWAK-64):** password login, session restore and sign-out. Later: sync start and stop, pusher registration |
 | `RoomListProxy` | the SDK room list | The ordered list of rooms as a stream of Domain `RoomSummary` values |
 | `RoomProxy` | one room | Send, reply, react, mark as read, room state |
 | `TimelineProxy` | one room's timeline | Applies the SDK's incremental updates and publishes `[TimelineItem]`; pagination |
 | `EncryptionProxy` | the SDK encryption API | Recovery state, entering a recovery key, session verification |
 | `NotificationProxy` | the SDK notification client | Fetch and decrypt one event for the [Notification Service Extension](../containers/notification-service-extension.md) |
+
+**What exists (TWAK-64).** `ClientProxy` is a `final class` with no public SDK member. It builds the client with
+`sessionPaths` under an injected store directory (`data/` and `cache/`), `discoverNative` sliding sync and the
+`multiProcess` cross-process lock. The pinned SDK refuses that lock without a session delegate, so
+`KeychainClientSessionDelegate` gives the SDK the saved session and saves refreshed tokens with
+`KeychainSessionStore.saveRefreshedTokens`, which only updates the item of the same user and device and never adds
+one: a refresh after sign-out cannot bring the session back. `MatrixAuthenticationRepository` (an actor) implements
+the Domain `AuthenticationRepository`. Password login is compiled in Debug builds only
+([ADR 0019](../../adr/0019-password-login-debug-builds.md)); Release reports `unknown`. The store holds one session, so
+login is refused (`unknown`) while a session is saved or a client runs, and a restore keeps the running client. It saves
+the session, including its sliding sync version, in `KeychainSessionStore` and exposes the signed-in `clientProxy` for
+later cards. `logout()` first restores a client when none runs yet (cold launch), so the server still signs the device
+out; it deletes the store directory and the Keychain item even when the server call fails, then reports that failure. `UserSessionMapper` is internal: it maps `M_FORBIDDEN` to `invalidCredentials`,
+connection failures and an unreachable server to `serverUnreachable`, a bad server name or well-known to
+`invalidHomeserverURL`, and everything else to `unknown`. No caller wires it into the app yet.
 
 SDK class and method names are not written here on purpose: they change between releases and must be read from the
 pinned version when the code is written. For the pinned version they are in

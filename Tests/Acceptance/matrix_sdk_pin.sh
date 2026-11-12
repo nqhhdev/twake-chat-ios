@@ -70,12 +70,13 @@ check "no Matrix SDK import in Tests/ (MatrixDataTests, TwakeChatTests)" bash -c
 # @_exported would hand every SDK type to Domain's and the app's importers of MatrixData (ADR 0006).
 check "MatrixData does not re-export the SDK (@_exported)" bash -c \
   "! grep -rnE --include='*.swift' '@_exported' Packages/MatrixData/Sources"
-# ADR 0011 and the card: no proxy, protocol or Domain type yet. MatrixData declares only its module marker, and its
-# public API names no SDK type.
-decls="$(grep -rhE '^[[:space:]]*(public |internal |private |fileprivate |package |open |static |final )*(class|struct|enum|protocol|actor|extension|typealias|func|let|var)[[:space:]]' Packages/MatrixData/Sources | sed -E 's/[[:space:]]*\{.*//; s/^[[:space:]]+//')"
+# ADR 0011 and the card: no placeholder. The module marker file declares only MatrixDataModule. TWAK-64 narrowed this
+# check from all of MatrixData's sources to the marker file, because ClientProxy and MatrixAuthenticationRepository now
+# exist beside it (proxies arrive with the features that need them, ADR 0006).
+decls="$(grep -hE '^[[:space:]]*(public |internal |private |fileprivate |package |open |static |final )*(class|struct|enum|protocol|actor|extension|typealias|func|let|var)[[:space:]]' Packages/MatrixData/Sources/MatrixData/MatrixData.swift | sed -E 's/[[:space:]]*\{.*//; s/^[[:space:]]+//')"
 expected="$(printf '%s\n' 'public enum MatrixDataModule' 'public static let dependencies = [DomainModule.name, AppSharedModule.name]')"
-[ "$decls" = "$expected" ] && pass "MatrixData declares only MatrixDataModule and its dependencies (no proxy or placeholder)" \
-  || fail "MatrixData declares more than its module marker: $(printf '%s' "$decls" | tr '\n' ';')"
+[ "$decls" = "$expected" ] && pass "MatrixData.swift declares only MatrixDataModule and its dependencies (no placeholder)" \
+  || fail "MatrixData.swift declares more than its module marker: $(printf '%s' "$decls" | tr '\n' ';')"
 
 # ---------------------------------------------------------------- the checkout is the tag
 if [ ! -d "$CHECKOUT" ]; then
@@ -87,6 +88,32 @@ check "the checkout exists ($CHECKOUT)" test -f "$CHECKOUT/Sources/MatrixRustSDK
 check "the checkout is at the pinned revision" bash -c "[ \"\$(git -C '$CHECKOUT' rev-parse HEAD)\" = '$PIN' ]"
 check "the pinned revision is the commit of tag $TAG" bash -c \
   "[ \"\$(git -C '$CHECKOUT' rev-parse '$TAG^{commit}')\" = '$PIN' ]"
+
+# ADR 0006: no public or open declaration anywhere in MatrixData's sources names a type the pinned SDK declares
+# (TWAK-64 narrowed the marker check above, so this covers ClientProxy, the repository and every later file).
+python3 -I - "$CHECKOUT/Sources/MatrixRustSDK" Packages/MatrixData/Sources <<'PY'
+import os, re, sys
+sdk_dir, src_dir = sys.argv[1], sys.argv[2]
+names = set()
+for f in os.listdir(sdk_dir):
+    if f.endswith(".swift"):
+        names |= set(re.findall(r"^\s*(?:public|open)\s+(?:final\s+)?(?:class|struct|enum|protocol|typealias)\s+(\w+)",
+                                open(os.path.join(sdk_dir, f)).read(), re.M))
+bad = []
+for root, _, files in os.walk(src_dir):
+    for f in files:
+        if not f.endswith(".swift"): continue
+        path = os.path.join(root, f)
+        for n, line in enumerate(open(path), 1):
+            if re.match(r"^\s*(?:@\w+\s+)*(?:public|open)\b", line):
+                hit = sorted(set(re.findall(r"\w+", line.split("//")[0])) & names)
+                if hit: bad.append(f"{path}:{n} {hit}")
+ok = len(names) > 100
+print(("ok   " if ok and not bad else "FAIL ") + f"MatrixData public declarations name no SDK type ({len(names)} SDK types)"
+      + ("" if not bad else ": " + "; ".join(bad)))
+sys.exit(0 if ok and not bad else 1)
+PY
+[ $? -eq 0 ] || FAILURES=$((FAILURES + 1))
 
 # ---------------------------------------------------------------- the API page
 check "$PAGE exists" test -f "$PAGE"

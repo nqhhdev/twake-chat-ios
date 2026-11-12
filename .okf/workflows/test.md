@@ -19,6 +19,7 @@ Run every command from the repository root.
 | Test the test script itself | `scripts/tests/test_test.sh` (stub `swift`, `xcrun` and `xcodebuild`; no Xcode needed) |
 | Architecture rules only (ADRs 0002, 0003, 0005, 0006; see [Constraints](../engineering/constraints.md)) | `scripts/check-architecture.sh [ROOT]` |
 | Test the architecture check on its fixture trees | `scripts/tests/check_architecture_test.sh` (trees in `scripts/tests/architecture-fixtures/`) |
+| Staging integration test only ([ADR 0020](../adr/0020-opt-in-local-staging-integration-tests.md)) | `TEST_RUNNER_MATRIX_HOMESERVER=https://matrix.stg.lin-saas.com TEST_RUNNER_MATRIX_USER=stgtest1 TEST_RUNNER_MATRIX_PASSWORD=… xcodebuild test -project TwakeChat.xcodeproj -scheme TwakeChat -testPlan TwakeChat -only-testing:TwakeChatTests/AuthenticationIntegrationTests -destination 'platform=iOS Simulator,id=<iOS 26 simulator id>'`. Without the variables, the test reads `~/.factos/secrets/twake-chat-ios-staging.env` |
 
 `scripts/test.sh` runs in this order:
 1. `scripts/check-architecture.sh` on the repository, then `scripts/tests/check_architecture_test.sh`. Both are text
@@ -61,6 +62,15 @@ tests again. Snapshot and integration tests do not run in CI.
   entitlements, which host `swift test` does not have. They use the group from the app's `KeychainAccessGroup`
   Info.plist key and the test-only service `app.twake.ios.chat.tests.keychain-session-store`, so they never touch a
   real session. The simulator signs the app locally ("Sign to Run Locally"), which is enough for the group (TWAK-63).
+- `MatrixDataTests` may use `@testable import MatrixData` for the internal `UserSessionMapper`. Its signatures name
+  SDK types, so it cannot be public ([ADR 0006](../adr/0006-sdk-behind-proxy-protocols.md)). The tests build the SDK
+  values through the mapper or as implicit members and never import the SDK (`scripts/check-architecture.sh` rule 1).
+  The target links `Domain` and `AppShared` too, because their types appear in those tests.
+- The staging integration test `AuthenticationIntegrationTests` runs hosted in `TwakeChatTests`, which links
+  `MatrixData` and `Domain` for it. The unhosted `MatrixDataTests` bundle has no Keychain entitlement: every Keychain
+  call there fails with `-34018`, even without an access group (TWAK-64). The test uses the app's Keychain group, the
+  service `app.twake.ios.chat.tests.matrix-authentication` and a temporary store directory. It never prints the
+  credentials.
 - Swift Testing only (`import Testing`, `@Test`, `#expect`), and no mocking library
   ([ADR 0010](../adr/0010-testing-strategy-two-ios-versions.md)).
 
@@ -68,7 +78,23 @@ tests again. Snapshot and integration tests do not run in CI.
 | Kind | Where | Runs on |
 |---|---|---|
 | Snapshot tests of `DesignSystem` | `DesignSystem` test target; the tool is not chosen | Not decided; ADR 0010 asks for iOS 18 and iOS 26 |
-| Integration tests with a homeserver | Opt-in, local only: staging credentials from `~/.factos/secrets/twake-chat-ios-staging.env` or the `MATRIX_HOMESERVER`, `MATRIX_USER`, `MATRIX_PASSWORD` environment variables; a test skips when they are absent ([ADR 0020](../adr/0020-opt-in-local-staging-integration-tests.md)) | A developer's machine; never CI |
+| More integration tests with a homeserver | Opt-in, local only, like `AuthenticationIntegrationTests` (below) | A developer's machine; never CI |
+
+## Staging integration tests
+`TwakeChatTests/AuthenticationIntegrationTests` (TWAK-64) logs in to staging, restores the saved session in a fresh
+client on the same store, then logs out. It checks that the store directory and the Keychain item are gone
+([ADR 0020](../adr/0020-opt-in-local-staging-integration-tests.md)).
+- **Credentials.** It reads `MATRIX_HOMESERVER`, `MATRIX_USER` and `MATRIX_PASSWORD` from the environment, and
+  otherwise from `~/.factos/secrets/twake-chat-ios-staging.env` (`KEY=value` lines). Inside the simulator, xcodebuild
+  passes only variables prefixed with `TEST_RUNNER_` (it strips the prefix; the test accepts both spellings), and `~`
+  is the simulated device's home, so the test finds the file through `SIMULATOR_HOST_HOME`. When a run fails or is
+  skipped after login, the test awaits a sign-out of the saved session before it ends. `MATRIX_USER` is sent unchanged: give a real account (`stgtest1` …
+  `stgtest20`), not the bare `stgtest` prefix.
+- **Skipping.** Without the values, it skips with a message that names them, so CI and `scripts/test.sh` stay green.
+  When staging rejects the credentials (`invalidCredentials`), it is cancelled with `Test.cancel` and reported as
+  skipped, not failed (owner's decision of 2026-11-12).
+- **When the env file exists.** Every `scripts/test.sh` run on that machine logs in to staging. It fails when
+  staging is down or any step after login fails.
 
 ## Writing a test for a view model
 1. Create fakes of the Domain protocols the view model needs.

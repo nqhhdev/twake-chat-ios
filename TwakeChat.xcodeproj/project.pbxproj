@@ -13,6 +13,10 @@
 		A1000000000000000000B004 /* MatrixData in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D004 /* MatrixData */; };
 		A10000000000000000000071 /* MatrixData in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000072 /* MatrixData */; };
 		A10000000000000000000081 /* AppShared in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000082 /* AppShared */; };
+		A10000000000000000000083 /* MatrixData in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000084 /* MatrixData */; };
+		A10000000000000000000089 /* Domain in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000008A /* Domain */; };
+		A10000000000000000000085 /* Domain in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000086 /* Domain */; };
+		A10000000000000000000087 /* AppShared in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000088 /* AppShared */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -85,6 +89,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000081 /* AppShared in Frameworks */,
+				A10000000000000000000083 /* MatrixData in Frameworks */,
+				A10000000000000000000089 /* Domain in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -93,6 +99,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000071 /* MatrixData in Frameworks */,
+				A10000000000000000000085 /* Domain in Frameworks */,
+				A10000000000000000000087 /* AppShared in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -179,6 +187,8 @@
 			name = TwakeChatTests;
 			packageProductDependencies = (
 				A10000000000000000000082 /* AppShared */,
+				A10000000000000000000084 /* MatrixData */,
+				A1000000000000000000008A /* Domain */,
 			);
 			productName = TwakeChatTests;
 			productReference = A10000000000000000000060 /* TwakeChatTests.xctest */;
@@ -202,6 +212,8 @@
 			name = MatrixDataTests;
 			packageProductDependencies = (
 				A10000000000000000000072 /* MatrixData */,
+				A10000000000000000000086 /* Domain */,
+				A10000000000000000000088 /* AppShared */,
 			);
 			productName = MatrixDataTests;
 			productReference = A10000000000000000000070 /* MatrixDataTests.xctest */;
@@ -560,6 +572,22 @@
 			productName = MatrixData;
 		};
 		A10000000000000000000082 /* AppShared */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AppShared;
+		};
+		A10000000000000000000084 /* MatrixData */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MatrixData;
+		};
+		A1000000000000000000008A /* Domain */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Domain;
+		};
+		A10000000000000000000086 /* Domain */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Domain;
+		};
+		A10000000000000000000088 /* AppShared */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = AppShared;
 		};

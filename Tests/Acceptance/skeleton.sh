@@ -41,7 +41,8 @@ allowed_imports() {
     Domain) echo "Foundation" ;;
     AppShared) echo "Foundation Security OSLog" ;;
     DesignSystem) echo "SwiftUI" ;;
-    MatrixData) echo "Domain AppShared MatrixRustSDK" ;; # the Matrix SDK, added by TWAK-48
+    MatrixData) echo "Foundation Domain AppShared MatrixRustSDK" ;; # the Matrix SDK, added by TWAK-48; Foundation for
+    # the URL and FileManager the client proxy needs (TWAK-64), as Domain and AppShared already use it
   esac
 }
 platforms_of() { grep -oE '\.(iOS|macOS|tvOS|watchOS|visionOS)\(\.v[0-9_]+\)' "Packages/$1/Package.swift" | sort | tr '\n' ' ' | sed 's/ $//'; }

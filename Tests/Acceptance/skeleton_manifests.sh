@@ -100,6 +100,8 @@ for p in "${PACKAGES[@]}"; do
   case "$p" in
     Domain) want="Sources/Domain/Domain.swift Sources/Domain/Models/UserSession.swift Sources/Domain/Repositories/AuthenticationError.swift Sources/Domain/Repositories/AuthenticationRepository.swift" ;;
     AppShared) want="Sources/AppShared/AppGroupContainer.swift Sources/AppShared/AppShared.swift Sources/AppShared/KeychainSessionStore.swift" ;;
+    # TWAK-64 adds the client proxy, the authentication repository and their mapper.
+    MatrixData) want="Sources/MatrixData/Mappers/UserSessionMapper.swift Sources/MatrixData/MatrixData.swift Sources/MatrixData/Proxies/ClientProxy.swift Sources/MatrixData/Repositories/MatrixAuthenticationRepository.swift" ;;
     *) want="Sources/$p/$p.swift" ;;
   esac
   [ "$files" = "$want" ] && pass "$p: source files are exactly '$want'" \

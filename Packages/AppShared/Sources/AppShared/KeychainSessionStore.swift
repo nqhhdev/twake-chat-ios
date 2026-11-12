@@ -10,15 +10,20 @@ public struct StoredSession: Codable, Sendable, Equatable {
   public let homeserverURL: URL
   public let accessToken: String
   public let refreshToken: String?
+  /// The sliding sync version the session was created with, as MatrixData names it, so a restore uses the same one.
+  /// `nil` in a record saved before the field existed.
+  public let slidingSyncVersion: String?
 
   public init(
-    userId: String, deviceId: String, homeserverURL: URL, accessToken: String, refreshToken: String?
+    userId: String, deviceId: String, homeserverURL: URL, accessToken: String,
+    refreshToken: String?, slidingSyncVersion: String? = nil
   ) {
     self.userId = userId
     self.deviceId = deviceId
     self.homeserverURL = homeserverURL
     self.accessToken = accessToken
     self.refreshToken = refreshToken
+    self.slidingSyncVersion = slidingSyncVersion
   }
 }
 
@@ -57,7 +62,7 @@ public struct KeychainSessionStore: Sendable {
   /// Saves the session of a new sign-in, replacing any saved one.
   /// When the item is missing it is added; if another process (the app or the extension) adds it in between, the add
   /// reports a duplicate and the save falls back to one more update instead of failing.
-  /// Token refresh is out of this card's scope: a later card adds it (and its race with sign-out) when it is needed.
+  /// Refreshed tokens go through `saveRefreshedTokens(_:)` instead, which never adds an item.
   public func save(_ session: StoredSession) throws {
     let data = try encode(session)
     let label = Self.label(for: session)
@@ -84,6 +89,21 @@ public struct KeychainSessionStore: Sendable {
       }
     default:
       throw KeychainSessionStoreError(status: status)
+    }
+  }
+
+  /// Replaces the saved session with refreshed tokens of the same user and device, and never adds an item. The update
+  /// matches the item's user-and-device label in one Keychain call, so once sign-out has deleted the item (in this
+  /// process or another), a late refresh cannot bring the session back. Returns whether an item was updated.
+  @discardableResult
+  public func saveRefreshedTokens(_ session: StoredSession) throws -> Bool {
+    var query = baseQuery()
+    query[kSecAttrLabel as String] = Self.label(for: session)
+    let status = update(try encode(session), label: Self.label(for: session), matching: query)
+    switch status {
+    case errSecSuccess: return true
+    case errSecItemNotFound: return false
+    default: throw KeychainSessionStoreError(status: status)
     }
   }
 
