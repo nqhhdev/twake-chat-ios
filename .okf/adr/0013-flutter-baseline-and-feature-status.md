@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: "ADR 0013: Port behaviour from one pinned Flutter commit"
-description: "Behaviour is ported only from twake-on-matrix origin/main at 5a3e9e849; every Flutter feature is marked kept, deferred or dropped."
+description: "Proposed: behaviour is ported only from twake-on-matrix origin/main at 5a3e9e849; every Flutter feature is marked kept, deferred or dropped."
 tags: [adr, scope, migration]
 status: draft
 ---
