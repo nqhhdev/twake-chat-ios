@@ -52,6 +52,6 @@ status: stable
 | [troubleshooting.md](troubleshooting.md) | Reference | Common failure symptoms, each mapped to its likely cause and the page that explains it. | [troubleshooting] |
 | [workflows/adapters.md](workflows/adapters.md) | Reference | Every coding agent is pointed at .okf/index.md; no agent gets its own copy of the knowledge. | [agents, okf] |
 | [workflows/add-a-feature.md](workflows/add-a-feature.md) | Workflow | The planned procedure for adding a feature across Domain, MatrixData and a feature package. | [feature, procedure] |
-| [workflows/build.md](workflows/build.md) | Workflow | How the project will be built and checked; commands are planned until the Xcode project exists. | [build, ci] |
+| [workflows/build.md](workflows/build.md) | Workflow | How to build the TwakeChat app and the local packages, and the build settings that keep Swift 6 strict and warning-free. | [build, ci] |
 | [workflows/maintain-the-knowledge-base.md](workflows/maintain-the-knowledge-base.md) | Workflow | How to add to, change and verify the .okf/ bundle so it stays true to the code and conformant to OKF v0.2. | [workflow, okf, documentation] |
 | [workflows/test.md](workflows/test.md) | Workflow | How unit and snapshot tests will be run, and on which iOS versions. | [test, ci, ios-26] |

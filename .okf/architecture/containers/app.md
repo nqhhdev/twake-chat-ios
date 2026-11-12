@@ -7,7 +7,9 @@ status: draft
 ---
 # App
 
-> Planned layout. Nothing here exists in the repository yet.
+> Partly built. The `TwakeChat` app target (an empty root view) and the `Domain`, `AppShared`, `DesignSystem` and
+> `MatrixData` packages exist (TWAK-34). The Notification Service Extension, the `Features/` packages, the composition
+> root, the coordinators, the `.xcconfig` files and the shared App Group and Keychain group are still planned.
 
 | | |
 |---|---|

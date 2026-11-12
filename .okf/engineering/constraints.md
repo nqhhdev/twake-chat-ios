@@ -8,7 +8,9 @@ status: draft
 # Constraints
 
 A rule nobody enforces is a wish: the tool is named, or "review" is written honestly. To change a rule, write or
-supersede an [ADR](../adr/index.md) first. No code exists yet, so every "Enforced by" below is the plan.
+supersede an [ADR](../adr/index.md) first. The package dependency rule and the Swift 6, strict concurrency and
+no-warnings rule are enforced today by the `Package.swift` files and the build settings; CI is not set up yet, and
+every other "Enforced by" below is still the plan until the code it checks exists.
 
 | Rule | Enforced by | Owner |
 |---|---|---|

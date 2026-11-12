@@ -124,9 +124,18 @@ expect "unknown argument exits 2" 2 "$r/scripts/lint.sh" --frobnicate
 expect "unknown argument did not format" 0 \
   diff "$work/bad.swift" "$r/Packages/Core/Sources/Core/Bad.swift"
 
-# 11. The committed style is exactly swift-format's defaults, as build.md states.
+# 11. The committed style is swift-format's defaults, as build.md states: every setting and rule in
+# .swift-format has the toolchain's default value. A newer swift-format may add options the file does not
+# list yet; those take their defaults, so only the values the file does list are compared.
 xcrun swift-format dump-configuration > "$work/defaults.json" 2> /dev/null
-expect ".swift-format equals the toolchain defaults" 0 diff "$work/defaults.json" "$repo/.swift-format"
+expect ".swift-format equals the toolchain defaults" 0 python3 -I -c '
+import json, sys
+def same(c, d):
+    if isinstance(c, dict):
+        return isinstance(d, dict) and all(k in d and same(v, d[k]) for k, v in c.items())
+    return c == d
+sys.exit(0 if same(json.load(open(sys.argv[1])), json.load(open(sys.argv[2]))) else 1)
+' "$repo/.swift-format" "$work/defaults.json"
 
 # 12. A lint-only finding, one `format` cannot repair (a naming rule), still fails: --strict applies to
 # every rule, not only to whitespace.
@@ -197,6 +206,86 @@ expect "--fix gets the same file list as lint" 0 diff "$work/lint.files" "$work/
 # 17. A swift-format failure in --fix mode (for example, a file it cannot save) makes the script fail.
 expect "--fix fails when swift-format fails" nonzero \
   env PATH="$fake:$PATH" FAKE_XCRUN_LOG="$work/fail.args" FAKE_XCRUN_EXIT=1 "$r/scripts/lint.sh" --fix
+
+# 18. Without the toolchain (no `xcrun` on PATH) there are files to lint, so the script must fail rather
+# than report a clean tree it never checked.
+nobin="$work/no-xcrun-bin"
+mkdir -p "$nobin"
+for tool in bash dirname find; do
+  ln -s "$(command -v "$tool")" "$nobin/$tool"
+done
+r=$(new_repo no-toolchain)
+put "$r" Packages/Core/Sources/Core/Good.swift "$good"
+expect "a missing xcrun fails instead of passing" nonzero env PATH="$nobin" "$r/scripts/lint.sh"
+expect "--fix with a missing xcrun fails" nonzero env PATH="$nobin" "$r/scripts/lint.sh" --fix
+
+# 19. Only regular files are handed to swift-format: a directory whose name ends in .swift (a fixture or
+# resource folder) is not, while the Swift files inside it are.
+r=$(new_repo swift-named-dir)
+put "$r" Packages/Core/Sources/Core.swift/Inner.swift "$good"
+expect "lint with a directory named *.swift" 0 \
+  env PATH="$fake:$PATH" FAKE_XCRUN_LOG="$work/dir.args" "$r/scripts/lint.sh"
+expect "the directory itself is not passed, its Swift file is" 0 \
+  bash -c "[ \"\$(sed '1,/^--\$/d' '$work/dir.args')\" = 'Packages/Core/Sources/Core.swift/Inner.swift' ]"
+r=$(new_repo swift-named-dir-real)
+put "$r" Packages/Core/Sources/Core.swift/Inner.swift "$good"
+expect "a directory named *.swift does not break a real lint run" 0 "$r/scripts/lint.sh"
+
+# 20. --fix with the real formatter brings Xcode-style code (4-space indent, no trailing comma in a
+# multi-line collection, as a generated Package.swift has) into the committed style, and lint then passes.
+# The sandbox-safe twin of case 9: this `xcrun` runs `format --in-place` to stdout and writes the file back
+# itself; every other call goes to the real xcrun, so swift-format, the config and the file list are real.
+real_xcrun="$(command -v xcrun)"
+shim="$work/shim-bin"
+mkdir -p "$shim"
+cat > "$shim/xcrun" <<'EOF'
+#!/bin/bash
+if [ "${1:-} ${2:-} ${3:-}" = "swift-format format --in-place" ]; then
+  shift 3
+  opts=()
+  while [ $# -gt 0 ] && [ "$1" != -- ]; do opts+=("$1"); shift; done
+  [ "${1:-}" = -- ] && shift
+  for f in "$@"; do
+    tmp="$(mktemp "${TMPDIR:-/tmp}/shim.XXXXXX")"
+    "$REAL_XCRUN" swift-format format "${opts[@]}" -- "$f" > "$tmp" || { rm -f "$tmp"; exit 1; }
+    cat "$tmp" > "$f"
+    rm -f "$tmp"
+  done
+  exit 0
+fi
+exec "$REAL_XCRUN" "$@"
+EOF
+chmod +x "$shim/xcrun"
+xcode_pkg=$'// swift-tools-version: 6.0\nimport PackageDescription\n\nlet package = Package(\n    name: "Core",\n    targets: [\n        .target(name: "Core"),\n        .testTarget(name: "CoreTests", dependencies: ["Core"])\n    ]\n)\n'
+r=$(new_repo fix-real)
+put "$r" Packages/Core/Package.swift "$xcode_pkg"
+put "$r" TwakeChat/App/Bad.swift "$bad"
+put "$r" Packages/Core/.build/checkouts/dep/Bad.swift "$bad"
+expect "Xcode-style code fails lint before --fix" nonzero "$r/scripts/lint.sh"
+expect "--fix with the real formatter exits 0" 0 \
+  env PATH="$shim:$PATH" REAL_XCRUN="$real_xcrun" "$r/scripts/lint.sh" --fix
+expect "lint passes after --fix with the real formatter" 0 "$r/scripts/lint.sh"
+expect "--fix rewrote the misformatted file to the committed style" 0 \
+  diff "$work/good.swift" "$r/TwakeChat/App/Bad.swift"
+expect "--fix left the pruned .build tree byte-for-byte alone" 0 \
+  diff "$work/bad.swift" "$r/Packages/Core/.build/checkouts/dep/Bad.swift"
+printf '%s' "$xcode_pkg" | tr -d ' \n,' > "$work/pkg.before"
+tr -d ' \n,' < "$r/Packages/Core/Package.swift" > "$work/pkg.after"
+expect "--fix changed only whitespace and the trailing comma in Package.swift" 0 \
+  diff "$work/pkg.before" "$work/pkg.after"
+
+# 21. A .swift-format that cannot be read (broken JSON, or a value of the wrong type) fails the run instead
+# of quietly linting against swift-format's built-in defaults, for lint and for --fix.
+r=$(new_repo broken-config)
+put "$r" Packages/Core/Sources/Core/Good.swift "$good"
+printf '{ "indentation": ' > "$r/.swift-format"
+expect "a .swift-format that is not valid JSON fails" nonzero "$r/scripts/lint.sh"
+expect "--fix with a .swift-format that is not valid JSON fails" nonzero \
+  env PATH="$shim:$PATH" REAL_XCRUN="$real_xcrun" "$r/scripts/lint.sh" --fix
+expect "--fix with a broken .swift-format left the file alone" 0 \
+  diff "$work/good.swift" "$r/Packages/Core/Sources/Core/Good.swift"
+sed 's/"lineLength" : 100/"lineLength" : "100"/' "$repo/.swift-format" > "$r/.swift-format"
+expect "a .swift-format with a wrongly typed value fails" nonzero "$r/scripts/lint.sh"
 
 echo "$((cases - failures))/$cases passed"
 [ "$failures" -eq 0 ]
