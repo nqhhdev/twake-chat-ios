@@ -18,7 +18,7 @@ Run every command from the repository root unless a step says otherwise.
 | Build a package that also targets macOS | `cd Packages/Domain && swift build`, and the same in `Packages/AppShared` |
 | Build an iOS-only package | `DesignSystem` and `MatrixData` declare iOS only, so build them through the app scheme |
 | Format and lint | swift-format, which ships with Xcode 26 ([ADR 0014](../adr/0014-ci-github-actions-swift-format.md)); see Format and lint below |
-| CI | GitHub Actions on GitHub-hosted macOS runners ([ADR 0014](../adr/0014-ci-github-actions-swift-format.md)); no workflow file yet |
+| CI | `.github/workflows/ci.yml` on GitHub Actions ([ADR 0014](../adr/0014-ci-github-actions-swift-format.md)); see CI below |
 | Release build and signing | Not designed; the Flutter app uses fastlane |
 
 Use any installed iOS 26 simulator: `xcrun simctl list devices available` lists them, and the `OS=` and `name=` values above are examples.
@@ -43,7 +43,30 @@ A build passes when it ends with `** BUILD SUCCEEDED **` and the log has no `war
 - swift-format has no exclude option, so the script builds the file list with `find` and prunes `.build`,
   `DerivedData` and `.swiftpm`. A tree that holds deliberate violations (such as architecture-check fixtures)
   must be added to that prune list in the same change that creates it.
-- No package dependency: swift-format ships with Xcode. Lint does not run in CI yet.
+- No package dependency: swift-format ships with Xcode. CI runs `scripts/lint.sh`; see CI below.
+
+## CI
+`.github/workflows/ci.yml` has one job, `ci`, on every pull request and every push to `main`. A newer run on the same
+ref cancels the older one.
+
+- Runner: the GitHub-hosted `macos-26` image. Xcode is pinned with `sudo xcode-select -s /Applications/Xcode_26.2.app`
+  (`XCODE_VERSION` in the workflow), and the step prints `xcodebuild -version`. To move Xcode, change that one value to
+  a version the image lists.
+- Steps, in order; the first failure stops the job:
+  1. `python3 .okf/tools/okf.py --check`
+  2. `scripts/lint.sh`
+  3. "Tests (host and iOS 26 simulator)": prints the installed iOS 26 runtimes, then `scripts/test.sh` with
+     `SIMULATOR_NAME` set in the workflow (`iPhone 17`). See [Test](test.md).
+  4. "Build app and tests (iOS 18.0 deployment target, no simulator)": `xcodebuild build-for-testing` of the
+     `TwakeChat` scheme and test plan for `generic/platform=iOS Simulator` with `CODE_SIGNING_ALLOWED=NO`. It compiles
+     the app and every test target against the iOS 18.0 deployment target (the log shows `arm64-apple-ios18.0-simulator`)
+     and runs nothing, so the unit tests run once ([ADR 0010](../adr/0010-testing-strategy-two-ios-versions.md)). No
+     iOS 18 runtime is installed (owner decision 2026-11-12).
+- Cache: `~/Library/Caches/org.swift.swiftpm`, keyed on the runner OS, the Xcode version and
+  `hashFiles('**/Package.resolved')`, so package downloads are reused until a `Package.resolved` changes.
+- No secrets and no signing: `permissions: contents: read`, no `secrets.*`, no `environment:`, no account or team.
+- Not in CI: snapshot tests (no tool chosen), integration tests against a homeserver (local only), signing, TestFlight
+  and release lanes, the self-tests in `scripts/tests/`. Branch protection is set by the owner on GitHub.
 
 ## Layout
 - `TwakeChat.xcodeproj` has one app target, `TwakeChat`, and a shared scheme of the same name. The `TwakeChat/` folder is a
