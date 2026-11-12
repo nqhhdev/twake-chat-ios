@@ -9,7 +9,7 @@ status: draft
 
 | | |
 |---|---|
-| Folder | `Packages/MatrixData/` (planned) |
+| Folder | `Packages/MatrixData/` (the package exists and imports the SDK; no proxy yet) |
 | Holds | Proxies around SDK objects, repository implementations, mappers from SDK types to Domain models |
 | May import | [Domain](domain.md), `AppShared`, the Matrix SDK |
 | Must not import | [Features](ui.md), [Design System](design-system.md) |
@@ -28,7 +28,8 @@ Each long-lived SDK object is wrapped once, behind a protocol, so the rest of th
 | `NotificationProxy` | the SDK notification client | Fetch and decrypt one event for the [Notification Service Extension](../containers/notification-service-extension.md) |
 
 SDK class and method names are not written here on purpose: they change between releases and must be read from the
-pinned version when the code is written.
+pinned version when the code is written. For the pinned version they are in
+[Matrix SDK 26.04.01 API](../../references/matrix-sdk-26-04-01-api.md).
 
 ## Errors and threading
 - SDK errors are caught in this layer and rethrown as Domain errors. No SDK error type crosses the boundary.

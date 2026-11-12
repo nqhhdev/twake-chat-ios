@@ -12,7 +12,7 @@ Run every command from the repository root unless a step says otherwise.
 ## Commands
 | Step | Command |
 |---|---|
-| Resolve dependencies | Swift Package Manager through Xcode resolves on the first build. `Package.resolved` is committed once the project has a remote dependency |
+| Resolve dependencies | Swift Package Manager through Xcode resolves on the first build. The Matrix SDK's pin is committed in `Packages/MatrixData/Package.resolved` (run `swift package resolve` there to refresh it). Xcode 27.2 writes no workspace `Package.resolved` for this project, even with a `project.xcworkspace`, so the app build relies on the `exact:` tag, not on a locked revision (TWAK-48) |
 | Build the app, iOS 26 | `xcodebuild build -project TwakeChat.xcodeproj -scheme TwakeChat -destination 'platform=iOS Simulator,OS=26.2,name=iPhone 17'` |
 | Build without a simulator runtime | `xcodebuild build -project TwakeChat.xcodeproj -scheme TwakeChat -destination 'generic/platform=iOS Simulator'` |
 | Build a package that also targets macOS | `cd Packages/Domain && swift build`, and the same in `Packages/AppShared` |

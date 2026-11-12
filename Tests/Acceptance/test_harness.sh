@@ -120,7 +120,12 @@ check "package tests use the public API (no @testable import)" bash -c \
   "! grep -rq '@testable' Packages/*/Tests Tests/MatrixDataTests"
 
 # ---------------------------------------------------------------- no new dependency
-check "no remote package in any Package.swift (no mocking library)" bash -c "! grep -q '\.package(url:' Packages/*/Package.swift"
+# TWAK-48: the Matrix SDK, pinned exactly in MatrixData, is the only remote package (ADR 0003, ADR 0006).
+# Any other remote package (a mocking library included, ADR 0010) still fails.
+check "no remote package in any Package.swift other than MatrixData (no mocking library)" bash -c \
+  "! grep -q '\.package(url:' \$(ls Packages/*/Package.swift | grep -v '^Packages/MatrixData/')"
+check "MatrixData's only remote package is the Matrix SDK, exact 26.04.01 (no mocking library)" bash -c \
+  "[ \"\$(grep -o '\.package(url:[^)]*)' Packages/MatrixData/Package.swift)\" = '.package(url: \"https://github.com/matrix-org/matrix-rust-components-swift\", exact: \"26.04.01\")' ]"
 check "no remote package in the project (no mocking library)" bash -c "! grep -q XCRemoteSwiftPackageReference '$PBX'"
 
 if [ "$FAILURES" -eq 0 ]; then echo "test harness: all checks passed"; exit 0; fi

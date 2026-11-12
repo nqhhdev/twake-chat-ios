@@ -8,3 +8,6 @@ External material this bundle draws on.
 | [Matrix specification](https://spec.matrix.org) | The protocol |
 | [Matrix Rust SDK](https://github.com/matrix-org/matrix-rust-sdk) | The SDK the app is built on |
 | [Twake Chat Flutter app](https://github.com/linagora/twake-on-matrix) | The existing app this one follows for behaviour and scope |
+
+# Concepts
+* [Matrix SDK 26.04.01 API](matrix-sdk-26-04-01-api.md) - The exact matrix-rust-components-swift 26.04.01 names and signatures the login, room list, timeline and send cards need, each cited from the resolved checkout.

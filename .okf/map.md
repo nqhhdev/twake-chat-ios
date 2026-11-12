@@ -51,6 +51,7 @@ status: stable
 | [glossary/repository.md](glossary/repository.md) | Term | A Domain protocol that gives features one kind of data without saying where it comes from. | [architecture] |
 | [glossary/sliding-sync.md](glossary/sliding-sync.md) | Term | The Matrix sync method that loads only the rooms in view; required by the Matrix Rust SDK. | [matrix] |
 | [glossary/state-holder.md](glossary/state-holder.md) | Term | The @Observable object that holds one screen's state and actions. | [architecture] |
+| [references/matrix-sdk-26-04-01-api.md](references/matrix-sdk-26-04-01-api.md) | Reference | The exact matrix-rust-components-swift 26.04.01 names and signatures the login, room list, timeline and send cards need, each cited from the resolved checkout. | [matrix, sdk, reference] |
 | [troubleshooting.md](troubleshooting.md) | Reference | Common failure symptoms, each mapped to its likely cause and the page that explains it. | [troubleshooting] |
 | [workflows/adapters.md](workflows/adapters.md) | Reference | Every coding agent is pointed at .okf/index.md; no agent gets its own copy of the knowledge. | [agents, okf] |
 | [workflows/add-a-feature.md](workflows/add-a-feature.md) | Workflow | The planned procedure for adding a feature across Domain, MatrixData and a feature package. | [feature, procedure] |

@@ -36,7 +36,8 @@ import json, sys
 name, path = sys.argv[1], sys.argv[2]
 m = json.load(open(path))
 # ADR 0005 dependency table, plus the platforms the card asks for.
-deps = {"Domain": [], "AppShared": [], "DesignSystem": [], "MatrixData": ["appshared", "domain"]}
+deps = {"Domain": [], "AppShared": [], "DesignSystem": [],
+        "MatrixData": ["appshared", "domain", "matrix-rust-components-swift"]}
 platforms = {"Domain": [("ios", "18.0"), ("macos", "15.0")], "AppShared": [("ios", "18.0"), ("macos", "15.0")],
              "DesignSystem": [("ios", "18.0")], "MatrixData": [("ios", "18.0")]}
 def report(ok, text):
@@ -49,8 +50,16 @@ modes = m.get("swiftLanguageVersions") or m.get("swiftLanguageModes")
 bad += report(modes in (None, ["6"]), f"package language modes are Swift 6 only (got {modes})")
 got_deps = sorted(next(iter(d.values()))[0]["identity"] for d in m["dependencies"])
 bad += report(got_deps == deps[name], f"package dependencies {got_deps} match ADR 0005 {deps[name]}")
+# TWAK-48: the only remote dependency is the Matrix SDK, in MatrixData alone, pinned exactly (ADR 0003, ADR 0015).
+# SwiftPM evaluates the tag 26.04.01 as the version 26.4.1.
 remote = [d for d in m["dependencies"] if "fileSystem" not in d]
-bad += report(not remote, "every package dependency is a local path (no Matrix SDK yet)")
+want_remote = ([{"identity": "matrix-rust-components-swift",
+                 "url": "https://github.com/matrix-org/matrix-rust-components-swift",
+                 "requirement": {"exact": ["26.4.1"]}}] if name == "MatrixData" else [])
+got_remote = [{"identity": d["sourceControl"][0]["identity"],
+               "url": d["sourceControl"][0]["location"]["remote"][0]["urlString"],
+               "requirement": d["sourceControl"][0]["requirement"]} if "sourceControl" in d else d for d in remote]
+bad += report(got_remote == want_remote, f"remote dependencies {got_remote} (want {want_remote})")
 got_platforms = sorted((x["platformName"], x["version"]) for x in m["platforms"])
 bad += report(got_platforms == platforms[name], f"platforms {got_platforms}")
 targets = m["targets"]
@@ -74,7 +83,8 @@ for t in targets:
     if t["type"] == "test":
         want = [("byName", name, None)]
     else:
-        want = [("product", "Domain", "Domain"), ("product", "AppShared", "AppShared")] if name == "MatrixData" else []
+        want = [("product", "Domain", "Domain"), ("product", "AppShared", "AppShared"),
+                ("product", "MatrixRustSDK", "matrix-rust-components-swift")] if name == "MatrixData" else []
     bad += report(sorted(tdeps) == sorted(want), f"{t['name']} target dependencies {tdeps}")
 sys.exit(1 if bad else 0)
 PY
@@ -100,9 +110,10 @@ for p in "${PACKAGES[@]}"; do
     "[ -z \"\$(find 'Packages/$p/Tests/${p}Tests' -type f ! -name '*.swift' ! -name .DS_Store)\" ]"
 done
 
-# Matrix SDK: no reference in any form (import kinds, @_exported, package reference, product name).
-check "no Matrix SDK name in Swift sources, manifests or the project file" bash -c \
-  "! grep -rnE 'MatrixRust|matrix-rust|MatrixSDK' --include='*.swift' --include='*.pbxproj' --include='*.xcscheme' TwakeChat Packages TwakeChat.xcodeproj"
+# Matrix SDK (TWAK-48): named only in Packages/MatrixData, in its Package.swift and its sources (ADR 0006).
+# .build is excluded: it holds the SDK checkout itself.
+check "no Matrix SDK name in Swift sources, manifests or the project file outside Packages/MatrixData" bash -c \
+  "! grep -rnE 'MatrixRust|matrix-rust|MatrixSDK' --include='*.swift' --include='*.pbxproj' --include='*.xcscheme' --exclude-dir=.build --exclude-dir=MatrixData TwakeChat Packages TwakeChat.xcodeproj"
 check "project has no remote package reference" bash -c "! grep -q XCRemoteSwiftPackageReference '$PBX'"
 check "project has no .xcconfig base configuration (out of scope)" bash -c "! grep -q baseConfigurationReference '$PBX'"
 check "no version check anywhere in the repository's Swift code" bash -c \
