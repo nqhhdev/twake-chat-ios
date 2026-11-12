@@ -45,6 +45,7 @@ tests again. Snapshot and integration tests do not run in CI.
 | `AppSharedTests` | `Packages/AppShared/Tests/AppSharedTests/` | `swift test`, host |
 | `MatrixDataTests` | `Tests/MatrixDataTests/`, a synchronized folder of the project; links the `MatrixData` product, not hosted by the app | test plan, iOS 26 simulator |
 | `DesignSystemTests` | `Packages/DesignSystem/Tests/DesignSystemTests/` | test plan, iOS 26 simulator |
+| `AuthenticationTests` | `Packages/Features/Authentication/Tests/AuthenticationTests/`; fakes in `AuthenticationTestSupport` | test plan, iOS 26 simulator |
 | `TwakeChatTests` | `Tests/TwakeChatTests/`, a synchronized folder of the project | test plan, iOS 26 simulator, hosted by the app |
 
 - `MatrixDataTests` is a project target, not a package test target, because `MatrixData` declares iOS only (its SDK

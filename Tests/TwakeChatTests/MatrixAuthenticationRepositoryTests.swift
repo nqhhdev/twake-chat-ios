@@ -304,7 +304,8 @@ struct MatrixAuthenticationRepositoryTests {
 /// `…/logout` fails with `400 M_UNKNOWN`, anything else is `404 M_UNRECOGNIZED`. `responses` replaces the answer for
 /// a path suffix (for example `/login`). It records each request line and body.
 /// Plain BSD sockets (re-exported by Foundation), one thread per connection; nothing leaves the machine.
-private final class FakeHomeserver: @unchecked Sendable {
+/// Internal, not private: the TWAK-65 root lifecycle tests reuse it.
+final class FakeHomeserver: @unchecked Sendable {
   let url: URL
   private let listening: Int32
   private let responses: [String: (status: String, body: String)]

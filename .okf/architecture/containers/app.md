@@ -10,8 +10,9 @@ status: draft
 > Partly built. The `TwakeChat` app target (an empty root view) and the `Domain`, `AppShared`, `DesignSystem` and
 > `MatrixData` packages exist (TWAK-34). The app target has the App Group `group.app.twake.ios.chat` and the Keychain
 > access group `$(AppIdentifierPrefix)app.twake.ios.chat` in `TwakeChat/TwakeChat.entitlements` (TWAK-63). The
-> Notification Service Extension, the `Features/` packages, the composition root, the coordinators and the `.xcconfig`
-> files are still planned.
+> Notification Service Extension and the `.xcconfig` files are still planned. TWAK-65 adds the first feature package,
+> `Features/Authentication`, the composition root in `TwakeChatApp.swift` and the root coordinator in `RootView.swift`
+> (see [Features Layer](../components/ui.md)).
 
 | | |
 |---|---|

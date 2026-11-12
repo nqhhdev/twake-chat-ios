@@ -160,13 +160,15 @@ linked = set()
 for f in (field(fw[0], 'files') if fw else []):
     ref = field(objs[f], 'productRef')
     if ref and ref in objs: linked.add(field(objs[ref], 'productName'))
-want = {"Domain", "AppShared", "DesignSystem", "MatrixData"}
+# TWAK-65: the app also links its first feature package, Packages/Features/Authentication (ADR 0005).
+want = {"Domain", "AppShared", "DesignSystem", "MatrixData", "Authentication"}
 report(linked == want, f"Frameworks phase links exactly {sorted(want)} (got {sorted(linked)})")
 deps = {field(objs[i], 'productName') for i in field(t, 'packageProductDependencies') or []}
 report(deps == want, f"packageProductDependencies are exactly {sorted(want)} (got {sorted(deps)})")
 proj = [b for b in objs.values() if 'isa = PBXProject' in b][0]
 refs = {field(objs[i], 'relativePath') for i in field(proj, 'packageReferences') or []}
-report(refs == {f"Packages/{n}" for n in want}, f"project package references are the four local packages (got {sorted(refs)})")
+want_refs = {f"Packages/{n}" for n in want - {"Authentication"}} | {"Packages/Features/Authentication"}
+report(refs == want_refs, f"project package references are the four layer packages and Features/Authentication (got {sorted(refs)})")
 sys.exit(1 if bad else 0)
 PY
 [ $? -eq 0 ] || FAILURES=$((FAILURES + 1))

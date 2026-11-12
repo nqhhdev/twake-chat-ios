@@ -85,11 +85,15 @@ check "no Matrix SDK import outside Packages/MatrixData" bash -c "! grep -rnE --
 check "MatrixData imports MatrixRustSDK" grep -qE '^import MatrixRustSDK$' Packages/MatrixData/Sources/MatrixData/MatrixData.swift
 # .build is excluded: `swift test` (TWAK-35) generates a test entry point there that uses @available.
 check "no #available or @available anywhere" bash -c "! grep -rnE --include='*.swift' --exclude-dir=.build '#available|#unavailable|@available' TwakeChat Packages"
-check "no Features package (ADR 0011: created with its first feature)" test ! -e Packages/Features
+# ADR 0011: the Features folder is created with its first feature. TWAK-65 adds it with Authentication, so the lock now
+# checks that the folder holds only the index manifest and that one feature package.
+check "Features holds only the index and Authentication (TWAK-65)" bash -c \
+  "[ \"\$(cd Packages/Features && ls | sort | tr '\\n' ' ')\" = 'Authentication Package.swift Sources ' ]"
 
 # App target
 check "entry point TwakeChat/TwakeChatApp.swift is @main and shows RootView" bash -c \
-  "grep -q '^@main' TwakeChat/TwakeChatApp.swift && grep -q 'RootView()' TwakeChat/TwakeChatApp.swift"
+  "grep -q '^@main' TwakeChat/TwakeChatApp.swift && grep -qE 'RootView\(coordinator: root\)' TwakeChat/TwakeChatApp.swift"
+# TWAK-65: RootView takes the root coordinator, which the composition root builds.
 check "root view has no screen content" bash -c "! grep -qE '\b(Text|Image|Button|Label|List|NavigationStack)\(' TwakeChat/RootView.swift"
 check "project file exists" test -f "$PBX"
 only_value() { # every occurrence of setting $1 has value $2, and there is at least one

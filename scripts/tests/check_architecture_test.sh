@@ -334,5 +334,17 @@ rule_case tester-rule2-crlf 2 Packages/Features/Chat/Sources/Chat/A.swift \
 rule_case tester-rule5-crlf 5 Packages/MatrixData/Package.swift \
   "$(printf '.package(\r\n  url: "%s",\r\n  from: "26.04.01"\r\n)\r' "$sdk_url")"
 
+# TWAK-65: the Features index (Packages/Features/Package.swift) lists feature packages only, and its sources are
+# not taken for a feature called "Sources".
+put features-index-clean Packages/Features/Package.swift '.package(path: "Authentication")'
+put features-index-clean Packages/Features/Sources/Features/Features.swift 'import Authentication'
+clean_case features-index-clean
+rule_case features-index-on-domain 3 Packages/Features/Package.swift '.package(path: "../Domain")'
+rule_case features-index-on-matrixdata 3 Packages/Features/Package.swift '.package(path: "../MatrixData")'
+rule_case features-index-sources-sdk 1 Packages/Features/Sources/Features/A.swift 'import MatrixRustSDK'
+run_tree features-index-on-domain
+expect features-index-message "names the Features index" \
+  grep -q '^Rule 3 (ADR 0005): Packages/Features/Package.swift:[0-9]*: the Features index may depend only on feature packages' <<< "$rule_lines"
+
 echo "$((cases - failures))/$cases passed"
 [ "$cases" -gt 0 ] && [ "$failures" -eq 0 ]

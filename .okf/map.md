@@ -56,7 +56,7 @@ status: stable
 | [references/matrix-sdk-26-04-01-api.md](references/matrix-sdk-26-04-01-api.md) | Reference | The exact matrix-rust-components-swift 26.04.01 names and signatures the login, room list, timeline and send cards need, each cited from the resolved checkout. | [matrix, sdk, reference] |
 | [troubleshooting.md](troubleshooting.md) | Reference | Common failure symptoms, each mapped to its likely cause and the page that explains it. | [troubleshooting] |
 | [workflows/adapters.md](workflows/adapters.md) | Reference | Every coding agent is pointed at .okf/index.md; no agent gets its own copy of the knowledge. | [agents, okf] |
-| [workflows/add-a-feature.md](workflows/add-a-feature.md) | Workflow | The planned procedure for adding a feature across Domain, MatrixData and a feature package. | [feature, procedure] |
+| [workflows/add-a-feature.md](workflows/add-a-feature.md) | Workflow | How to add a feature across Domain, MatrixData, a feature package and the app target, as Authentication was built. | [feature, procedure] |
 | [workflows/build.md](workflows/build.md) | Workflow | How to build the TwakeChat app and the local packages, and the build settings that keep Swift 6 strict and warning-free. | [build, ci] |
 | [workflows/maintain-the-knowledge-base.md](workflows/maintain-the-knowledge-base.md) | Workflow | How to add to, change and verify the .okf/ bundle so it stays true to the code and conformant to OKF v0.2. | [workflow, okf, documentation] |
 | [workflows/test.md](workflows/test.md) | Workflow | How to run every unit test with one command, where each test target lives, and which part needs a simulator. | [test, ci, ios-26] |

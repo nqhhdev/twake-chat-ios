@@ -4,6 +4,7 @@
 #   Rule 1 (ADR 0006): only Packages/MatrixData imports the Matrix SDK or declares its package.
 #   Rule 2 (ADR 0002): no #available / @available(iOS outside Packages/DesignSystem.
 #   Rule 3 (ADR 0005): each package depends only on the local packages ADR 0005 allows; no feature on a feature.
+#     The Features index (Packages/Features/Package.swift, TWAK-65) may depend on feature packages only.
 #   Rule 4 (ADR 0005): Domain, AppShared and DesignSystem sources import only the system modules ADR 0005 allows.
 #   Rule 5 (ADR 0003): a Package.swift that declares the Matrix SDK pins it with exact:.
 # Scans *.swift and Package.swift files; skips build output and the test fixtures under scripts/tests.
@@ -27,9 +28,12 @@ report() {  # report <rule> <adr> <path:line> <message>
   violations=$((violations + 1))
 }
 
-# Prints the package a path belongs to (Domain, AppShared, DesignSystem, MatrixData, Features/<X>) or "outside".
+# Prints the package a path belongs to (Domain, AppShared, DesignSystem, MatrixData, FeaturesIndex, Features/<X>)
+# or "outside". FeaturesIndex is Packages/Features/Package.swift and its Sources: the manifest that lists every
+# feature so Packages/Features builds as one package (Features Layer page). No feature may be called Sources.
 owner_of() {
   case "$1" in
+    Packages/Features/Package.swift | Packages/Features/Sources/*) echo FeaturesIndex ;;
     Packages/Domain/*) echo Domain ;;
     Packages/AppShared/*) echo AppShared ;;
     Packages/DesignSystem/*) echo DesignSystem ;;
@@ -222,6 +226,7 @@ for file in ${swift_files[@]+"${swift_files[@]}"}; do
     Domain | AppShared | DesignSystem) allowed="" ;;
     MatrixData) allowed="Domain AppShared" ;;
     Features/*) allowed="Domain DesignSystem" ;;
+    FeaturesIndex) allowed="" ;;
     *) continue ;;
   esac
   while read -r line path; do
@@ -230,7 +235,10 @@ for file in ${swift_files[@]+"${swift_files[@]}"}; do
     # Judged by the package the path points at, not by its last part: ../Features/Domain is a feature, not Domain.
     name="$target_owner"
     [ "$name" = outside ] && name="$(basename "$path")"
-    if [[ "$owner" == Features/* && "$target_owner" == Features/* ]]; then
+    if [ "$owner" = FeaturesIndex ]; then
+      [[ "$target_owner" == Features/* ]] \
+        || report 3 0005 "$file:$line" "the Features index may depend only on feature packages, found $name"
+    elif [[ "$owner" == Features/* && "$target_owner" == Features/* ]]; then
       report 3 0005 "$file:$line" "feature $owner depends on feature $target_owner; a feature must not depend on another feature"
     elif [ -z "$allowed" ]; then
       report 3 0005 "$file:$line" "$owner may depend on no local package, found $name"

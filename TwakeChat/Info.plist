@@ -4,5 +4,7 @@
 <dict>
 	<key>KeychainAccessGroup</key>
 	<string>$(AppIdentifierPrefix)app.twake.ios.chat</string>
+	<key>DefaultHomeserver</key>
+	<string>$(TWAKE_DEFAULT_HOMESERVER)</string>
 </dict>
 </plist>

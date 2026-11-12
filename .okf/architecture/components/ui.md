@@ -9,7 +9,7 @@ status: draft
 
 | | |
 |---|---|
-| Folder | `Packages/Features/<Feature>/` (planned) |
+| Folder | `Packages/Features/<Feature>/` |
 | Holds | SwiftUI views, one `@Observable` view model per screen, a coordinator per flow |
 | May import | [Domain](domain.md), [Design System](design-system.md) |
 | Must not import | [Data](data.md), the Matrix SDK, another feature |
@@ -25,10 +25,55 @@ A feature never checks the iOS version; that belongs to the [Design System](desi
 
 Reasoning: [ADR 0004](../../adr/0004-swiftui-observable-coordinators.md).
 
+## Authentication (built, TWAK-65)
+`Packages/Features/Authentication/` holds the password sign-in for Debug builds
+([ADR 0019](../../adr/0019-password-login-debug-builds.md)); SSO and discovery
+([ADR 0008](../../adr/0008-authentication-sso-and-discovery.md)) are not built yet.
+- `PasswordLoginScreen` and `PasswordLoginViewModel`: homeserver (prefilled from the Debug build configuration),
+  username, password, a loading state and one message per `AuthenticationError`. As in the Flutter app's
+  `lib/pages/login/login.dart` `login()`, an empty username or password shows its own message and is not sent, and a
+  tap while a sign-in runs does nothing. A homeserver that is not an absolute URL is not sent either.
+- `SignedInScreen` and `SignedInViewModel`: the signed-in user id and Log out. A logout error keeps the signed-in
+  screen with an error so the user can try again. `MatrixAuthenticationRepository` deletes the local session even
+  when the server call fails, so trying again then succeeds at once; the user is never shown as signed out while the
+  session is still saved. The room list replaces this screen in a later card.
+- `AuthenticationCoordinator` and `AuthenticationCoordinatorView`: start from the session restored at launch, switch
+  between the two screens and create their view models. There is no push navigation yet, so there is no
+  `NavigationStack`.
+- `AuthenticationTestSupport` (a library target of the same package) holds `FakeAuthenticationRepository`, used by
+  `AuthenticationTests` and by `TwakeChatTests`. It is not in a Domain test support target, because the TWAK-34/35
+  acceptance locks hold Domain to one product and one test target; the owner decides whether to move it when a
+  second feature needs it (a feature may not depend on another feature).
+
+The app target's root coordinator, `RootCoordinator` in `TwakeChat/RootView.swift`, restores the saved session once
+at launch, then shows `AuthenticationCoordinatorView`. It marks the restore as started before it awaits, since every
+window of the app shares it. A restore error of any kind keeps the saved session and its SDK store: the root shows the
+feature's `RestoreFailedScreen` with Try again, which restores once more, and Log out, the way out when the error
+does not pass (it signs out and shows the sign-in form). The two never run together: Try again shows nothing while
+it restores, and Try again does nothing while Log out runs. A Log out error keeps the restore-failed screen with a
+message, as on the signed-in screen, since the session may still be saved. The Domain errors cannot tell a session the server rejected
+from a fault that passes (a locked Keychain, a held store lock, a 5xx all map to `unknown`), and `logout()` deletes
+the store with its encryption keys, so the root never clears a session on its own. This replaces the plan's "a
+restore error counts as signed out"; it was accepted on 2026-11-13 under the owner's standing instruction of
+2026-11-12, and the owner may still reverse it. Every screen the root shows comes from the feature package, so `RootView.swift` itself holds no `Text` or `Button` (the TWAK-34 lock).
+The feature and its views exist only under `#if DEBUG` in the app target; a Release build shows an empty screen in
+every state. Every source file of
+`Authentication` is also wrapped in `#if DEBUG`, because Xcode links a package product in every configuration: this
+keeps the password flow out of the Release binary, as ADR 0019 requires. The composition root,
+`TwakeChat/TwakeChatApp.swift`, builds `KeychainSessionStore` and `MatrixAuthenticationRepository` and reads the
+default homeserver from the `DefaultHomeserver` Info.plist key, which the Debug configuration's
+`TWAKE_DEFAULT_HOMESERVER` build setting fills.
+
+## The Features index package
+`Packages/Features/Package.swift` (with `Sources/Features/Features.swift`, which only imports each feature) is not a
+feature and the app does not link it. It depends on every feature package so that a check walking `Packages/*/` can
+run `swift build --package-path Packages/Features` and build them all. `scripts/check-architecture.sh` calls it
+`FeaturesIndex` and rule 3 lets it depend on feature packages only; for that reason no feature may be called `Sources`.
+
 ## Planned features for v1
 | Feature | Flutter counterpart (`lib/pages/`) |
 |---|---|
-| `Authentication` | `twake_welcome`, `homeserver_picker`, `connect`, `login` |
+| `Authentication` | `twake_welcome`, `homeserver_picker`, `connect`, `login` (password form in Debug built; SSO planned) |
 | `ChatList` | `chat_list` |
 | `Room` | `chat` (timeline, composer, events) |
 | `Encryption` | `bootstrap`, `key_verification`, `chat_encryption_settings` |
