@@ -93,10 +93,17 @@ done
 
 # The card: "Each has one source file so the package compiles". Exactly one Swift file, at Sources/<Name>/<Name>.swift,
 # and no other file under Sources (no resource, no second placeholder). Tests live in Tests/<Name>Tests (TWAK-35).
+# TWAK-63 adds the session types to Domain and the Keychain store and App Group paths to AppShared: those two packages
+# now hold exactly the files listed below, still all Swift.
 for p in "${PACKAGES[@]}"; do
   files="$(cd "Packages/$p" && find Sources -type f ! -name .DS_Store | sort | tr '\n' ' ' | sed 's/ $//')"
-  [ "$files" = "Sources/$p/$p.swift" ] && pass "$p: exactly one source file, Sources/$p/$p.swift" \
-    || fail "$p: source files are '$files', the card asks for one (Sources/$p/$p.swift)"
+  case "$p" in
+    Domain) want="Sources/Domain/Domain.swift Sources/Domain/Models/UserSession.swift Sources/Domain/Repositories/AuthenticationError.swift Sources/Domain/Repositories/AuthenticationRepository.swift" ;;
+    AppShared) want="Sources/AppShared/AppGroupContainer.swift Sources/AppShared/AppShared.swift Sources/AppShared/KeychainSessionStore.swift" ;;
+    *) want="Sources/$p/$p.swift" ;;
+  esac
+  [ "$files" = "$want" ] && pass "$p: source files are exactly '$want'" \
+    || fail "$p: source files are '$files', expected '$want'"
   # TWAK-35 (card b): the only test folder is Tests/<Name>Tests, holding Swift files only. MatrixData has none: an
   # iOS-only package with a Tests folder would be run by host `swift test`, which cannot build it.
   if [ "$p" = MatrixData ]; then
@@ -174,7 +181,7 @@ if [ "$MODE" = full ]; then
       for kv in SWIFT_VERSION=6.0 SWIFT_STRICT_CONCURRENCY=complete SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
                 GCC_TREAT_WARNINGS_AS_ERRORS=YES IPHONEOS_DEPLOYMENT_TARGET=18.0 \
                 PRODUCT_BUNDLE_IDENTIFIER=app.twake.ios.chat GENERATE_INFOPLIST_FILE=YES SDKROOT=iphoneos \
-                DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS= SWIFT_SUPPRESS_WARNINGS=NO; do
+                DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS=TwakeChat/TwakeChat.entitlements SWIFT_SUPPRESS_WARNINGS=NO; do
         key="${kv%%=*}"; want="${kv#*=}"; got="$(setting "$key")"
         # Newer Xcode prints SDKROOT as the SDK's path and leaves SWIFT_SUPPRESS_WARNINGS empty when it is not set (NO).
         case "$key=$got" in SDKROOT=*/iPhoneOS*.sdk) got=iphoneos ;; SWIFT_SUPPRESS_WARNINGS=) got=NO ;; esac
@@ -238,8 +245,15 @@ if [ "$MODE" = full ]; then
     sdkname="$(plist DTSDKName)"; sdkmajor="${sdkname#iphonesimulator}"; sdkmajor="${sdkmajor%%.*}"
     case "$sdkname" in iphonesimulator*) [ "$sdkmajor" -ge 26 ] 2>/dev/null ;; *) false ;; esac \
       && pass "built app: built with an iOS 26 or newer SDK ($sdkname)" || fail "built app: DTSDKName '$sdkname', ADR 0002 needs iOS 26 or newer"
-    check "built app: no app extension or entitlements (out of scope)" bash -c \
-      "[ ! -d '$APP/PlugIns' ] && ! codesign -d --entitlements - '$APP' 2>/dev/null | grep -q 'application-groups\|keychain-access-groups'"
+    check "built app: no app extension (out of scope)" bash -c "[ ! -d '$APP/PlugIns' ]"
+    # TWAK-63: the signed app carries the App Group and the Keychain access group of ADR 0007, and no other group.
+    codesign -d --entitlements - --xml "$APP" 2>/dev/null >"$WORK/entitlements.plist" || true
+    groups="$(plutil -extract com.apple.security.application-groups json -o - "$WORK/entitlements.plist" 2>/dev/null)"
+    [ "$groups" = '["group.app.twake.ios.chat"]' ] && pass "built app: App Group group.app.twake.ios.chat only" \
+      || fail "built app: application-groups '$groups'"
+    keychain="$(plutil -extract keychain-access-groups json -o - "$WORK/entitlements.plist" 2>/dev/null)"
+    case "$keychain" in '["'*'app.twake.ios.chat"]') pass "built app: one Keychain access group ending in app.twake.ios.chat" ;;
+      *) fail "built app: keychain-access-groups '$keychain'" ;; esac
   else
     grep -E 'warning:|error:' "$WORK/product.log" | sort -u | head -20 >&2
     fail "generic iOS Simulator build: failed or warned (log lines above)"

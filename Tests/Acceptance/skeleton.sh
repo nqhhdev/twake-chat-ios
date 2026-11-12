@@ -117,8 +117,15 @@ check "SWIFT_TREAT_WARNINGS_AS_ERRORS is YES" only_value SWIFT_TREAT_WARNINGS_AS
 check "GCC_TREAT_WARNINGS_AS_ERRORS is YES" only_value GCC_TREAT_WARNINGS_AS_ERRORS YES
 check "settings are in both Debug and Release project configurations" bash -c \
   "[ \$(grep -c 'SWIFT_TREAT_WARNINGS_AS_ERRORS = YES' '$PBX') -ge 2 ] && [ \$(grep -c 'IPHONEOS_DEPLOYMENT_TARGET = 18.0' '$PBX') -ge 2 ] && [ \$(grep -c 'SWIFT_VERSION = 6.0' '$PBX') -ge 2 ]"
-check "no development team, entitlements or extension target (out of scope)" bash -c \
-  "! grep -qE 'DEVELOPMENT_TEAM|CODE_SIGN_ENTITLEMENTS|app-extension' '$PBX'"
+check "no development team or extension target (out of scope)" bash -c \
+  "! grep -qE 'DEVELOPMENT_TEAM|app-extension' '$PBX'"
+# TWAK-63 adds the app's App Group and Keychain access group (ADR 0007, ADR 0012): one entitlements file, nothing else.
+check "the app target's only entitlements file is TwakeChat/TwakeChat.entitlements (ADR 0007)" bash -c \
+  "[ \$(grep -c 'CODE_SIGN_ENTITLEMENTS = TwakeChat/TwakeChat.entitlements;' '$PBX') -eq 2 ] \
+   && [ \$(grep -c 'CODE_SIGN_ENTITLEMENTS' '$PBX') -eq 2 ]"
+check "the entitlements are exactly the App Group and Keychain group of ADR 0007" bash -c \
+  "[ \"\$(plutil -convert json -o - TwakeChat/TwakeChat.entitlements)\" = \
+     '{\"com.apple.security.application-groups\":[\"group.app.twake.ios.chat\"],\"keychain-access-groups\":[\"\$(AppIdentifierPrefix)app.twake.ios.chat\"]}' ]"
 # TWAK-35 adds the TwakeChatTests and MatrixDataTests unit-test bundles; the app stays the only application target.
 check "exactly one application target, and the two test bundles are the only other native targets" bash -c \
   "[ \$(grep -c 'productType = \"com.apple.product-type.application\"' '$PBX') -eq 1 ] \

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Marks the Domain module. Models, repository protocols and use cases arrive with the first feature slice.
+/// Marks the Domain module. Models and repository protocols live under Models/ and Repositories/.
 public enum DomainModule {
   public static let name = "Domain"
 }

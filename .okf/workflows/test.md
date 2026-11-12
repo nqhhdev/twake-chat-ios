@@ -56,6 +56,11 @@ tests again. Snapshot and integration tests do not run in CI.
 - A new package test target goes in its `Package.swift` with `swiftSettings: [.treatAllWarnings(as: .error)]`. If it
   runs on the simulator, add it to the test plan too.
 - `TwakeChatTests` uses `@testable import TwakeChat`; package tests use plain `import` of the module's public API.
+- Keychain round trips of `AppShared`'s `KeychainSessionStore` run in `TwakeChatTests`
+  (`KeychainSessionStoreTests.swift`), hosted by the app, because the Keychain access group needs the app's
+  entitlements, which host `swift test` does not have. They use the group from the app's `KeychainAccessGroup`
+  Info.plist key and the test-only service `app.twake.ios.chat.tests.keychain-session-store`, so they never touch a
+  real session. The simulator signs the app locally ("Sign to Run Locally"), which is enough for the group (TWAK-63).
 - Swift Testing only (`import Testing`, `@Test`, `#expect`), and no mocking library
   ([ADR 0010](../adr/0010-testing-strategy-two-ios-versions.md)).
 

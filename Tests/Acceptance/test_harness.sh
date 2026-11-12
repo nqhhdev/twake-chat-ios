@@ -91,10 +91,12 @@ check "test bundles set none of SWIFT_VERSION, SWIFT_STRICT_CONCURRENCY, SWIFT_T
 # ---------------------------------------------------------------- test files
 # Every test target has at least one <TypeUnderTest>Tests.swift (naming.md), uses Swift Testing,
 # and imports nothing but Testing, the module under test and what the app test needs (ADR 0010: no XCTest, no mocks).
+# TWAK-63: Foundation is allowed everywhere (URL, Data, JSONEncoder), and TwakeChatTests may import AppShared for the
+# hosted Keychain round trips, which need the app's entitlements.
 allowed_test_imports() {
   case "$1" in
-    TwakeChat) echo "Testing TwakeChat SwiftUI" ;;
-    *) echo "Testing $1" ;;
+    TwakeChat) echo "Testing Foundation TwakeChat SwiftUI AppShared" ;;
+    *) echo "Testing Foundation $1" ;;
   esac
 }
 for m in Domain AppShared MatrixData DesignSystem TwakeChat; do
