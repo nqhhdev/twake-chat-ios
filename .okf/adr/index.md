@@ -17,3 +17,5 @@ Supersede an accepted ADR rather than editing it.
 * [ADR 0011: Version 1 is core chat only](0011-v1-scope-core-chat.md) - v1 ships sign-in, chat list, timeline, encryption recovery and push; every other Flutter feature is deferred.
 * [ADR Template](_template-adr.md) - Copy this when recording an architecture decision.
 * [ADR 0012: Reuse the Flutter app's bundle identifier](0012-reuse-flutter-bundle-identifier.md) - The native app ships as app.twake.ios.chat, so it installs over the Flutter app instead of beside it.
+* [ADR 0014: CI on GitHub Actions with GitHub-hosted macOS runners; swift-format for formatting and lint](0014-ci-github-actions-swift-format.md) - CI runs on GitHub Actions macOS runners like the Flutter app, and swift-format from Xcode formats and lints; billed macOS minutes are the price.
+* [ADR 0015: Pin matrix-rust-components-swift at exactly 26.04.01](0015-pin-matrix-rust-components-swift-26-04-01.md) - The SDK package is pinned to 26.04.01, the version the Flutter app's extension uses; it is older than Element X, so API names come from the pinned package.
