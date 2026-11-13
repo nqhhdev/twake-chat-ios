@@ -37,6 +37,11 @@ public struct TextStyleToken: Hashable, Sendable {
     TextStyleToken(size: size, lineHeight: lineHeight, weight: weight, letterSpacing: letterSpacing)
   }
 
+  /// The same style in another weight, as Flutter's `copyWith(fontWeight:)`.
+  public func with(weight: Weight) -> TextStyleToken {
+    TextStyleToken(size: size, lineHeight: lineHeight, weight: weight, letterSpacing: letterSpacing)
+  }
+
   /// SwiftUI adds line spacing between lines: (height ratio − 1) × size, which is line height − size.
   public var lineSpacing: CGFloat { lineHeight - size }
 
