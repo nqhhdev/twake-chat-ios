@@ -23,6 +23,12 @@
 		A1000000000000000000B007 /* Room in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D007 /* Room */; };
 		A1000000000000000000B008 /* Settings in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D008 /* Settings */; };
 		A1000000000000000000B009 /* People in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D009 /* People */; };
+		A1000000000000000000F004 /* TwakeChatNSE.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A1000000000000000000F001 /* TwakeChatNSE.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A1000000000000000000F011 /* Domain in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000F021 /* Domain */; };
+		A1000000000000000000F012 /* AppShared in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000F022 /* AppShared */; };
+		A1000000000000000000F013 /* MatrixData in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000F023 /* MatrixData */; };
+		A1000000000000000000F104 /* TwakeChatShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A1000000000000000000F101 /* TwakeChatShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A1000000000000000000F112 /* AppShared in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000F122 /* AppShared */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -33,7 +39,36 @@
 			remoteGlobalIDString = A10000000000000000000020;
 			remoteInfo = TwakeChat;
 		};
+		A1000000000000000000F007 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000030 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A1000000000000000000F010;
+			remoteInfo = TwakeChatNSE;
+		};
+		A1000000000000000000F107 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000030 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A1000000000000000000F110;
+			remoteInfo = TwakeChatShare;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A1000000000000000000F005 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A1000000000000000000F004 /* TwakeChatNSE.appex in Embed Foundation Extensions */,
+				A1000000000000000000F104 /* TwakeChatShare.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		A10000000000000000000002 /* TwakeChat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TwakeChat.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -48,6 +83,8 @@
 		A1000000000000000000E007 /* Room */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = Room; path = Packages/Features/Room; sourceTree = "<group>"; };
 		A1000000000000000000E008 /* Settings */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = Settings; path = Packages/Features/Settings; sourceTree = "<group>"; };
 		A1000000000000000000E009 /* People */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = People; path = Packages/Features/People; sourceTree = "<group>"; };
+		A1000000000000000000F001 /* TwakeChatNSE.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TwakeChatNSE.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1000000000000000000F101 /* TwakeChatShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TwakeChatShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -57,6 +94,20 @@
 				Info.plist,
 			);
 			target = A10000000000000000000020 /* TwakeChat */;
+		};
+		A1000000000000000000F003 /* Exceptions for "TwakeChatNSE" folder in "TwakeChatNSE" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A1000000000000000000F010 /* TwakeChatNSE */;
+		};
+		A1000000000000000000F103 /* Exceptions for "TwakeChatShare" folder in "TwakeChatShare" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A1000000000000000000F110 /* TwakeChatShare */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -79,6 +130,22 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			name = MatrixDataTests;
 			path = Tests/MatrixDataTests;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000F002 /* TwakeChatNSE */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A1000000000000000000F003 /* Exceptions for "TwakeChatNSE" folder in "TwakeChatNSE" target */,
+			);
+			path = TwakeChatNSE;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000F102 /* TwakeChatShare */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A1000000000000000000F103 /* Exceptions for "TwakeChatShare" folder in "TwakeChatShare" target */,
+			);
+			path = TwakeChatShare;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -121,6 +188,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A1000000000000000000F032 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000000000000000000F011 /* Domain in Frameworks */,
+				A1000000000000000000F012 /* AppShared in Frameworks */,
+				A1000000000000000000F013 /* MatrixData in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1000000000000000000F132 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000000000000000000F112 /* AppShared in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -129,6 +214,8 @@
 			children = (
 				A10000000000000000000006 /* Packages */,
 				A10000000000000000000003 /* TwakeChat */,
+				A1000000000000000000F002 /* TwakeChatNSE */,
+				A1000000000000000000F102 /* TwakeChatShare */,
 				A10000000000000000000061 /* TwakeChatTests */,
 				A10000000000000000000073 /* MatrixDataTests */,
 				A10000000000000000000005 /* Products */,
@@ -141,6 +228,8 @@
 				A10000000000000000000002 /* TwakeChat.app */,
 				A10000000000000000000060 /* TwakeChatTests.xctest */,
 				A10000000000000000000070 /* MatrixDataTests.xctest */,
+				A1000000000000000000F001 /* TwakeChatNSE.appex */,
+				A1000000000000000000F101 /* TwakeChatShare.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -171,10 +260,13 @@
 				A10000000000000000000011 /* Sources */,
 				A10000000000000000000010 /* Frameworks */,
 				A10000000000000000000012 /* Resources */,
+				A1000000000000000000F005 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A1000000000000000000F006 /* PBXTargetDependency */,
+				A1000000000000000000F106 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A10000000000000000000003 /* TwakeChat */,
@@ -247,6 +339,54 @@
 			productReference = A10000000000000000000070 /* MatrixDataTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		A1000000000000000000F010 /* TwakeChatNSE */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1000000000000000000F030 /* Build configuration list for PBXNativeTarget "TwakeChatNSE" */;
+			buildPhases = (
+				A1000000000000000000F031 /* Sources */,
+				A1000000000000000000F032 /* Frameworks */,
+				A1000000000000000000F033 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A1000000000000000000F002 /* TwakeChatNSE */,
+			);
+			name = TwakeChatNSE;
+			packageProductDependencies = (
+				A1000000000000000000F021 /* Domain */,
+				A1000000000000000000F022 /* AppShared */,
+				A1000000000000000000F023 /* MatrixData */,
+			);
+			productName = TwakeChatNSE;
+			productReference = A1000000000000000000F001 /* TwakeChatNSE.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		A1000000000000000000F110 /* TwakeChatShare */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1000000000000000000F130 /* Build configuration list for PBXNativeTarget "TwakeChatShare" */;
+			buildPhases = (
+				A1000000000000000000F131 /* Sources */,
+				A1000000000000000000F132 /* Frameworks */,
+				A1000000000000000000F133 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A1000000000000000000F102 /* TwakeChatShare */,
+			);
+			name = TwakeChatShare;
+			packageProductDependencies = (
+				A1000000000000000000F122 /* AppShared */,
+			);
+			productName = TwakeChatShare;
+			productReference = A1000000000000000000F101 /* TwakeChatShare.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -267,6 +407,12 @@
 					A10000000000000000000077 = {
 						CreatedOnToolsVersion = 26.2;
 					};
+					A1000000000000000000F010 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					A1000000000000000000F110 = {
+						CreatedOnToolsVersion = 26.2;
+					};
 				};
 			};
 			buildConfigurationList = A10000000000000000000040 /* Build configuration list for PBXProject "TwakeChat" */;
@@ -275,6 +421,7 @@
 			knownRegions = (
 				en,
 				Base,
+				fr,
 			);
 			mainGroup = A10000000000000000000001;
 			minimizedProjectReferenceProxies = 1;
@@ -297,6 +444,8 @@
 				A10000000000000000000020 /* TwakeChat */,
 				A10000000000000000000067 /* TwakeChatTests */,
 				A10000000000000000000077 /* MatrixDataTests */,
+				A1000000000000000000F010 /* TwakeChatNSE */,
+				A1000000000000000000F110 /* TwakeChatShare */,
 			);
 		};
 /* End PBXProject section */
@@ -317,6 +466,20 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		A10000000000000000000076 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1000000000000000000F033 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1000000000000000000F133 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -347,6 +510,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A1000000000000000000F031 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1000000000000000000F131 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -354,6 +531,16 @@
 			isa = PBXTargetDependency;
 			target = A10000000000000000000020 /* TwakeChat */;
 			targetProxy = A10000000000000000000062 /* PBXContainerItemProxy */;
+		};
+		A1000000000000000000F006 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A1000000000000000000F010 /* TwakeChatNSE */;
+			targetProxy = A1000000000000000000F007 /* PBXContainerItemProxy */;
+		};
+		A1000000000000000000F106 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A1000000000000000000F110 /* TwakeChatShare */;
+			targetProxy = A1000000000000000000F107 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -441,6 +628,7 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TWAKE_DEFAULT_HOMESERVER = "https://matrix.stg.lin-saas.com/";
 				TWAKE_PRIVACY_URL = "https://twake.app/en/privacy/";
+				TWAKE_PUSH_GATEWAY_URL = "https://push.twake.app/_matrix/push/v1/notify";
 				TWAKE_REGISTRATION_URL = "https://sign-up.stg.lin-saas.com/";
 				TWAKE_WORKPLACE_HOMESERVER = "https://tom.stg.lin-saas.com/";
 			};
@@ -472,6 +660,7 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TWAKE_DEFAULT_HOMESERVER = "https://matrix.twake.app/";
 				TWAKE_PRIVACY_URL = "https://twake.app/policy";
+				TWAKE_PUSH_GATEWAY_URL = "https://push.twake.app/_matrix/push/v1/notify";
 				TWAKE_REGISTRATION_URL = "https://sign-up.twake.app/";
 				TWAKE_WORKPLACE_HOMESERVER = "https://matrix.twake.app";
 			};
@@ -533,6 +722,102 @@
 			};
 			name = Release;
 		};
+		A1000000000000000000F034 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = TwakeChatNSE/TwakeChatNSE.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2331;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TwakeChatNSE/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = TwakeChatNSE;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LM_SKIP_METADATA_EXTRACTION = YES;
+				MARKETING_VERSION = 3.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.twake.ios.chat.nse;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A1000000000000000000F035 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = TwakeChatNSE/TwakeChatNSE.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2331;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TwakeChatNSE/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = TwakeChatNSE;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LM_SKIP_METADATA_EXTRACTION = YES;
+				MARKETING_VERSION = 3.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.twake.ios.chat.nse;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		A1000000000000000000F134 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = TwakeChatShare/TwakeChatShare.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2331;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TwakeChatShare/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Twake Chat";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LM_SKIP_METADATA_EXTRACTION = YES;
+				MARKETING_VERSION = 3.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.twake.ios.chat.TwakeShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A1000000000000000000F135 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = TwakeChatShare/TwakeChatShare.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2331;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TwakeChatShare/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Twake Chat";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LM_SKIP_METADATA_EXTRACTION = YES;
+				MARKETING_VERSION = 3.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.twake.ios.chat.TwakeShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -568,6 +853,24 @@
 			buildConfigurations = (
 				A10000000000000000000079 /* Debug */,
 				A1000000000000000000007A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1000000000000000000F030 /* Build configuration list for PBXNativeTarget "TwakeChatNSE" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1000000000000000000F034 /* Debug */,
+				A1000000000000000000F035 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1000000000000000000F130 /* Build configuration list for PBXNativeTarget "TwakeChatShare" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1000000000000000000F134 /* Debug */,
+				A1000000000000000000F135 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -677,6 +980,22 @@
 		A1000000000000000000D009 /* People */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = People;
+		};
+		A1000000000000000000F021 /* Domain */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Domain;
+		};
+		A1000000000000000000F022 /* AppShared */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AppShared;
+		};
+		A1000000000000000000F023 /* MatrixData */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MatrixData;
+		};
+		A1000000000000000000F122 /* AppShared */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AppShared;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
