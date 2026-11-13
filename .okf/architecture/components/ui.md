@@ -56,13 +56,15 @@ from a fault that passes (a locked Keychain, a held store lock, a 5xx all map to
 the store with its encryption keys, so the root never clears a session on its own. This replaces the plan's "a
 restore error counts as signed out"; it was accepted on 2026-11-13 under the owner's standing instruction of
 2026-11-12, and the owner may still reverse it. Every screen the root shows comes from the feature package, so `RootView.swift` itself holds no `Text` or `Button` (the TWAK-34 lock).
-The feature and its views exist only under `#if DEBUG` in the app target; a Release build shows an empty screen in
-every state. Every source file of
-`Authentication` is also wrapped in `#if DEBUG`, because Xcode links a package product in every configuration: this
-keeps the password flow out of the Release binary, as ADR 0019 requires. The composition root,
-`TwakeChat/TwakeChatApp.swift`, builds `KeychainSessionStore` and `MatrixAuthenticationRepository` and reads the
-default homeserver from the `DefaultHomeserver` Info.plist key, which the Debug configuration's
-`TWAKE_DEFAULT_HOMESERVER` build setting fills.
+Signed out, the feature opens on `TwakeWelcomeScreen` (linagora-design-flutter `TwakeWelcomeScreen`): Create Twake ID
+and Sign in open the registration site, "Use your company server" opens `HomeserverPickerScreen`, which goes to the
+server's single SSO provider, to `ConnectScreen` (one button per provider) or to `PasswordLoginScreen` on a server
+without SSO, as [ADR 0021](../../adr/0021-sign-in-as-the-flutter-app.md) says. The feature is the same in Debug and
+Release. SSO pages open through the feature's `WebAuthenticator` protocol, which the app implements with
+`ASWebAuthenticationSession` (`TwakeChat/SystemWebAuthenticator.swift`). The composition root,
+`TwakeChat/TwakeChatApp.swift`, builds `KeychainSessionStore` and `MatrixAuthenticationRepository` and a
+`SignInConfiguration` from the `RegistrationURL`, `WorkplaceHomeserver`, `DefaultHomeserver` and `PrivacyURL`
+Info.plist keys, which the `TWAKE_*` build settings fill: staging in Debug, Twake SaaS in Release.
 
 ## Chat list (built, TWAK-66)
 `Packages/Features/ChatList/` (Domain and DesignSystem only) shows the joined rooms after sign-in, in the order the

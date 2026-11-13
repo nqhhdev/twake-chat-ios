@@ -29,8 +29,8 @@ Checked against the first feature, `Authentication` (TWAK-65).
    to `TwakeChat` (and its test support product to `TwakeChatTests` if they use it), and add
    `container:Packages/Features/<Feature>` / `<Feature>Tests` to `TwakeChat.xctestplan`. Build the new dependencies
    in the composition root (`TwakeChat/TwakeChatApp.swift`) and show the flow from the root coordinator
-   (`TwakeChat/RootView.swift`). Code reachable only in Debug builds (ADR 0019) stays under `#if DEBUG` there,
-   and a Debug-only feature wraps each of its source files in `#if DEBUG` too, since the product is linked in Release;
-   build-configuration values go in a build setting read through an `Info.plist` key, never a secret.
+   (`TwakeChat/RootView.swift`). A Debug-only feature wraps each of its source files in `#if DEBUG`, since the
+   product is linked in Release; build-configuration values go in a build setting read through an `Info.plist` key,
+   never a secret.
 7. Re-read [Constraints](../engineering/constraints.md). Update this knowledge base if something durable changed
    ([Maintain the Knowledge Base](maintain-the-knowledge-base.md)).

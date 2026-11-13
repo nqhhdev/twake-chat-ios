@@ -34,9 +34,11 @@ Each long-lived SDK object is wrapped once, behind a protocol, so the rest of th
 `KeychainClientSessionDelegate` gives the SDK the saved session and saves refreshed tokens with
 `KeychainSessionStore.saveRefreshedTokens`, which only updates the item of the same user and device and never adds
 one: a refresh after sign-out cannot bring the session back. `MatrixAuthenticationRepository` (an actor) implements
-the Domain `AuthenticationRepository`. Password login is compiled in Debug builds only
-([ADR 0019](../../adr/0019-password-login-debug-builds.md)); Release reports `unknown`. The store holds one session, so
-login is refused (`unknown`) while a session is saved or a client runs, and a restore keeps the running client. It saves
+the Domain `AuthenticationRepository` with the Flutter sign-in of [ADR 0021](../../adr/0021-sign-in-as-the-flutter-app.md):
+`HomeserverDiscovery` reads `.well-known`, the login flows with their identity providers and a registration probe over
+plain HTTP (the pinned SDK lists no providers); `startSSOLogin` builds a client and keeps the SDK `SsoHandler` until
+`finishSSOLogin` hands it the web session's callback (`loginToken`); password login is the same in every build. The
+store holds one session, so sign-in is refused (`unknown`) while a session is saved or a client runs, and a restore keeps the running client. It saves
 the session, including its sliding sync version, in `KeychainSessionStore` and exposes the signed-in `clientProxy` for
 later cards. `logout()` first restores a client when none runs yet (cold launch), so the server still signs the device
 out; it deletes the store directory and the Keychain item even when the server call fails, then reports that failure. `UserSessionMapper` is internal: it maps `M_FORBIDDEN` to `invalidCredentials`,

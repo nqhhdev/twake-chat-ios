@@ -1,13 +1,13 @@
 ---
 type: ADR
 title: "ADR 0019: Offer password login in Debug builds only"
-description: "Debug builds sign in with m.login.password against the staging homeserver behind #if DEBUG; Release stays SSO-only as ADR 0008 says."
+description: "Debug builds sign in with m.login.password against the staging homeserver behind #if DEBUG; Release stays SSO-only as ADR 0008 says. Superseded by ADR 0021."
 tags: [adr, authentication, security]
 status: draft
 ---
 # ADR 0019: Offer password login in Debug builds only
 
-**Status:** Accepted by the project owner, 2026-11-12 (TWAK-62). Partly amends [ADR 0008](0008-authentication-sso-and-discovery.md) for Debug builds only.
+**Status:** Superseded by [ADR 0021](0021-sign-in-as-the-flutter-app.md), 2026-11-13. Was accepted by the project owner, 2026-11-12 (TWAK-62). Partly amended [ADR 0008](0008-authentication-sso-and-discovery.md) for Debug builds only.
 
 ## Context
 [ADR 0008](0008-authentication-sso-and-discovery.md) says the app signs in with SSO and that password login is not
