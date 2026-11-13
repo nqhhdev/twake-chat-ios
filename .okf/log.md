@@ -38,3 +38,9 @@
 * **Change**: Messages show their media: thumbnails, a full-screen picture viewer, and file downloads through `MediaRepository` (`MediaProxy`). The UI page describes them.
 * **Change**: The chat details page (members, search, leave) is built; the UI page describes it.
 * **Change**: The signed-in shell has the Contacts, Chats and Settings tabs, as a bottom bar on a phone or folded Duo and a navigation rail on an unfolded Duo, an iPad or in landscape (ADR 0022, owner request). The chat list has the Flutter header and search; Log out moved to Settings.
+* **Change**: The chat groups bubbles by sender with Telegram-style shapes and tails, shows albums, and animates sending, replies (swipe), reactions (double-tap ❤️), the composer and scrolling; the UI page lists them.
+* **Change**: The composer sends pictures, videos and documents (Files app, Drive providers included) and the room shows and sends typing notices; the UI page describes them.
+* **Change**: New Settings feature package: profile, chat backup with the recovery key, notification defaults, About and Logout; chat info sets a room's notification mode. The UI page describes them.
+* **Change**: New People feature package: the Contacts tab and the new chat sheet (direct message or new group) on the user directory; the UI page describes them.
+* **Change**: Pin and forward messages, big emoji messages, unread and mention badges; the UI page describes them.
+* **Change**: Voice messages (hold-to-record, in-bubble player) and in-app video playback; the UI page describes them.

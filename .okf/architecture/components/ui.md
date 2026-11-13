@@ -69,19 +69,39 @@ Info.plist keys, which the `TWAKE_*` build settings fill: staging in Debug, Twak
 ## Signed-in shell and room (built)
 `TwakeChat/ChatShell.swift` joins the ChatList, Room and Authentication (Settings) features after sign-in. Its
 Contacts, Chats and Settings tabs are the Twake bottom bar on a phone held upright or a folded Duo and the Twake
-navigation rail on an unfolded Duo, an iPad or a landscape screen; Contacts shows that it is not built yet, Settings
-shows the profile and Logout. The chat list has the Flutter header: the centred "Chats" title and a search field that
+navigation rail on an unfolded Duo, an iPad or a landscape screen; Contacts and the chat list's pencil button are
+`Packages/Features/People/` (`PeopleRepository`, `PeopleProxy` in MatrixData): search Twake's address book on the ToM server
+(`t.server` in `.well-known`, `POST /_twake/identity/v1/lookup/match` with the access token, as the Flutter
+`TomContactAPI` does), then the Matrix user directory, or type a full Matrix id, open the direct chat with someone (the existing one or a new encrypted one), or pick people
+and a name for a new private encrypted group; the new chat opens at once. Settings is
+`Packages/Features/Settings/` (Domain and DesignSystem only, `AccountSettingsRepository`, `AccountSettingsProxy` in
+MatrixData): the profile, Privacy & Security (chat backup: enter the recovery key to unlock old messages, or set up
+backup and see the new key once), Notifications (default mode for direct and group chats), About, and Logout with its
+confirmation. Chat info also sets the room's own notification mode or its default. The chat list has the Flutter header: the centred "Chats" title and a search field that
 filters the rooms by name. The shell lays the screens out by
 [ADR 0022](../../adr/0022-adaptive-layout-flutter-breakpoints.md): one stack under 905 pt (phones, a folded Duo), the
 472 pt chat list beside the chat from 905 pt (an unfolded Duo, iPads). `Packages/Features/Room/` (Domain and
 DesignSystem only) is the chat: `RoomViewModel` follows the room's `TimelineRepository`, loads older messages, and
 sends, replies to, edits, deletes and reacts to messages; `RoomScreen` shows Twake bubbles (own on the right in
 `primaryContainer`, others white with the sender's avatar and name), day dividers, room events as one-line notices,
-reply quotes and reactions, with the Flutter message menu as a context menu, then `ComposerView`. Pictures, videos and
+reply quotes and reactions, with the Flutter message menu as a context menu, then `ComposerView`. The timeline groups
+messages as Telegram and iMessage do (`TimelineRows`: one sender within 5 minutes; the name on the first bubble, the
+avatar and the tail on the last, `TwakeBubbleShape`), and pictures sent together within a minute form an album grid.
+It animates: new bubbles spring in from their sender's side, swipe-to-reply with a haptic, double-tap for ❤️ with a
+heart burst, reaction chips pop and roll their counts, the send button pops in and bounces, the reply/edit banner
+slides up, pictures fade in, and a button returns to the newest message. Pictures, videos and
 stickers show a thumbnail at their aspect ratio (at most the bubble width and 300 pt tall); a tap on a picture opens
 it full screen with pinch to zoom and Share. Voice messages and files show their name and size; a tap downloads them
-(`MediaRepository`, `MediaProxy` in MatrixData) and offers to share or open them. Video and voice do not play in the
-app yet. The room's header opens `RoomDetailsScreen` (the Flutter `chat_details` page): avatar, name, description, address,
+(`MediaRepository`, `MediaProxy` in MatrixData) and offers to share or open them. Voice messages and audio play in the bubble (play/pause,
+bars that fill and move, time left); videos play full screen with the system player after they download. Holding
+the composer's mic records a voice message (slide left to cancel, release to send, with its waveform), sent as a
+Matrix voice message; the app asks for the microphone the first time. The composer's "+" (Flutter `PickerType`) sends pictures and videos from the photo library (several at once
+arrive as an album) and documents from the Files app, which lists iCloud Drive, Google Drive and any other installed
+file provider; uploads go through `TimelineRepository.sendAttachment`. The message menu also pins (a Telegram-style banner under
+the header shows the pins, a tap cycles them) and forwards to a chat picked from the chat list (the original content,
+media included, without its reply). Messages of only emojis show large without a bubble, and the chat list shows unread
+and mention badges. The room shows who is typing above the composer
+with bouncing dots, and tells the room when the user types. The room's header opens `RoomDetailsScreen` (the Flutter `chat_details` page): avatar, name, description, address,
 encryption, visibility, the members with search, and Leave chat after a confirmation, which closes the chat
 (`RoomDetailsRepository`, `RoomDetailsProxy` in MatrixData). `RoomTestSupport` holds `FakeTimelineRepository`,
 `FakeMediaRepository` and `FakeRoomDetailsRepository`.
