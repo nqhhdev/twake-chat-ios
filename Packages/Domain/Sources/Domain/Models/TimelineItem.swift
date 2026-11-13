@@ -87,11 +87,13 @@ public struct TimelineMessage: Sendable, Equatable {
   public let reactions: [Reaction]
   public let reply: Reply?
   public let sendState: SendState
+  /// The picture, video, voice message, file or sticker of the message; `nil` for text.
+  public let media: MediaReference?
 
   public init(
     eventId: String?, senderId: String, senderName: String, isOwn: Bool, date: Date, body: Body,
     isEdited: Bool = false, reactions: [Reaction] = [], reply: Reply? = nil,
-    sendState: SendState = .sent
+    sendState: SendState = .sent, media: MediaReference? = nil
   ) {
     self.eventId = eventId
     self.senderId = senderId
@@ -103,6 +105,7 @@ public struct TimelineMessage: Sendable, Equatable {
     self.reactions = reactions
     self.reply = reply
     self.sendState = sendState
+    self.media = media
   }
 }
 

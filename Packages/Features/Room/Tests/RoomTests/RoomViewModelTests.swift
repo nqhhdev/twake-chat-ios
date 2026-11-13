@@ -17,7 +17,9 @@ struct RoomViewModelTests {
   }
 
   private func viewModel(_ repository: FakeTimelineRepository) -> RoomViewModel {
-    RoomViewModel(roomId: "!room:example.org", roomName: "Team", repository: repository)
+    RoomViewModel(
+      roomId: "!room:example.org", roomName: "Team", repository: repository,
+      media: FakeMediaRepository())
   }
 
   @Test func showsTheItemsTheRepositoryPublishesAndClosesWhenTheScreenGoes() async {
@@ -132,5 +134,51 @@ struct RoomViewModelTests {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     #expect(RoomViewModel.dayTitle(now, now: now) == "Today")
     #expect(RoomViewModel.dayTitle(now.addingTimeInterval(-86_400), now: now) == "Yesterday")
+  }
+}
+
+@MainActor
+struct RoomMediaTests {
+  private let reference = MediaReference(source: "{}", mimeType: "application/pdf", size: 1_200_000)
+
+  private func message(_ body: TimelineMessage.Body) -> TimelineMessage {
+    TimelineMessage(
+      eventId: "$1", senderId: "@bob:example.org", senderName: "Bob", isOwn: false, date: .now,
+      body: body,
+      media: reference)
+  }
+
+  @Test func aFileIsSavedUnderItsName() async {
+    let media = FakeMediaRepository()
+    let viewModel = RoomViewModel(
+      roomId: "!r", roomName: "Team", repository: FakeTimelineRepository(), media: media)
+    let url = await viewModel.file(of: message(.file(name: "report.pdf")))
+    #expect(url?.lastPathComponent == "report.pdf")
+    #expect(media.fileNames == ["report.pdf"])
+  }
+
+  @Test func aFailedDownloadShowsAnError() async {
+    let media = FakeMediaRepository()
+    media.result = .failure(.downloadFailed)
+    let viewModel = RoomViewModel(
+      roomId: "!r", roomName: "Team", repository: FakeTimelineRepository(), media: media)
+    #expect(await viewModel.file(of: message(.file(name: "report.pdf"))) == nil)
+    #expect(viewModel.errorMessage == "Could not download the file.")
+  }
+
+  @Test func emptyCaptionsAreNotShown() {
+    #expect(MessageRow.caption(of: .image(caption: "")) == nil)
+    #expect(MessageRow.caption(of: .image(caption: "Holiday")) == "Holiday")
+    #expect(MessageRow.caption(of: .file(name: "a.pdf")) == nil)
+  }
+
+  @Test func aPictureKeepsItsAspectRatio() {
+    #expect(MediaReference(source: "{}", width: 200, height: 100).aspectRatio == 0.5)
+    #expect(MediaReference(source: "{}").aspectRatio == nil)
+  }
+
+  @Test func sizesReadLikeFiles() {
+    #expect(RoomViewModel.sizeText(nil) == nil)
+    #expect(RoomViewModel.sizeText(1_200_000) != nil)
   }
 }

@@ -1,0 +1,224 @@
+import DesignSystem
+import Domain
+import SwiftUI
+
+/// The media of a message inside its bubble, as the Flutter chat shows it: pictures, videos and stickers as a
+/// thumbnail at their aspect ratio (a tap opens a picture full screen), voice messages and files as a row with the name
+/// and size (a tap downloads the file and offers to open or share it).
+struct MessageMediaView: View {
+  let message: TimelineMessage
+  let media: MediaReference
+  let width: CGFloat
+  let viewModel: RoomViewModel
+
+  @State private var isViewerShown = false
+  @State private var downloaded: DownloadedFile?
+  @State private var isDownloading = false
+
+  var body: some View {
+    switch message.body {
+    case .image, .sticker, .video:
+      thumbnail
+    default:
+      fileRow
+    }
+  }
+
+  /// `MessageStyle` caps a picture at the bubble width and 300 pt tall; without a size it is square.
+  private var thumbnailSize: CGSize {
+    let ratio = media.aspectRatio ?? 1
+    let height = min(300, width * ratio)
+    return CGSize(width: min(width, height / ratio), height: height)
+  }
+
+  private var thumbnail: some View {
+    let size = thumbnailSize
+    return RemoteImage(media: media, size: size, repository: viewModel.media)
+      .frame(width: size.width, height: size.height)
+      .clipShape(.rect(cornerRadius: 12))
+      .overlay {
+        if case .video = message.body {
+          Image(systemName: "play.circle.fill")
+            .font(.system(size: 44))
+            .foregroundStyle(.white.opacity(0.9))
+        }
+      }
+      .contentShape(Rectangle())
+      .onTapGesture {
+        if case .video = message.body {
+          Task { await download() }
+        } else {
+          isViewerShown = true
+        }
+      }
+      .fullScreenCover(isPresented: $isViewerShown) {
+        ImageViewer(media: media, repository: viewModel.media, title: message.senderName)
+      }
+      .sheet(item: $downloaded) { file in ShareSheetLink(url: file.url) }
+  }
+
+  private var isAudio: Bool {
+    if case .audio = message.body { true } else { false }
+  }
+
+  private var fileRow: some View {
+    Button {
+      Task { await download() }
+    } label: {
+      HStack(spacing: 12) {
+        ZStack {
+          Circle().fill(SysColors.primary).frame(width: 40, height: 40)
+          if isDownloading {
+            ProgressView().tint(.white)
+          } else {
+            Image(systemName: isAudio ? "waveform" : "doc.fill")
+              .foregroundStyle(.white)
+          }
+        }
+        VStack(alignment: .leading, spacing: 2) {
+          Text(RoomViewModel.fileName(of: message))
+            .textStyle(TextStyles.bodyMedium)
+            .foregroundStyle(SysColors.onSurface)
+            .lineLimit(2)
+          if let size = RoomViewModel.sizeText(media.size) {
+            Text(size).textStyle(TextStyles.labelSmall).foregroundStyle(SysColors.textSecondary)
+          }
+        }
+      }
+    }
+    .buttonStyle(.plain)
+    .disabled(isDownloading)
+    .sheet(item: $downloaded) { file in ShareSheetLink(url: file.url) }
+  }
+
+  private func download() async {
+    guard !isDownloading else { return }
+    isDownloading = true
+    defer { isDownloading = false }
+    downloaded = await viewModel.file(of: message).map(DownloadedFile.init(url:))
+  }
+}
+
+/// A downloaded file, as the sheet that offers it needs it.
+struct DownloadedFile: Identifiable {
+  let url: URL
+  var id: URL { url }
+}
+
+/// A sheet that offers to open or share a downloaded file.
+struct ShareSheetLink: View {
+  let url: URL
+
+  var body: some View {
+    VStack(spacing: 16) {
+      Image(systemName: "doc.fill").font(.system(size: 44)).foregroundStyle(SysColors.primary)
+      Text(url.lastPathComponent).textStyle(TextStyles.titleMedium).multilineTextAlignment(.center)
+      ShareLink(item: url) {
+        Label("Share", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
+      }
+      .buttonStyle(.twakePrimary)
+    }
+    .padding(24)
+    .presentationDetents([.medium])
+  }
+}
+
+/// A thumbnail loaded from the media repository; a neutral box with an icon while it loads or when it fails.
+struct RemoteImage: View {
+  let media: MediaReference
+  let size: CGSize
+  let repository: any MediaRepository
+
+  @State private var image: UIImage?
+  @State private var failed = false
+  @Environment(\.displayScale) private var scale
+
+  var body: some View {
+    ZStack {
+      if let image {
+        Image(uiImage: image).resizable().scaledToFill()
+      } else {
+        Rectangle().fill(SysColors.surface)
+        if failed {
+          Image(systemName: "photo").foregroundStyle(SysColors.textSecondary)
+        } else {
+          ProgressView()
+        }
+      }
+    }
+    .task(id: media.source) {
+      do {
+        let data = try await repository.thumbnail(
+          media, width: Int(size.width * scale), height: Int(size.height * scale))
+        image = UIImage(data: data)
+        failed = image == nil
+      } catch {
+        failed = true
+      }
+    }
+  }
+}
+
+/// A picture full screen, pinch to zoom, with Close and Share, as the Flutter image viewer.
+struct ImageViewer: View {
+  let media: MediaReference
+  let repository: any MediaRepository
+  let title: String
+
+  @Environment(\.dismiss) private var dismiss
+  @State private var image: UIImage?
+  @State private var failed = false
+  @State private var zoom: CGFloat = 1
+  @State private var lastZoom: CGFloat = 1
+
+  var body: some View {
+    NavigationStack {
+      ZStack {
+        Color.black.ignoresSafeArea()
+        if let image {
+          Image(uiImage: image)
+            .resizable()
+            .scaledToFit()
+            .scaleEffect(zoom)
+            .gesture(
+              MagnifyGesture()
+                .onChanged { zoom = max(1, lastZoom * $0.magnification) }
+                .onEnded { _ in lastZoom = zoom }
+            )
+            .onTapGesture(count: 2) {
+              zoom = zoom > 1 ? 1 : 2
+              lastZoom = zoom
+            }
+        } else if failed {
+          Label("Could not load the picture.", systemImage: "photo").foregroundStyle(.white)
+        } else {
+          ProgressView().tint(.white)
+        }
+      }
+      .navigationTitle(title)
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbarBackground(.black, for: .navigationBar)
+      .toolbarColorScheme(.dark, for: .navigationBar)
+      .toolbar {
+        ToolbarItem(placement: .topBarLeading) {
+          Button("Close", systemImage: "xmark") { dismiss() }
+        }
+        if let image {
+          ToolbarItem(placement: .topBarTrailing) {
+            ShareLink(
+              item: Image(uiImage: image),
+              preview: SharePreview(title, image: Image(uiImage: image)))
+          }
+        }
+      }
+    }
+    .task {
+      do {
+        image = UIImage(data: try await repository.content(media))
+        failed = image == nil
+      } catch {
+        failed = true
+      }
+    }
+  }
+}

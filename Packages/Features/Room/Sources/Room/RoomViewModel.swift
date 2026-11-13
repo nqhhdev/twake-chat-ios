@@ -30,15 +30,31 @@ public final class RoomViewModel {
   public private(set) var errorMessage: String?
 
   @ObservationIgnored private let repository: any TimelineRepository
+  /// Loads the pictures and files of messages.
+  @ObservationIgnored public let media: any MediaRepository
+  @ObservationIgnored private let detailsRepository: (any RoomDetailsRepository)?
+  @ObservationIgnored private let onLeft: @MainActor () -> Void
   @ObservationIgnored private var startCount = 0
 
   /// The quick reactions of the Flutter message menu.
   public static let quickReactions = ["👍", "❤️", "😂", "😮", "😢", "🙏"]
 
-  public init(roomId: String, roomName: String, repository: any TimelineRepository) {
+  public init(
+    roomId: String, roomName: String, repository: any TimelineRepository,
+    media: any MediaRepository,
+    details: (any RoomDetailsRepository)? = nil, onLeft: @escaping @MainActor () -> Void = {}
+  ) {
     self.roomId = roomId
     self.roomName = roomName
     self.repository = repository
+    self.media = media
+    self.detailsRepository = details
+    self.onLeft = onLeft
+  }
+
+  /// The details page of this room, or `nil` when the app gave no details repository.
+  public func makeDetails() -> RoomDetailsViewModel? {
+    detailsRepository.map { RoomDetailsViewModel(roomId: roomId, repository: $0, onLeft: onLeft) }
   }
 
   /// Opens the timeline and follows it until the calling task is cancelled (the screen goes away); then closes it.
@@ -136,6 +152,33 @@ public final class RoomViewModel {
     } catch {
       errorMessage = "Could not send the reaction."
     }
+  }
+
+  /// Saves a message's file in a temporary folder to open or share it; `nil` (with a message) when it cannot be loaded.
+  public func file(of message: TimelineMessage) async -> URL? {
+    guard let reference = message.media else { return nil }
+    do {
+      return try await media.file(reference, filename: Self.fileName(of: message))
+    } catch {
+      errorMessage = "Could not download the file."
+      return nil
+    }
+  }
+
+  /// The name a message's file is saved under.
+  public static func fileName(of message: TimelineMessage) -> String {
+    switch message.body {
+    case .file(let name): name
+    case .image: "image"
+    case .video: "video"
+    case .audio: "audio"
+    default: "file"
+    }
+  }
+
+  /// "1.2 MB" for a file's size, as the Flutter file bubble shows it.
+  public static func sizeText(_ bytes: Int?) -> String? {
+    bytes.map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) }
   }
 
   /// The text a message's Copy action copies, or `nil` for a message without text.

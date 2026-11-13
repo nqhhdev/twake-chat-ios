@@ -52,12 +52,17 @@ enum TimelineItemMapper {
     let eventId: String? =
       if case .eventId(let value) = event.eventOrTransactionId { value } else { nil }
     var isEdited = false
+    var media: MediaReference?
     let body: TimelineMessage.Body
     switch content.kind {
     case .message(let message):
       isEdited = message.isEdited
       body = Self.body(message.msgType)
-    case .sticker(let text, _, _): body = .sticker(text)
+      media = Self.media(message.msgType)
+    case .sticker(let text, let info, let source):
+      body = .sticker(text)
+      media = reference(
+        source, info.thumbnailSource, info.mimetype, info.size, info.width, info.height)
     case .poll(let question, _, _, _, _, _, _): body = .poll(question: question)
     case .redacted: body = .redacted
     case .unableToDecrypt: body = .unableToDecrypt
@@ -71,7 +76,7 @@ enum TimelineItemMapper {
     return TimelineMessage(
       eventId: eventId, senderId: event.sender, senderName: sender, isOwn: event.isOwn,
       date: date(event.timestamp), body: body, isEdited: isEdited, reactions: reactions,
-      reply: content.inReplyTo.map(reply), sendState: sendState(event.localSendState))
+      reply: content.inReplyTo.map(reply), sendState: sendState(event.localSendState), media: media)
   }
 
   static func body(_ type: MessageType) -> TimelineMessage.Body {
@@ -87,6 +92,40 @@ enum TimelineItemMapper {
     case .other(_, let body): .text(body)
     default: .unsupported
     }
+  }
+
+  /// The media of a picture, video, voice message or file; `nil` for the other message types.
+  static func media(_ type: MessageType) -> MediaReference? {
+    switch type {
+    case .image(let content):
+      let info = content.info
+      return reference(
+        content.source, info?.thumbnailSource, info?.mimetype, info?.size, info?.width, info?.height
+      )
+    case .video(let content):
+      let info = content.info
+      return reference(
+        content.source, info?.thumbnailSource, info?.mimetype, info?.size, info?.width, info?.height
+      )
+    case .audio(let content):
+      return reference(content.source, nil, content.info?.mimetype, content.info?.size, nil, nil)
+    case .file(let content):
+      let info = content.info
+      return reference(content.source, info?.thumbnailSource, info?.mimetype, info?.size, nil, nil)
+    default:
+      return nil
+    }
+  }
+
+  private static func reference(
+    _ source: MediaSource, _ thumbnail: MediaSource?, _ mimeType: String?, _ size: UInt64?,
+    _ width: UInt64?,
+    _ height: UInt64?
+  ) -> MediaReference {
+    MediaReference(
+      source: source.toJson(), thumbnailSource: thumbnail?.toJson(), mimeType: mimeType,
+      size: size.map { Int(clamping: $0) }, width: width.map { Int(clamping: $0) },
+      height: height.map { Int(clamping: $0) })
   }
 
   private static func reply(_ details: InReplyToDetails) -> TimelineMessage.Reply {

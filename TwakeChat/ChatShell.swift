@@ -10,7 +10,8 @@ import SwiftUI
 /// and Room features, which do not know each other (ADR 0005).
 struct ChatShell: View {
   let chatList: ChatListViewModel
-  let makeRoom: (RoomSummary) -> RoomViewModel
+  /// Makes a room's screen model; the closure it is given closes the room (after the user left it).
+  let makeRoom: (RoomSummary, @escaping @MainActor () -> Void) -> RoomViewModel
 
   @State private var room: RoomViewModel?
   @State private var isRoomPushed = false
@@ -49,7 +50,12 @@ struct ChatShell: View {
   }
 
   private func open(_ summary: RoomSummary) {
-    if room?.roomId != summary.id { room = makeRoom(summary) }
+    if room?.roomId != summary.id {
+      room = makeRoom(summary) { [room = $room, pushed = $isRoomPushed] in
+        pushed.wrappedValue = false
+        room.wrappedValue = nil
+      }
+    }
     isRoomPushed = true
   }
 }

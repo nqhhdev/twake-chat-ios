@@ -32,6 +32,8 @@ final class RootCoordinator {
   @ObservationIgnored private let repository: any AuthenticationRepository
   @ObservationIgnored private let roomList: (any RoomListRepository)?
   @ObservationIgnored private let makeTimeline: (String) -> any TimelineRepository
+  @ObservationIgnored private let media: any MediaRepository
+  @ObservationIgnored private let roomDetails: (any RoomDetailsRepository)?
   @ObservationIgnored private let signInConfiguration: SignInConfiguration
   @ObservationIgnored private let webAuthenticator: any WebAuthenticator
 
@@ -43,11 +45,15 @@ final class RootCoordinator {
   init(
     repository: any AuthenticationRepository, roomList: (any RoomListRepository)? = nil,
     makeTimeline: @escaping (String) -> any TimelineRepository = { _ in UnavailableTimeline() },
+    media: any MediaRepository = UnavailableMedia(),
+    roomDetails: (any RoomDetailsRepository)? = nil,
     signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator
   ) {
     self.repository = repository
     self.roomList = roomList
     self.makeTimeline = makeTimeline
+    self.media = media
+    self.roomDetails = roomDetails
     self.signInConfiguration = signInConfiguration
     self.webAuthenticator = webAuthenticator
   }
@@ -70,9 +76,12 @@ final class RootCoordinator {
     return viewModel
   }
 
-  /// A room's screen model on its own timeline; the shell keeps the open one.
-  func room(for summary: RoomSummary) -> RoomViewModel {
-    RoomViewModel(roomId: summary.id, roomName: summary.name, repository: makeTimeline(summary.id))
+  /// A room's screen model on its own timeline; the shell keeps the open one and closes it through `onLeft`.
+  func room(for summary: RoomSummary, onLeft: @escaping @MainActor () -> Void) -> RoomViewModel {
+    RoomViewModel(
+      roomId: summary.id, roomName: summary.name, repository: makeTimeline(summary.id),
+      media: media,
+      details: roomDetails, onLeft: onLeft)
   }
 
   @ObservationIgnored private var started = false
@@ -145,7 +154,7 @@ struct RootView: View {
     } else if let authentication = coordinator.authentication {
       AuthenticationCoordinatorView(coordinator: authentication) { signedIn in
         if let chatList = coordinator.chatList(for: signedIn) {
-          ChatShell(chatList: chatList, makeRoom: coordinator.room(for:))
+          ChatShell(chatList: chatList, makeRoom: coordinator.room(for:onLeft:))
         }
       }
     } else {
@@ -170,4 +179,16 @@ struct UnavailableTimeline: TimelineRepository {
   }
   func markAsRead() async {}
   func close() async {}
+}
+
+/// The media of a root built without it (tests that never open a room): nothing loads.
+struct UnavailableMedia: MediaRepository {
+  func thumbnail(_ media: MediaReference, width: Int, height: Int) async throws(MediaError) -> Data
+  {
+    throw .notSignedIn
+  }
+  func content(_ media: MediaReference) async throws(MediaError) -> Data { throw .notSignedIn }
+  func file(_ media: MediaReference, filename: String) async throws(MediaError) -> URL {
+    throw .notSignedIn
+  }
 }

@@ -8,6 +8,7 @@ import SwiftUI
 /// no logic.
 public struct RoomScreen: View {
   @Bindable var viewModel: RoomViewModel
+  @State private var details: RoomDetailsViewModel?
 
   public init(viewModel: RoomViewModel) {
     self.viewModel = viewModel
@@ -30,6 +31,22 @@ public struct RoomScreen: View {
     .background(SysColors.background)
     .navigationTitle(viewModel.roomName)
     .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      // As in the Flutter chat, the header opens the chat details.
+      ToolbarItem(placement: .principal) {
+        Button {
+          details = viewModel.makeDetails()
+        } label: {
+          HStack(spacing: 8) {
+            TwakeAvatar(name: viewModel.roomName, size: 32)
+            Text(viewModel.roomName).textStyle(TextStyles.titleMedium).lineLimit(1)
+          }
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Shows the chat details")
+      }
+    }
+    .navigationDestination(item: $details) { details in RoomDetailsScreen(viewModel: details) }
     .task(id: viewModel.roomId) { await viewModel.start() }
   }
 
@@ -148,8 +165,18 @@ struct MessageRow: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
       }
-      MessageBody(content: message.body)
-        .frame(maxWidth: .infinity, alignment: .leading)
+      if let media = message.media {
+        MessageMediaView(message: message, media: media, width: contentWidth, viewModel: viewModel)
+        if let caption = Self.caption(of: message.body) {
+          Text(caption)
+            .textStyle(TextStyleToken(size: 15, lineHeight: 20, weight: .regular, letterSpacing: 0))
+            .foregroundStyle(SysColors.onSurface)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+      } else {
+        MessageBody(content: message.body)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
       HStack(spacing: 4) {
         if message.isEdited { Text("edited") }
         Text(message.date, format: .dateTime.hour().minute())
@@ -166,6 +193,15 @@ struct MessageRow: View {
     )
     .shadow(color: .black.opacity(message.isOwn ? 0 : 0.12), radius: 1)
     .contextMenu { menu }
+  }
+
+  /// The caption under a picture or video; a file's or a voice message's row already shows its name.
+  static func caption(of body: TimelineMessage.Body) -> String? {
+    switch body {
+    case .image(let caption?), .video(let caption?):
+      caption.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : caption
+    default: nil
+    }
   }
 
   @ViewBuilder private var sendStateIcon: some View {
