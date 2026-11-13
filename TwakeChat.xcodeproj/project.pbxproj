@@ -7,19 +7,19 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A10000000000000000000071 /* MatrixData in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000072 /* MatrixData */; };
+		A10000000000000000000081 /* AppShared in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000082 /* AppShared */; };
+		A10000000000000000000083 /* MatrixData in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000084 /* MatrixData */; };
+		A10000000000000000000085 /* Domain in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000086 /* Domain */; };
+		A10000000000000000000087 /* AppShared in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000088 /* AppShared */; };
+		A10000000000000000000089 /* Domain in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000008A /* Domain */; };
+		A1000000000000000000008B /* AuthenticationTestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000008C /* AuthenticationTestSupport */; };
 		A1000000000000000000B001 /* Domain in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D001 /* Domain */; };
 		A1000000000000000000B002 /* AppShared in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D002 /* AppShared */; };
 		A1000000000000000000B003 /* DesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D003 /* DesignSystem */; };
 		A1000000000000000000B004 /* MatrixData in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D004 /* MatrixData */; };
-		A10000000000000000000071 /* MatrixData in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000072 /* MatrixData */; };
-		A10000000000000000000081 /* AppShared in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000082 /* AppShared */; };
-		A10000000000000000000083 /* MatrixData in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000084 /* MatrixData */; };
-		A10000000000000000000089 /* Domain in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000008A /* Domain */; };
-		A10000000000000000000085 /* Domain in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000086 /* Domain */; };
-		A10000000000000000000087 /* AppShared in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000088 /* AppShared */; };
 		A1000000000000000000B005 /* Authentication in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D005 /* Authentication */; };
 		A1000000000000000000B006 /* ChatList in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D006 /* ChatList */; };
-		A1000000000000000000008B /* AuthenticationTestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000008C /* AuthenticationTestSupport */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -126,6 +126,16 @@
 			);
 			sourceTree = "<group>";
 		};
+		A10000000000000000000005 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000002 /* TwakeChat.app */,
+				A10000000000000000000060 /* TwakeChatTests.xctest */,
+				A10000000000000000000070 /* MatrixDataTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
 		A10000000000000000000006 /* Packages */ = {
 			isa = PBXGroup;
 			children = (
@@ -137,16 +147,6 @@
 				A1000000000000000000E006 /* ChatList */,
 			);
 			name = Packages;
-			sourceTree = "<group>";
-		};
-		A10000000000000000000005 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				A10000000000000000000002 /* TwakeChat.app */,
-				A10000000000000000000060 /* TwakeChatTests.xctest */,
-				A10000000000000000000070 /* MatrixDataTests.xctest */,
-			);
-			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -400,8 +400,8 @@
 		A10000000000000000000052 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
 				CODE_SIGN_ENTITLEMENTS = TwakeChat/TwakeChat.entitlements;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2331;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TwakeChat/Info.plist;
@@ -410,25 +410,28 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				LM_SKIP_METADATA_EXTRACTION = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				LM_SKIP_METADATA_EXTRACTION = YES;
 				MARKETING_VERSION = 3.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.twake.ios.chat;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TWAKE_DEFAULT_HOMESERVER = "https://matrix.stg.lin-saas.com";
+				TWAKE_DEFAULT_HOMESERVER = "https://matrix.stg.lin-saas.com/";
+				TWAKE_PRIVACY_URL = "https://twake.app/en/privacy/";
+				TWAKE_REGISTRATION_URL = "https://sign-up.stg.lin-saas.com/";
+				TWAKE_WORKPLACE_HOMESERVER = "https://tom.stg.lin-saas.com/";
 			};
 			name = Debug;
 		};
 		A10000000000000000000053 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
 				CODE_SIGN_ENTITLEMENTS = TwakeChat/TwakeChat.entitlements;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2331;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TwakeChat/Info.plist;
@@ -437,16 +440,20 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				LM_SKIP_METADATA_EXTRACTION = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				LM_SKIP_METADATA_EXTRACTION = YES;
 				MARKETING_VERSION = 3.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.twake.ios.chat;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				TWAKE_DEFAULT_HOMESERVER = "https://matrix.twake.app/";
+				TWAKE_PRIVACY_URL = "https://twake.app/policy";
+				TWAKE_REGISTRATION_URL = "https://sign-up.twake.app/";
+				TWAKE_WORKPLACE_HOMESERVER = "https://matrix.twake.app";
 			};
 			name = Release;
 		};
@@ -575,6 +582,34 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A10000000000000000000072 /* MatrixData */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MatrixData;
+		};
+		A10000000000000000000082 /* AppShared */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AppShared;
+		};
+		A10000000000000000000084 /* MatrixData */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MatrixData;
+		};
+		A10000000000000000000086 /* Domain */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Domain;
+		};
+		A10000000000000000000088 /* AppShared */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AppShared;
+		};
+		A1000000000000000000008A /* Domain */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Domain;
+		};
+		A1000000000000000000008C /* AuthenticationTestSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AuthenticationTestSupport;
+		};
 		A1000000000000000000D001 /* Domain */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Domain;
@@ -591,30 +626,6 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = MatrixData;
 		};
-		A10000000000000000000072 /* MatrixData */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = MatrixData;
-		};
-		A10000000000000000000082 /* AppShared */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = AppShared;
-		};
-		A10000000000000000000084 /* MatrixData */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = MatrixData;
-		};
-		A1000000000000000000008A /* Domain */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = Domain;
-		};
-		A10000000000000000000086 /* Domain */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = Domain;
-		};
-		A10000000000000000000088 /* AppShared */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = AppShared;
-		};
 		A1000000000000000000D005 /* Authentication */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Authentication;
@@ -622,10 +633,6 @@
 		A1000000000000000000D006 /* ChatList */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ChatList;
-		};
-		A1000000000000000000008C /* AuthenticationTestSupport */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = AuthenticationTestSupport;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

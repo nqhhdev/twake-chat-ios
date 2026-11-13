@@ -63,7 +63,7 @@ struct RootChatListTests {
     await chatList.logOut()
     #expect(repository.logoutCallCount == 1)
     #expect(chatList.logOutErrorMessage == nil)
-    guard case .passwordLogin = root.authentication?.screen else {
+    guard isSignedOut(root) else {
       Issue.record("expected the sign-in form after logout")
       return
     }
@@ -91,7 +91,7 @@ struct RootChatListTests {
     let (root, firstSignedIn) = try await signedInRoot(repository)
     let firstChatList = try #require(root.chatList(for: firstSignedIn))
     await firstChatList.logOut()
-    guard case .passwordLogin(let form) = root.authentication?.screen else {
+    guard let form = await passwordForm(of: root) else {
       Issue.record("expected the sign-in form after logout")
       return
     }

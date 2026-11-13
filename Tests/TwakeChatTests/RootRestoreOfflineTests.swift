@@ -59,7 +59,7 @@ struct RootRestoreOfflineTests {
     await root.logOutAfterFailedRestore()
     #expect(repository.logoutCallCount == 1)
     #expect(root.state == .restored(nil))
-    guard case .passwordLogin = root.authentication?.screen else {
+    guard isSignedOut(root) else {
       Issue.record("expected the sign-in form")
       return
     }

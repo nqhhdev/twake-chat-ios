@@ -36,13 +36,13 @@ struct RootViewTests {
     #expect(signedIn.userId == "@alice:example.org")
   }
 
-  @Test func noSavedSessionShowsLogin() async {
+  @Test func noSavedSessionShowsTwakeWelcomeThenTheCompanyServerForm() async {
     let repository = FakeAuthenticationRepository()
     repository.restoreResult = .success(nil)
     let root = RootCoordinator(repository: repository, defaultHomeserver: homeserver)
     await root.start()
     #expect(root.state == .restored(nil))
-    guard case .passwordLogin(let login) = root.authentication?.screen else {
+    guard let login = await passwordForm(of: root) else {
       Issue.record("expected the login form")
       return
     }
@@ -68,15 +68,24 @@ struct RootViewTests {
     #expect(root.authentication == nil)
   }
 
-  /// Hosted in the Debug app: the build configuration's development homeserver reaches the Info.plist key the
-  /// composition root reads, as a usable URL (ADR 0019).
-  @Test func theDebugBuildConfiguresTheStagingHomeserver() throws {
-    let value = try #require(
-      Bundle.main.object(forInfoDictionaryKey: "DefaultHomeserver") as? String)
-    #expect(value == "https://matrix.stg.lin-saas.com")
-    let url = try #require(URL(string: value))
-    #expect(url.scheme == "https")
-    #expect(url.host() == "matrix.stg.lin-saas.com")
+  /// Hosted in the Debug app: the build configuration's staging sign-in URLs (twake-on-matrix `config.json`) reach the
+  /// Info.plist keys the composition root reads. None is a secret.
+  @Test func theDebugBuildConfiguresStagingSignIn() throws {
+    func value(_ key: String) throws -> String {
+      try #require(Bundle.main.object(forInfoDictionaryKey: key) as? String)
+    }
+    #expect(try value("DefaultHomeserver") == "https://matrix.stg.lin-saas.com/")
+    #expect(try value("RegistrationURL") == "https://sign-up.stg.lin-saas.com/")
+    #expect(try value("WorkplaceHomeserver") == "https://tom.stg.lin-saas.com/")
+    #expect(try value("PrivacyURL") == "https://twake.app/en/privacy/")
+  }
+
+  /// The SSO pages call back on `twake.chat`, and Matrix links use `matrix`, as in the Flutter app.
+  @Test func theAppRegistersTheTwakeChatAndMatrixSchemes() throws {
+    let types = try #require(Bundle.main.object(forInfoDictionaryKey: "CFBundleURLTypes") as? [[String: Any]])
+    let schemes = types.flatMap { $0["CFBundleURLSchemes"] as? [String] ?? [] }
+    #expect(schemes.contains("twake.chat"))
+    #expect(schemes.contains("matrix"))
   }
 
   @Test func signingInAfterAnEmptyRestoreShowsSignedIn() async throws {
@@ -85,7 +94,7 @@ struct RootViewTests {
     repository.loginResult = .success(session)
     let root = RootCoordinator(repository: repository, defaultHomeserver: homeserver)
     await root.start()
-    guard case .passwordLogin(let login) = root.authentication?.screen else {
+    guard let login = await passwordForm(of: root) else {
       Issue.record("expected the login form")
       return
     }
@@ -98,7 +107,7 @@ struct RootViewTests {
     }
     await signedIn.logOut()
     #expect(repository.logoutCallCount == 1)
-    guard case .passwordLogin = root.authentication?.screen else {
+    guard isSignedOut(root) else {
       Issue.record("expected the login form after logout")
       return
     }

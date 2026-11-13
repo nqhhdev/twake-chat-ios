@@ -1,18 +1,13 @@
+import Authentication
+import ChatList
 import Domain
 import Foundation
 import Observation
 import SwiftUI
 
-#if DEBUG
-  import Authentication
-  import ChatList
-#endif
-
 /// The root coordinator. At launch it restores the saved session, then hands over to the authentication flow, which
-/// starts signed in or on the sign-in form. Signed in, it shows the chat list, whose Log out goes back to the
-/// authentication flow: the root joins the two features, which do not know each other (ADR 0005). Sign-in exists only
-/// in Debug builds (ADR 0019); a Release build shows an
-/// empty screen until SSO lands (ADR 0008).
+/// starts signed in or on TwakeWelcome. Signed in, it shows the chat list, whose Log out goes back to the
+/// authentication flow: the root joins the two features, which do not know each other (ADR 0005).
 @MainActor @Observable
 final class RootCoordinator {
   enum State: Equatable {
@@ -29,49 +24,55 @@ final class RootCoordinator {
   /// Shown on the restore-failed screen when Log out failed and the session is still saved on this device.
   private(set) var logOutErrorMessage: String?
 
-  #if DEBUG
-    /// The authentication flow, created once the restore is done.
-    private(set) var authentication: AuthenticationCoordinator?
-  #endif
+  /// The authentication flow, created once the restore is done.
+  private(set) var authentication: AuthenticationCoordinator?
 
   @ObservationIgnored private let repository: any AuthenticationRepository
   @ObservationIgnored private let roomList: (any RoomListRepository)?
-  @ObservationIgnored private let defaultHomeserver: URL?
+  @ObservationIgnored private let signInConfiguration: SignInConfiguration
+  @ObservationIgnored private let webAuthenticator: any WebAuthenticator
 
   /// - Parameters:
   ///   - roomList: The signed-in user's rooms; the app passes MatrixData's `RoomListProxy`. Tests that never reach the
   ///     chat list leave it out, and the signed-in screen is then empty.
-  ///   - defaultHomeserver: Prefills the Debug sign-in form; Release passes `nil`.
+  ///   - signInConfiguration: The build's sign-in URLs.
+  ///   - webAuthenticator: Opens the SSO pages.
   init(
     repository: any AuthenticationRepository, roomList: (any RoomListRepository)? = nil,
-    defaultHomeserver: URL?
+    signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator
   ) {
     self.repository = repository
     self.roomList = roomList
-    self.defaultHomeserver = defaultHomeserver
+    self.signInConfiguration = signInConfiguration
+    self.webAuthenticator = webAuthenticator
   }
 
-  #if DEBUG
-    /// The chat list of the current signed-in state, kept so the screen keeps its state while it is shown.
-    @ObservationIgnored private var chatList:
-      (signedIn: SignedInViewModel, viewModel: ChatListViewModel)?
+  /// The chat list of the current signed-in state, kept so the screen keeps its state while it is shown.
+  @ObservationIgnored private var chatList:
+    (signedIn: SignedInViewModel, viewModel: ChatListViewModel)?
 
-    /// The chat list for a signed-in state, created once per sign-in. Its Log out runs the signed-in state's logout,
-    /// which shows the sign-in form when it succeeds.
-    func chatList(for signedIn: SignedInViewModel) -> ChatListViewModel? {
-      if let chatList, chatList.signedIn === signedIn { return chatList.viewModel }
-      guard let roomList else { return nil }
-      let viewModel = ChatListViewModel(repository: roomList) { [weak signedIn] in
-        guard let signedIn else { return false }
-        await signedIn.logOut()
-        return signedIn.errorMessage == nil
-      }
-      chatList = (signedIn, viewModel)
-      return viewModel
+  /// The chat list for a signed-in state, created once per sign-in. Its Log out runs the signed-in state's logout,
+  /// which shows the sign-in form when it succeeds.
+  func chatList(for signedIn: SignedInViewModel) -> ChatListViewModel? {
+    if let chatList, chatList.signedIn === signedIn { return chatList.viewModel }
+    guard let roomList else { return nil }
+    let viewModel = ChatListViewModel(repository: roomList) { [weak signedIn] in
+      guard let signedIn else { return false }
+      await signedIn.logOut()
+      return signedIn.errorMessage == nil
     }
-  #endif
+    chatList = (signedIn, viewModel)
+    return viewModel
+  }
 
   @ObservationIgnored private var started = false
+
+  private func makeAuthentication(session: UserSession?) -> AuthenticationCoordinator {
+    AuthenticationCoordinator(
+      repository: repository, configuration: signInConfiguration,
+      webAuthenticator: webAuthenticator,
+      session: session)
+  }
 
   /// Restores the saved session once, also when several windows start it together. A restore error keeps the saved
   /// session and its store and sets `restoreFailed`: calling `start()` again tries once more. The Domain errors cannot
@@ -92,10 +93,7 @@ final class RootCoordinator {
       return
     }
     state = .restored(session)
-    #if DEBUG
-      authentication = AuthenticationCoordinator(
-        repository: repository, defaultHomeserver: defaultHomeserver, session: session)
-    #endif
+    authentication = makeAuthentication(session: session)
   }
 
   /// The way out of `restoreFailed` when the error does not pass: signs out (the repository clears the local session
@@ -114,10 +112,7 @@ final class RootCoordinator {
       return
     }
     state = .restored(nil)
-    #if DEBUG
-      authentication = AuthenticationCoordinator(
-        repository: repository, defaultHomeserver: defaultHomeserver, session: nil)
-    #endif
+    authentication = makeAuthentication(session: nil)
   }
 }
 
@@ -130,26 +125,21 @@ struct RootView: View {
       .task { await coordinator.start() }
   }
 
-  /// The screens come from the Authentication and ChatList feature packages; Release, which cannot sign in, stays
-  /// empty.
+  /// The screens come from the Authentication and ChatList feature packages.
   @ViewBuilder private var content: some View {
-    #if DEBUG
-      if coordinator.state == .restoreFailed {
-        RestoreFailedScreen(
-          errorMessage: coordinator.logOutErrorMessage,
-          retry: { Task { await coordinator.start() } },
-          logOut: { Task { await coordinator.logOutAfterFailedRestore() } })
-      } else if let authentication = coordinator.authentication {
-        AuthenticationCoordinatorView(coordinator: authentication) { signedIn in
-          if let chatList = coordinator.chatList(for: signedIn) {
-            ChatListScreen(viewModel: chatList)
-          }
+    if coordinator.state == .restoreFailed {
+      RestoreFailedScreen(
+        errorMessage: coordinator.logOutErrorMessage,
+        retry: { Task { await coordinator.start() } },
+        logOut: { Task { await coordinator.logOutAfterFailedRestore() } })
+    } else if let authentication = coordinator.authentication {
+      AuthenticationCoordinatorView(coordinator: authentication) { signedIn in
+        if let chatList = coordinator.chatList(for: signedIn) {
+          ChatListScreen(viewModel: chatList)
         }
-      } else {
-        Color.clear
       }
-    #else
+    } else {
       Color.clear
-    #endif
+    }
   }
 }

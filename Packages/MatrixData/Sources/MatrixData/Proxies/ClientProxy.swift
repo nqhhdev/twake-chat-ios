@@ -28,23 +28,46 @@ public final class ClientProxy: Sendable {
     get throws { try client.deviceId() }
   }
 
-  #if DEBUG
-    /// Signs in with a password and returns the proxy with the SDK session to save. Debug builds only (ADR 0019).
-    /// The username goes to the server unchanged: a plain localpart or a full `@user:server`.
-    static func login(
-      homeserver: URL, username: String, password: String, initialDeviceName: String,
-      storeDirectory: URL, sessionStore: KeychainSessionStore, lockHolderName: String
-    ) async throws -> (ClientProxy, Session) {
-      let builder = ClientBuilder()
-        .serverNameOrHomeserverUrl(serverNameOrUrl: homeserver.absoluteString)
-      let client = try await build(
-        builder, storeDirectory: storeDirectory, sessionStore: sessionStore,
-        lockHolderName: lockHolderName)
-      try await client.login(
-        username: username, password: password, initialDeviceName: initialDeviceName, deviceId: nil)
-      return (ClientProxy(client: client), try client.session())
-    }
-  #endif
+  /// Signs in with a password and returns the proxy with the SDK session to save. The Flutter app offers it only on
+  /// a homeserver without SSO. The username goes to the server unchanged: a plain localpart or a full `@user:server`.
+  static func login(
+    homeserver: URL, username: String, password: String, initialDeviceName: String,
+    storeDirectory: URL, sessionStore: KeychainSessionStore, lockHolderName: String
+  ) async throws -> (ClientProxy, Session) {
+    let builder = ClientBuilder()
+      .serverNameOrHomeserverUrl(serverNameOrUrl: homeserver.absoluteString)
+    let client = try await build(
+      builder, storeDirectory: storeDirectory, sessionStore: sessionStore,
+      lockHolderName: lockHolderName)
+    try await client.login(
+      username: username, password: password, initialDeviceName: initialDeviceName, deviceId: nil)
+    return (ClientProxy(client: client), try client.session())
+  }
+
+  /// Builds a client on `homeserver` and starts an SSO sign-in on it. The returned sign-in holds the client until
+  /// `finishSSO` turns it into a proxy.
+  static func startSSO(
+    homeserver: URL, identityProviderId: String?, redirectURL: URL, storeDirectory: URL,
+    sessionStore: KeychainSessionStore, lockHolderName: String
+  ) async throws -> PendingSSOLogin {
+    let builder = ClientBuilder()
+      .serverNameOrHomeserverUrl(serverNameOrUrl: homeserver.absoluteString)
+    let client = try await build(
+      builder, storeDirectory: storeDirectory, sessionStore: sessionStore,
+      lockHolderName: lockHolderName)
+    let handler = try await client.startSsoLogin(
+      redirectUrl: redirectURL.absoluteString, idpId: identityProviderId)
+    return PendingSSOLogin(client: client, handler: handler)
+  }
+
+  /// Finishes `pending` with the web session's callback URL (it reads the `loginToken` from it) and returns the
+  /// proxy with the SDK session to save.
+  static func finishSSO(_ pending: PendingSSOLogin, callbackURL: URL) async throws -> (
+    ClientProxy, Session
+  ) {
+    try await pending.handler.finish(callbackUrl: callbackURL.absoluteString)
+    return (ClientProxy(client: pending.client), try pending.client.session())
+  }
 
   /// Opens the store again and restores a saved session in a new client.
   static func restore(
@@ -106,6 +129,15 @@ public final class ClientProxy: Sendable {
       .setSessionDelegate(sessionDelegate: delegate)
       .build()
   }
+}
+
+/// An SSO sign-in that was started: the client it runs on and the SDK handler that finishes it.
+struct PendingSSOLogin: Sendable {
+  let client: Client
+  let handler: SsoHandler
+
+  /// The URL to open in the web authentication session.
+  var url: URL? { URL(string: handler.url()) }
 }
 
 /// SDK objects that live only while sync runs: `entries` is cancelled and `objects` released when sync stops.

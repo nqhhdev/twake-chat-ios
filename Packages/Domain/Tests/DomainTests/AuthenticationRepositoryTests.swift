@@ -24,6 +24,22 @@ struct AuthenticationRepositoryTests {
       return session
     }
 
+    func loginOptions(server: String) async throws(AuthenticationError) -> HomeserverLoginOptions {
+      throw .invalidHomeserverURL
+    }
+
+    func startSSOLogin(homeserver: URL, identityProviderId: String?, redirectURL: URL)
+      async throws(AuthenticationError) -> URL
+    {
+      throw .unknown
+    }
+
+    func finishSSOLogin(callbackURL: URL) async throws(AuthenticationError) -> UserSession {
+      throw .invalidCredentials
+    }
+
+    func cancelSSOLogin() async {}
+
     func restoreSession() async throws(AuthenticationError) -> UserSession? { saved }
 
     func logout() async throws(AuthenticationError) { saved = nil }

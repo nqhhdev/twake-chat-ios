@@ -1,4 +1,5 @@
 import AppShared
+import Authentication
 import Foundation
 import MatrixData
 import SwiftUI
@@ -18,18 +19,20 @@ struct TwakeChatApp: App {
     let repository = MatrixAuthenticationRepository(
       storeDirectory: storeDirectory,
       sessionStore: KeychainSessionStore(service: "app.twake.ios.chat", accessGroup: accessGroup))
-    #if DEBUG
-      // The Debug build configuration sets the development homeserver (ADR 0019); it is not a secret.
-      let defaultHomeserver =
-        (Bundle.main.object(forInfoDictionaryKey: "DefaultHomeserver") as? String)
-        .flatMap(URL.init(string:))
-    #else
-      let defaultHomeserver: URL? = nil
-    #endif
+    // The build configuration sets the sign-in URLs: staging in Debug, Twake SaaS in Release. None is a secret.
+    func url(_ key: String) -> URL? {
+      (Bundle.main.object(forInfoDictionaryKey: key) as? String).flatMap {
+        $0.isEmpty ? nil : URL(string: $0)
+      }
+    }
+    let configuration = SignInConfiguration(
+      registrationURL: url("RegistrationURL"), workplaceHomeserver: url("WorkplaceHomeserver"),
+      defaultHomeserver: url("DefaultHomeserver"),
+      privacyURL: url("PrivacyURL") ?? URL(string: "https://twake.app/policy")!)
     _root = State(
       initialValue: RootCoordinator(
         repository: repository, roomList: RoomListProxy(authentication: repository),
-        defaultHomeserver: defaultHomeserver))
+        signInConfiguration: configuration, webAuthenticator: SystemWebAuthenticator()))
   }
 
   var body: some Scene {

@@ -1,26 +1,33 @@
 import AppShared
 import Domain
 import Foundation
+import MatrixRustSDK
 
-/// `AuthenticationRepository` on the Matrix SDK: password login (Debug builds, ADR 0019), restore and logout.
-/// The session is saved in the Keychain and the SDK store in `storeDirectory` (ADR 0007). Nothing here logs.
+/// `AuthenticationRepository` on the Matrix SDK: homeserver discovery, SSO and password sign-in as the Flutter app
+/// does them, restore and logout. The session is saved in the Keychain and the SDK store in `storeDirectory`
+/// (ADR 0007). Nothing here logs.
 public actor MatrixAuthenticationRepository: AuthenticationRepository {
   private let storeDirectory: URL
   private let sessionStore: KeychainSessionStore
   private let lockHolderName: String
   private let initialDeviceName: String
+  private let discovery: HomeserverDiscovery
   private var proxy: ClientProxy?
+  private var pendingSSO: PendingSSOLogin?
   private var isSigningIn = false
 
   /// - Parameters:
   ///   - storeDirectory: The SDK store directory; the app passes `AppGroupContainer().sdkStoreDirectory()`.
   ///   - sessionStore: Where the session is saved.
   ///   - lockHolderName: This process's name in the SDK's cross-process store lock.
-  ///   - initialDeviceName: The device name the server shows for a new sign-in.
+  ///   - initialDeviceName: The device name the server shows for a new password sign-in.
+  ///   - discovery: Reads a homeserver's sign-in options.
   public init(
     storeDirectory: URL, sessionStore: KeychainSessionStore, lockHolderName: String = "app",
-    initialDeviceName: String = "Twake Chat iOS"
+    initialDeviceName: String = "Twake Chat iOS",
+    discovery: HomeserverDiscovery = HomeserverDiscovery()
   ) {
+    self.discovery = discovery
     self.storeDirectory = storeDirectory
     self.sessionStore = sessionStore
     self.lockHolderName = lockHolderName
@@ -30,38 +37,93 @@ public actor MatrixAuthenticationRepository: AuthenticationRepository {
   /// The client of the signed-in session, for the cards that sync and list rooms; `nil` before login or restore.
   public var clientProxy: ClientProxy? { proxy }
 
-  #if DEBUG
-    /// Signs in with a password (Debug builds only, ADR 0019). The SDK store holds one session, so a sign-in while one
-    /// is saved, in progress or already running is refused with `unknown`; sign out first. Leftovers of an earlier
-    /// failed sign-in or sign-out are deleted first.
-    public func login(
-      homeserver: URL, username: String, password: String
-    ) async throws(AuthenticationError) -> UserSession {
-      guard !isSigningIn, proxy == nil else { throw .unknown }
-      isSigningIn = true
-      defer { isSigningIn = false }
-      do {
-        guard try sessionStore.load() == nil else { throw AuthenticationError.unknown }
-        try removeStoreDirectory()
-        let (proxy, session) = try await ClientProxy.login(
-          homeserver: homeserver, username: username, password: password,
-          initialDeviceName: initialDeviceName, storeDirectory: storeDirectory,
-          sessionStore: sessionStore, lockHolderName: lockHolderName)
-        try sessionStore.save(try UserSessionMapper.storedSession(from: session))
-        self.proxy = proxy
-        return try UserSessionMapper.userSession(from: session)
-      } catch {
-        throw UserSessionMapper.authenticationError(from: error)
-      }
+  public func loginOptions(server: String) async throws(AuthenticationError)
+    -> HomeserverLoginOptions
+  {
+    try await discovery.loginOptions(server: server)
+  }
+
+  /// Signs in with a password. The SDK store holds one session, so a sign-in while one is saved, in progress or
+  /// already running is refused with `unknown`; sign out first. Leftovers of an earlier failed sign-in or sign-out
+  /// are deleted first.
+  public func login(
+    homeserver: URL, username: String, password: String
+  ) async throws(AuthenticationError) -> UserSession {
+    try beginSignIn()
+    defer { isSigningIn = false }
+    do {
+      let (proxy, session) = try await ClientProxy.login(
+        homeserver: homeserver, username: username, password: password,
+        initialDeviceName: initialDeviceName, storeDirectory: storeDirectory,
+        sessionStore: sessionStore, lockHolderName: lockHolderName)
+      return try finishSignIn(proxy: proxy, session: session)
+    } catch {
+      throw UserSessionMapper.authenticationError(from: error)
     }
-  #else
-    /// Release builds contain no password sign-in code (ADR 0019): sign-in is SSO-only (ADR 0008).
-    public func login(
-      homeserver: URL, username: String, password: String
-    ) async throws(AuthenticationError) -> UserSession {
-      throw .unknown
+  }
+
+  /// Builds a client on `homeserver`, starts an SSO sign-in and keeps it until `finishSSOLogin` or `cancelSSOLogin`.
+  /// A sign-in started earlier and never finished is dropped first.
+  public func startSSOLogin(
+    homeserver: URL, identityProviderId: String?, redirectURL: URL
+  ) async throws(AuthenticationError) -> URL {
+    pendingSSO = nil
+    try beginSignIn()
+    defer { isSigningIn = false }
+    do {
+      let pending = try await ClientProxy.startSSO(
+        homeserver: homeserver, identityProviderId: identityProviderId, redirectURL: redirectURL,
+        storeDirectory: storeDirectory, sessionStore: sessionStore, lockHolderName: lockHolderName)
+      guard let url = pending.url else { throw AuthenticationError.unknown }
+      pendingSSO = pending
+      return url
+    } catch {
+      throw UserSessionMapper.authenticationError(from: error)
     }
-  #endif
+  }
+
+  /// Finishes the started SSO sign-in. Without one, or when the callback has no `loginToken`, it throws.
+  public func finishSSOLogin(callbackURL: URL) async throws(AuthenticationError) -> UserSession {
+    guard let pending = pendingSSO, !isSigningIn, proxy == nil else { throw .unknown }
+    guard Self.loginToken(in: callbackURL) != nil else { throw .invalidCredentials }
+    isSigningIn = true
+    defer { isSigningIn = false }
+    do {
+      let (proxy, session) = try await ClientProxy.finishSSO(pending, callbackURL: callbackURL)
+      pendingSSO = nil
+      return try finishSignIn(proxy: proxy, session: session)
+    } catch {
+      throw UserSessionMapper.authenticationError(from: error)
+    }
+  }
+
+  public func cancelSSOLogin() async {
+    pendingSSO = nil
+  }
+
+  /// The `loginToken` query item of an SSO callback, as the Flutter app reads it.
+  static func loginToken(in callbackURL: URL) -> String? {
+    URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?.queryItems?
+      .first { $0.name == "loginToken" }?.value.flatMap { $0.isEmpty ? nil : $0 }
+  }
+
+  /// Refuses a sign-in while one runs or a session exists, then clears what an earlier attempt left in the store.
+  private func beginSignIn() throws(AuthenticationError) {
+    guard !isSigningIn, proxy == nil else { throw .unknown }
+    do {
+      guard try sessionStore.load() == nil else { throw AuthenticationError.unknown }
+      try removeStoreDirectory()
+    } catch {
+      throw UserSessionMapper.authenticationError(from: error)
+    }
+    isSigningIn = true
+  }
+
+  private func finishSignIn(proxy: ClientProxy, session: Session) throws -> UserSession {
+    try sessionStore.save(try UserSessionMapper.storedSession(from: session))
+    self.proxy = proxy
+    return try UserSessionMapper.userSession(from: session)
+  }
 
   /// The saved session, with a client restored on it. When a client is already running, it is kept: a second client
   /// on the same store is never built.

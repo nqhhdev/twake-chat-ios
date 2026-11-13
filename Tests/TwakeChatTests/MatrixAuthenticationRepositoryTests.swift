@@ -398,7 +398,11 @@ final class FakeHomeserver: @unchecked Sendable {
       recordedBodies.append(("\(method) \(path)", requestBody))
     }
     let (status, body): (String, String)
-    if let override = responses.first(where: { path.hasSuffix($0.key) })?.value {
+    if method == "GET", path.hasSuffix("/_matrix/client/v3/login") {
+      // The homeserver picker reads the login flows first: a password-only server.
+      status = "200 OK"
+      body = #"{"flows":[{"type":"m.login.password"}]}"#
+    } else if let override = responses.first(where: { path.hasSuffix($0.key) })?.value {
       status = override.status
       body = override.body
     } else if path.hasSuffix("/_matrix/client/versions") {

@@ -17,7 +17,26 @@ public final class FakeAuthenticationRepository: AuthenticationRepository, @unch
     }
   }
 
+  public struct StartSSOCall: Equatable, Sendable {
+    public let homeserver: URL
+    public let identityProviderId: String?
+    public let redirectURL: URL
+
+    public init(homeserver: URL, identityProviderId: String?, redirectURL: URL) {
+      self.homeserver = homeserver
+      self.identityProviderId = identityProviderId
+      self.redirectURL = redirectURL
+    }
+  }
+
   private let lock = NSLock()
+  private var _loginOptionsResult: Result<HomeserverLoginOptions, AuthenticationError>?
+  private var _loginOptionsCalls: [String] = []
+  private var _startSSOResult: Result<URL, AuthenticationError> = .failure(.unknown)
+  private var _startSSOCalls: [StartSSOCall] = []
+  private var _finishSSOResult: Result<UserSession, AuthenticationError> = .failure(.unknown)
+  private var _finishSSOCalls: [URL] = []
+  private var _cancelSSOCallCount = 0
   private var _loginResult: Result<UserSession, AuthenticationError> = .failure(.unknown)
   private var _restoreResult: Result<UserSession?, AuthenticationError> = .success(nil)
   private var _logoutResult: Result<Void, AuthenticationError> = .success(())
@@ -40,6 +59,30 @@ public final class FakeAuthenticationRepository: AuthenticationRepository, @unch
     get { lock.withLock { _loginResult } }
     set { lock.withLock { _loginResult = newValue } }
   }
+
+  /// What `loginOptions` returns or throws. Unset, it answers a password-only server at what was typed, so a test can
+  /// walk to the password form.
+  public var loginOptionsResult: Result<HomeserverLoginOptions, AuthenticationError>? {
+    get { lock.withLock { _loginOptionsResult } }
+    set { lock.withLock { _loginOptionsResult = newValue } }
+  }
+
+  /// What `startSSOLogin` returns or throws.
+  public var startSSOResult: Result<URL, AuthenticationError> {
+    get { lock.withLock { _startSSOResult } }
+    set { lock.withLock { _startSSOResult = newValue } }
+  }
+
+  /// What `finishSSOLogin` returns or throws; a success also saves the session.
+  public var finishSSOResult: Result<UserSession, AuthenticationError> {
+    get { lock.withLock { _finishSSOResult } }
+    set { lock.withLock { _finishSSOResult = newValue } }
+  }
+
+  public var loginOptionsCalls: [String] { lock.withLock { _loginOptionsCalls } }
+  public var startSSOCalls: [StartSSOCall] { lock.withLock { _startSSOCalls } }
+  public var finishSSOCalls: [URL] { lock.withLock { _finishSSOCalls } }
+  public var cancelSSOCallCount: Int { lock.withLock { _cancelSSOCallCount } }
 
   /// What `restoreSession` returns or throws.
   public var restoreResult: Result<UserSession?, AuthenticationError> {
@@ -133,6 +176,41 @@ public final class FakeAuthenticationRepository: AuthenticationRepository, @unch
     let session = try loginResult.get()
     savedSession = session
     return session
+  }
+
+  public func loginOptions(server: String) async throws(AuthenticationError)
+    -> HomeserverLoginOptions
+  {
+    lock.withLock { _loginOptionsCalls.append(server) }
+    if let result = loginOptionsResult { return try result.get() }
+    guard let url = URL(string: server.contains("://") ? server : "https://\(server)") else {
+      throw .invalidHomeserverURL
+    }
+    return HomeserverLoginOptions(
+      homeserver: url, supportsPassword: true, supportsSSO: false, identityProviders: [],
+      registrationSupported: false)
+  }
+
+  public func startSSOLogin(homeserver: URL, identityProviderId: String?, redirectURL: URL)
+    async throws(AuthenticationError) -> URL
+  {
+    lock.withLock {
+      _startSSOCalls.append(
+        StartSSOCall(
+          homeserver: homeserver, identityProviderId: identityProviderId, redirectURL: redirectURL))
+    }
+    return try startSSOResult.get()
+  }
+
+  public func finishSSOLogin(callbackURL: URL) async throws(AuthenticationError) -> UserSession {
+    lock.withLock { _finishSSOCalls.append(callbackURL) }
+    let session = try finishSSOResult.get()
+    savedSession = session
+    return session
+  }
+
+  public func cancelSSOLogin() async {
+    lock.withLock { _cancelSSOCallCount += 1 }
   }
 
   public func restoreSession() async throws(AuthenticationError) -> UserSession? {

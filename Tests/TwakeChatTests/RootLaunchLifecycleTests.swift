@@ -48,22 +48,27 @@ struct RootLaunchLifecycleTests {
     return root
   }
 
-  private func passwordLogin(_ root: RootCoordinator) -> PasswordLoginViewModel? {
-    if case .passwordLogin(let viewModel) = root.authentication?.screen { viewModel } else { nil }
-  }
-
   private func signedIn(_ root: RootCoordinator) -> SignedInViewModel? {
     if case .signedIn(let viewModel) = root.authentication?.screen { viewModel } else { nil }
   }
 
-  /// Card: "A Debug build opens to a login form". Nothing is saved, so the restore asks no server.
+  /// A first launch opens on TwakeWelcome, and "Use your company server" shows the build's homeserver. Nothing is
+  /// saved, so the restore asks no server.
   @Test(.timeLimit(.minutes(1)))
-  func aFirstLaunchShowsThePrefilledLoginForm() async throws {
+  func aFirstLaunchShowsTwakeWelcome() async throws {
     defer { cleanUp() }
     let root = await launch("tests-first", homeserver: URL(string: "https://matrix.example.org")!)
     #expect(root.state == .restored(nil))
-    let form = try #require(passwordLogin(root))
-    #expect(form.homeserver == "https://matrix.example.org")
+    guard case .welcome(let welcome) = root.authentication?.screen else {
+      Issue.record("expected TwakeWelcome")
+      return
+    }
+    welcome.useCompanyServer()
+    guard case .homeserverPicker(let picker) = root.authentication?.screen else {
+      Issue.record("expected the homeserver picker")
+      return
+    }
+    #expect(picker.server == "matrix.example.org")
   }
 
   /// Card: sign in, kill and relaunch (still signed in), log out (back to login), relaunch (login shown).
@@ -76,7 +81,7 @@ struct RootLaunchLifecycleTests {
     defer { server.stop() }
 
     let first = await launch("tests-launch-1", homeserver: server.url)
-    let form = try #require(passwordLogin(first))
+    let form = try #require(await passwordForm(of: first))
     form.username = "alice"
     form.password = "fixture-password"
     await form.signIn()
@@ -91,11 +96,11 @@ struct RootLaunchLifecycleTests {
     await signedInScreen.logOut()
     #expect(signedInScreen.errorMessage == nil)
     #expect(server.requests.contains { $0.hasPrefix("POST ") && $0.hasSuffix("/logout") })
-    #expect(passwordLogin(second) != nil)
+    #expect(isSignedOut(second))
 
     let third = await launch("tests-launch-3", homeserver: server.url)
     #expect(third.state == .restored(nil))
-    #expect(passwordLogin(third) != nil)
+    #expect(isSignedOut(third))
   }
 
   /// SignedInViewModel's documented promise: when the server refuses the logout, the repository still deletes the
@@ -108,7 +113,7 @@ struct RootLaunchLifecycleTests {
     defer { server.stop() }
 
     let first = await launch("tests-refused-1", homeserver: server.url)
-    let form = try #require(passwordLogin(first))
+    let form = try #require(await passwordForm(of: first))
     form.username = "alice"
     form.password = "fixture-password"
     await form.signIn()
@@ -121,11 +126,11 @@ struct RootLaunchLifecycleTests {
 
     await signedInScreen.logOut()
     #expect(signedInScreen.errorMessage == nil)
-    #expect(passwordLogin(first) != nil)
+    #expect(isSignedOut(first))
 
     let second = await launch("tests-refused-2", homeserver: server.url)
     #expect(second.state == .restored(nil))
-    #expect(passwordLogin(second) != nil)
+    #expect(isSignedOut(second))
   }
 }
 

@@ -62,7 +62,7 @@ struct RootRestoreFailedTests {
     #expect(repository.logoutCallCount == 2)
     #expect(root.logOutErrorMessage == nil)
     #expect(root.state == .restored(nil))
-    guard case .passwordLogin(let form) = root.authentication?.screen else {
+    guard let form = await passwordForm(of: root) else {
       Issue.record("expected the sign-in form")
       return
     }
