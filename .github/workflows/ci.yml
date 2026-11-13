@@ -1,5 +1,6 @@
-# CI for every pull request and every push to main (ADR 0014). Uses no secret and no signing.
-# What it runs and why: .okf/workflows/build.md, section CI.
+# CI for every pull request and every push to main (ADR 0014): format only. Uses no secret and no signing.
+# Each module is its own job, so they run in parallel and a finding names its module. Builds and tests run
+# locally before a pull request (.okf/workflows/build.md, section CI).
 name: CI
 
 on:
@@ -16,48 +17,38 @@ concurrency:
 
 env:
   XCODE_VERSION: "26.2"
-  SIMULATOR_NAME: "iPhone 17"
 
 jobs:
-  ci:
-    name: ci
+  format:
+    name: format (${{ matrix.module }})
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: app
+            path: TwakeChat
+          - module: domain
+            path: Packages/Domain
+          - module: matrixdata
+            path: Packages/MatrixData
+          - module: designsystem
+            path: Packages/DesignSystem
+          - module: appshared
+            path: Packages/AppShared
+          - module: features
+            path: Packages/Features
+          - module: scripts
+            path: scripts
     steps:
       - uses: actions/checkout@v4
 
+      # swift-format ships with Xcode; the pinned Xcode decides its version.
       - name: Select Xcode ${{ env.XCODE_VERSION }}
         run: |
           sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
-          xcodebuild -version
+          xcrun swift-format --version
 
-      - name: Cache SwiftPM downloads
-        uses: actions/cache@v4
-        with:
-          path: ~/Library/Caches/org.swift.swiftpm
-          key: swiftpm-${{ runner.os }}-xcode-${{ env.XCODE_VERSION }}-${{ hashFiles('**/Package.resolved') }}
-          restore-keys: |
-            swiftpm-${{ runner.os }}-xcode-${{ env.XCODE_VERSION }}-
-
-      - name: Knowledge base check
-        run: python3 .okf/tools/okf.py --check
-
-      - name: Lint
-        run: scripts/lint.sh
-
-      - name: Tests (host and iOS 26 simulator)
-        run: |
-          xcrun simctl list runtimes | grep '^iOS 26\.'
-          scripts/test.sh
-
-      # No iOS 18 runtime is installed or needed (owner decision 2026-11-12): this compiles the app and
-      # every test target against the iOS 18.0 deployment target without running them again (ADR 0010).
-      # The log shows each compile with the target triple arm64-apple-ios18.0-simulator.
-      - name: Build app and tests (iOS 18.0 deployment target, no simulator)
-        run: |
-          xcodebuild build-for-testing \
-            -project TwakeChat.xcodeproj \
-            -scheme TwakeChat \
-            -testPlan TwakeChat \
-            -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO
+      - name: swift-format lint ${{ matrix.path }}
+        run: scripts/lint.sh "${{ matrix.path }}"
