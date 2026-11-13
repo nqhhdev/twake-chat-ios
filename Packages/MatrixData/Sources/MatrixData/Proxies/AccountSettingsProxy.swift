@@ -16,6 +16,47 @@ public actor AccountSettingsProxy: AccountSettingsRepository {
     return (try? await client.client.displayName()).flatMap { $0.isEmpty ? nil : $0 }
   }
 
+  public func avatar() async -> MediaReference? {
+    guard let client = await clientProxy() else { return nil }
+    return RoomSummaryMapper.avatar((try? await client.client.avatarUrl()) ?? nil)
+  }
+
+  public func blockedUsers() async throws(SettingsError) -> [BlockedUser] {
+    guard let client = await clientProxy()?.client else { throw .notSignedIn }
+    let ids: [String]
+    do { ids = try await client.ignoredUsers() } catch { throw .requestFailed }
+    var users: [BlockedUser] = []
+    for id in ids {
+      let name = (try? await client.getProfile(userId: id))?.displayName
+      users.append(BlockedUser(id: id, displayName: name))
+    }
+    return users.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+  }
+
+  public func unblock(userId: String) async throws(SettingsError) {
+    guard let client = await clientProxy()?.client else { throw .notSignedIn }
+    do { try await client.unignoreUser(userId: userId) } catch { throw .requestFailed }
+  }
+
+  public func setDisplayName(_ name: String) async throws(SettingsError) {
+    guard let client = await clientProxy() else { throw .notSignedIn }
+    do { try await client.client.setDisplayName(name: name) } catch { throw .requestFailed }
+  }
+
+  public func setAvatar(_ picture: PictureUpload) async throws(SettingsError) {
+    guard let client = await clientProxy() else { throw .notSignedIn }
+    do {
+      try await client.client.uploadAvatar(mimeType: picture.mimeType, data: picture.data)
+    } catch {
+      throw .requestFailed
+    }
+  }
+
+  public func removeAvatar() async throws(SettingsError) {
+    guard let client = await clientProxy() else { throw .notSignedIn }
+    do { try await client.client.removeAvatar() } catch { throw .requestFailed }
+  }
+
   public func recoveryStatus() async -> RecoveryStatus {
     guard let client = await clientProxy() else { return .unknown }
     let encryption = client.client.encryption()

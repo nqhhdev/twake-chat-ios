@@ -11,6 +11,8 @@ public actor TimelineProxy: TimelineRepository {
   static let pageSize: UInt16 = 30
 
   private let roomId: String
+  /// The one kind of message this timeline shows, for a chat details tab; `nil` shows the whole room.
+  private let content: RoomContentKind?
   /// Typing subscriptions, cancelled when the timeline closes.
   private var typingHandles: [TaskHandle] = []
   private let clientProxy: @Sendable () async -> ClientProxy?
@@ -19,8 +21,13 @@ public actor TimelineProxy: TimelineRepository {
   /// - Parameters:
   ///   - roomId: The room this timeline shows.
   ///   - authentication: Gives the signed-in client.
-  public init(roomId: String, authentication: MatrixAuthenticationRepository) {
+  ///   - content: Shows only this kind of message, for a chat details tab.
+  public init(
+    roomId: String, authentication: MatrixAuthenticationRepository,
+    only content: RoomContentKind? = nil
+  ) {
     self.roomId = roomId
+    self.content = content
     clientProxy = { await authentication.clientProxy }
   }
 
@@ -35,7 +42,12 @@ public actor TimelineProxy: TimelineRepository {
         throw TimelineError.roomNotFound
       }
       room = found
-      timeline = try await room.timeline()
+      if let content {
+        timeline = try await room.timelineWithConfiguration(
+          configuration: Self.configuration(only: content))
+      } else {
+        timeline = try await room.timeline()
+      }
     } catch let error as TimelineError {
       throw error
     } catch {
@@ -79,6 +91,21 @@ public actor TimelineProxy: TimelineRepository {
     return items
   }
 
+  /// A timeline of one kind of message, as the Flutter chat details tabs list them (`isVideoOrImage`, `isAFile`, and
+  /// text that may hold a link, which the feature checks); it does not track read receipts.
+  static func configuration(only content: RoomContentKind) -> TimelineConfiguration {
+    let types: [RoomMessageEventMessageType] =
+      switch content {
+      case .media: [.image, .video]
+      case .files: [.file]
+      case .links, .text: [.text, .notice, .emote]
+      }
+    return TimelineConfiguration(
+      focus: .live(hideThreadedEvents: false), filter: .onlyMessage(types: types),
+      internalIdPrefix: content.rawValue, dateDividerMode: .monthly, trackReadReceipts: .disabled,
+      reportUtds: false)
+  }
+
   public func loadOlder() async throws(TimelineError) -> Bool {
     let timeline = try openedTimeline()
     do {
@@ -91,7 +118,7 @@ public actor TimelineProxy: TimelineRepository {
   public func send(text: String) async throws(TimelineError) {
     let timeline = try openedTimeline()
     do {
-      _ = try await timeline.send(msg: messageEventContentFromMarkdown(md: text))
+      _ = try await timeline.send(msg: Self.content(text))
     } catch {
       throw .requestFailed
     }
@@ -171,7 +198,7 @@ public actor TimelineProxy: TimelineRepository {
   public func reply(text: String, to eventId: String) async throws(TimelineError) {
     let timeline = try openedTimeline()
     do {
-      try await timeline.sendReply(msg: messageEventContentFromMarkdown(md: text), eventId: eventId)
+      try await timeline.sendReply(msg: Self.content(text), eventId: eventId)
     } catch {
       throw .requestFailed
     }
@@ -182,7 +209,7 @@ public actor TimelineProxy: TimelineRepository {
     do {
       try await timeline.edit(
         eventOrTransactionId: .eventId(eventId: eventId),
-        newContent: .roomMessage(content: messageEventContentFromMarkdown(md: text)))
+        newContent: .roomMessage(content: Self.content(text)))
     } catch {
       throw .requestFailed
     }
@@ -251,6 +278,58 @@ public actor TimelineProxy: TimelineRepository {
     } catch {
       throw .requestFailed
     }
+  }
+
+  public func loadDraft() async -> String? {
+    guard let draft = try? await opened?.room.loadComposerDraft(threadRoot: nil) else { return nil }
+    return draft.plainText.isEmpty ? nil : draft.plainText
+  }
+
+  public func saveDraft(_ text: String) async {
+    guard let room = opened?.room else { return }
+    if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      try? await room.clearComposerDraft(threadRoot: nil)
+    } else {
+      try? await room.saveComposerDraft(
+        draft: ComposerDraft(
+          plainText: text, htmlText: nil, draftType: .newMessage, attachments: []),
+        threadRoot: nil)
+    }
+  }
+
+  public func retryFailedSends() async {
+    opened?.room.enableSendQueue(enable: true)
+  }
+
+  public func report(eventId: String, reason: String?) async throws(TimelineError) {
+    let room = try openedState().room
+    do { try await room.reportContent(eventId: eventId, reason: reason) } catch {
+      throw .requestFailed
+    }
+  }
+
+  public func ignore(userId: String) async throws(TimelineError) {
+    let client = try openedState().client
+    do { try await client.client.ignoreUser(userId: userId) } catch { throw .requestFailed }
+  }
+
+  /// The message content of a Markdown text. A link to a user (`[Name](https://matrix.to/#/@user:server)`, as the
+  /// composer writes a mention) also lists that user in the intentional mentions, so they are notified.
+  static func content(_ text: String) -> RoomMessageEventContentWithoutRelation {
+    let content = messageEventContentFromMarkdown(md: text)
+    let userIds = mentionedUserIds(in: text)
+    return userIds.isEmpty
+      ? content : content.withMentions(mentions: Mentions(userIds: userIds, room: false))
+  }
+
+  /// The Matrix ids of the users linked with matrix.to in `text`, once each, in order.
+  static func mentionedUserIds(in text: String) -> [String] {
+    var ids: [String] = []
+    for match in text.matches(of: /https:\/\/matrix\.to\/#\/(@[^)\s\/?]+)/) {
+      let id = String(match.output.1)
+      if !ids.contains(id) { ids.append(id) }
+    }
+    return ids
   }
 
   public func markAsRead() async {
