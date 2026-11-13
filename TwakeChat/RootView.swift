@@ -33,11 +33,35 @@ final class RootCoordinator {
 
   @ObservationIgnored private let repository: any AuthenticationRepository
   @ObservationIgnored private let roomList: (any RoomListRepository)?
-  @ObservationIgnored private let makeTimeline: (String) -> any TimelineRepository
+  /// The chats the user left.
+  @ObservationIgnored private let archive: (any ArchivedRoomsRepository)?
+  /// The homeserver's public groups.
+  @ObservationIgnored private let publicRooms: (any PublicRoomsRepository)?
+  /// What spaces hold.
+  @ObservationIgnored private let spaces: (any SpacesRepository)?
+  /// Link previews from the homeserver.
+  @ObservationIgnored private let linkPreviews: (any LinkPreviewRepository)?
+  /// A room's timeline, or with a kind, only that kind of message, for a chat details tab.
+  @ObservationIgnored private let makeTimeline: (String, RoomContentKind?) -> any TimelineRepository
   @ObservationIgnored private let media: any MediaRepository
   @ObservationIgnored private let roomDetails: (any RoomDetailsRepository)?
+  @ObservationIgnored private let roomSearch: (any RoomSearchRepository)?
   @ObservationIgnored private let accountSettings: (any AccountSettingsRepository)?
   @ObservationIgnored private let people: (any PeopleRepository)?
+  /// Push notifications of the signed-in account.
+  @ObservationIgnored let push: PushCenter
+  /// Pauses sync in the background and resumes it on return.
+  @ObservationIgnored let lifecycle: AppLifecycle
+  /// Opens Matrix links in the app; the shell shows what it finds.
+  @ObservationIgnored private(set) var links: LinkRouter!
+  /// What other apps share into the app, waiting for a chat.
+  @ObservationIgnored let shares = ShareCenter()
+  @ObservationIgnored private let verificationRepository: (any VerificationRepository)?
+  @ObservationIgnored private let devicesRepository: (any DevicesRepository)?
+  /// Which room events chats show, kept on this device.
+  @ObservationIgnored private let chatDisplay: (any ChatDisplaySettingsStore)?
+  /// Face ID, Touch ID or the passcode before the app shows anything; `nil` (tests) never locks.
+  @ObservationIgnored let appLock: AppLock?
   @ObservationIgnored private let signInConfiguration: SignInConfiguration
   @ObservationIgnored private let webAuthenticator: any WebAuthenticator
 
@@ -48,22 +72,46 @@ final class RootCoordinator {
   ///   - webAuthenticator: Opens the SSO pages.
   init(
     repository: any AuthenticationRepository, roomList: (any RoomListRepository)? = nil,
-    makeTimeline: @escaping (String) -> any TimelineRepository = { _ in UnavailableTimeline() },
+    archive: (any ArchivedRoomsRepository)? = nil,
+    publicRooms: (any PublicRoomsRepository)? = nil,
+    spaces: (any SpacesRepository)? = nil,
+    linkPreviews: (any LinkPreviewRepository)? = nil,
+    makeTimeline: @escaping (String, RoomContentKind?) -> any TimelineRepository = { _, _ in
+      UnavailableTimeline()
+    },
     media: any MediaRepository = UnavailableMedia(),
     roomDetails: (any RoomDetailsRepository)? = nil,
+    roomSearch: (any RoomSearchRepository)? = nil,
+    roomLinks: (any RoomLinkRepository)? = nil,
     accountSettings: (any AccountSettingsRepository)? = nil,
-    people: (any PeopleRepository)? = nil,
+    people: (any PeopleRepository)? = nil, push: (any PushRepository)? = nil,
+    verification: (any VerificationRepository)? = nil, devices: (any DevicesRepository)? = nil,
+    chatDisplay: (any ChatDisplaySettingsStore)? = nil, appLock: AppLock? = nil,
+    sync: (any SyncLifecycle)? = nil,
     signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator
   ) {
+    let pushCenter = PushCenter(repository: push)
+    self.push = pushCenter
+    self.lifecycle = AppLifecycle(sync: sync, push: pushCenter)
+    self.verificationRepository = verification
+    self.devicesRepository = devices
+    self.chatDisplay = chatDisplay
+    self.appLock = appLock
     self.repository = repository
     self.roomList = roomList
+    self.archive = archive
+    self.publicRooms = publicRooms
+    self.spaces = spaces
+    self.linkPreviews = linkPreviews
     self.makeTimeline = makeTimeline
     self.media = media
     self.roomDetails = roomDetails
+    self.roomSearch = roomSearch
     self.accountSettings = accountSettings
     self.people = people
     self.signInConfiguration = signInConfiguration
     self.webAuthenticator = webAuthenticator
+    self.links = LinkRouter(rooms: roomLinks, openDirectChat: openDirectChat())
   }
 
   /// The chat list of the current signed-in state, kept so the screen keeps its state while it is shown.
@@ -75,22 +123,95 @@ final class RootCoordinator {
   func chatList(for signedIn: SignedInViewModel) -> ChatListViewModel? {
     if let chatList, chatList.signedIn === signedIn { return chatList.viewModel }
     guard let roomList else { return nil }
-    let viewModel = ChatListViewModel(repository: roomList) { [weak signedIn] in
+    let viewModel = ChatListViewModel(
+      repository: roomList, media: media, archive: archive, publicRooms: publicRooms,
+      spaces: spaces
+    ) {
+      [weak signedIn, push] in
       guard let signedIn else { return false }
+      await push.stop()
       await signedIn.logOut()
       return signedIn.errorMessage == nil
     }
     chatList = (signedIn, viewModel)
+    lifecycle.unreadCount = { [weak viewModel] in
+      viewModel?.joinedRooms.reduce(0) { $0 + $1.unreadCount } ?? 0
+    }
     return viewModel
   }
 
   /// A room's screen model on its own timeline; the shell keeps the open one and closes it through `onLeft`.
   func room(for summary: RoomSummary, onLeft: @escaping @MainActor () -> Void) -> RoomViewModel {
     RoomViewModel(
-      roomId: summary.id, roomName: summary.name, repository: makeTimeline(summary.id),
-      media: media,
+      roomId: summary.id, roomName: summary.name, roomAvatar: summary.avatar,
+      repository: makeTimeline(summary.id, nil), media: media,
       details: roomDetails, onLeft: onLeft,
-      forwardTargets: { [weak self] in self?.chatList?.viewModel.visibleRooms ?? [] })
+      forwardTargets: { [weak self] in self?.chatList?.viewModel.visibleRooms ?? [] },
+      invitePeople: invitePeople(),
+      contentTimeline: { [makeTimeline] kind in makeTimeline(summary.id, kind) },
+      openDirectChat: openDirectChat(), search: roomSearch,
+      isArchived: summary.isArchived, rejoin: rejoin(summary.id), linkPreviews: linkPreviews,
+      checkSession: sessionCheck(), display: displaySettings())
+  }
+
+  /// Which room events a chat shows: the Settings tab's choice, so a change there redraws the open chat.
+  private func displaySettings() -> @MainActor () -> ChatDisplaySettings {
+    { [weak self] in
+      self?.settings?.viewModel.chatDisplay ?? self?.chatDisplay?.load() ?? ChatDisplaySettings()
+    }
+  }
+
+  /// Whether this session can read encrypted messages, for the chat's banner: its verification, then its recovery.
+  private func sessionCheck() -> (@Sendable () async -> SessionWarning?)? {
+    guard let verificationRepository, let accountSettings else { return nil }
+    return {
+      SessionWarning.of(
+        verification: await verificationRepository.state(),
+        recovery: await accountSettings.recoveryStatus())
+    }
+  }
+
+  /// Rejoins a left chat from its read-only screen (the archive belongs to the room list proxy).
+  private func rejoin(_ roomId: String) -> (@MainActor () async -> Bool)? {
+    guard let archive else { return nil }
+    return {
+      do {
+        try await archive.rejoin(roomId: roomId)
+        return true
+      } catch {
+        return false
+      }
+    }
+  }
+
+  /// Message on a member's profile: finds or creates the direct chat, then has the shell open it as it opens a tapped
+  /// notification's room (the app joins the features, ADR 0005).
+  private func openDirectChat() -> (@MainActor (String) async -> Bool)? {
+    guard let people else { return nil }
+    return { [push] userId in
+      guard let roomId = try? await people.directChat(with: userId) else { return false }
+      push.pendingRoomId = roomId
+      return true
+    }
+  }
+
+  /// The People search in invite mode, shown from a room's details (the app joins the features, ADR 0005).
+  private func invitePeople() -> InvitePeople? {
+    guard let people, let roomDetails else { return nil }
+    return InvitePeople { roomId, onInvited in
+      let search = PeopleSearchViewModel(
+        mode: .invite, repository: people, onOpen: { _, _ in },
+        invite: { userIds in
+          do {
+            try await roomDetails.invite(userIds: userIds, roomId: roomId)
+            onInvited()
+            return true
+          } catch {
+            return false
+          }
+        })
+      return AnyView(InviteScreen(viewModel: search))
+    }
   }
 
   @ObservationIgnored private var settings:
@@ -100,9 +221,13 @@ final class RootCoordinator {
   func settings(for signedIn: SignedInViewModel) -> SettingsViewModel {
     if let settings, settings.signedIn === signedIn { return settings.viewModel }
     let viewModel = SettingsViewModel(
-      userId: signedIn.userId, repository: accountSettings ?? UnavailableAccountSettings()
-    ) { [weak signedIn] in
+      userId: signedIn.userId, repository: accountSettings ?? UnavailableAccountSettings(),
+      media: media, verification: verificationRepository.map(VerificationViewModel.init),
+      devices: devicesRepository.map(DevicesViewModel.init), chatDisplay: chatDisplay,
+      appLock: appLock
+    ) { [weak signedIn, push] in
       guard let signedIn else { return false }
+      await push.stop()
       await signedIn.logOut()
       return signedIn.errorMessage == nil
     }
@@ -175,6 +300,11 @@ struct RootView: View {
   var body: some View {
     content
       .task { await coordinator.start() }
+      .overlay {
+        if let lock = coordinator.appLock, lock.isLocked || lock.isCovered {
+          AppLockScreen(lock: lock).transition(.opacity)
+        }
+      }
   }
 
   /// The screens come from the Authentication and ChatList feature packages.
@@ -189,8 +319,12 @@ struct RootView: View {
         if let chatList = coordinator.chatList(for: signedIn) {
           ChatShell(
             chatList: chatList, signedIn: signedIn, settings: coordinator.settings(for: signedIn),
+            push: coordinator.push, links: coordinator.links, shares: coordinator.shares,
             makePeopleSearch: coordinator.peopleSearch(mode:onOpen:),
-            makeRoom: coordinator.room(for:onLeft:))
+            makeRoom: coordinator.room(for:onLeft:)
+          )
+          // Signed in: ask for notifications and register this device.
+          .task { await coordinator.push.start() }
         }
       }
     } else {
@@ -213,6 +347,11 @@ struct UnavailableTimeline: TimelineRepository {
   func setTyping(_ isTyping: Bool) async {}
   func setPinned(_ pinned: Bool, eventId: String) async throws(TimelineError) { throw .unavailable }
   func pinnedMessages() async -> [TimelineMessage] { [] }
+  func loadDraft() async -> String? { nil }
+  func report(eventId: String, reason: String?) async throws(TimelineError) { throw .unavailable }
+  func retryFailedSends() async {}
+  func ignore(userId: String) async throws(TimelineError) { throw .unavailable }
+  func saveDraft(_ text: String) async {}
   func forward(eventId: String, to roomId: String) async throws(TimelineError) {
     throw .unavailable
   }
@@ -242,6 +381,12 @@ struct UnavailableMedia: MediaRepository {
 /// The account settings of a root built without them (tests): nothing is known and nothing changes.
 struct UnavailableAccountSettings: AccountSettingsRepository {
   func displayName() async -> String? { nil }
+  func setDisplayName(_ name: String) async throws(SettingsError) { throw .notSignedIn }
+  func setAvatar(_ picture: PictureUpload) async throws(SettingsError) { throw .notSignedIn }
+  func removeAvatar() async throws(SettingsError) { throw .notSignedIn }
+  func avatar() async -> MediaReference? { nil }
+  func blockedUsers() async throws(SettingsError) -> [BlockedUser] { [] }
+  func unblock(userId: String) async throws(SettingsError) { throw .notSignedIn }
   func recoveryStatus() async -> RecoveryStatus { .unknown }
   func recover(recoveryKey: String) async throws(SettingsError) { throw .notSignedIn }
   func enableRecovery() async throws(SettingsError) -> String { throw .notSignedIn }

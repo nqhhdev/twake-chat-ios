@@ -2,42 +2,29 @@ import Testing
 
 @testable import TwakeChat
 
-/// The navigation adapts to the screen (ADR 0022): bottom bar on a phone held upright and on a folded Duo, rail on an
-/// unfolded Duo, an iPad and any screen on its side.
+/// The chat list sits beside the chat from 905 pt (ADR 0022); the tabs are the system tab view on every screen.
 struct ChatShellLayoutTests {
-  @Test func aPhoneHeldUprightHasOneColumnAndTheBottomBar() {
-    let layout = ChatShell.Layout(width: 390, height: 844)
-    #expect(!layout.isTwoColumn)
-    #expect(!layout.usesRail)
+  @Test func aPhoneHeldUprightHasOneColumn() {
+    #expect(!ChatShell.Layout(width: 390).isTwoColumn)
   }
 
-  @Test func aFoldedDuoHasOneColumnAndTheBottomBar() {
-    let layout = ChatShell.Layout(width: 466, height: 678)
-    #expect(!layout.isTwoColumn)
-    #expect(!layout.usesRail)
+  @Test func aFoldedDuoHasOneColumn() {
+    #expect(!ChatShell.Layout(width: 466).isTwoColumn)
   }
 
-  @Test func anUnfoldedDuoHasTwoColumnsAndTheRail() {
-    let layout = ChatShell.Layout(width: 951, height: 669)
-    #expect(layout.isTwoColumn)
-    #expect(layout.usesRail)
+  @Test func anUnfoldedDuoHasTwoColumns() {
+    #expect(ChatShell.Layout(width: 951).isTwoColumn)
   }
 
-  @Test func anUnfoldedDuoHeldUprightHasOneColumnAndTheBottomBar() {
-    let layout = ChatShell.Layout(width: 669, height: 951)
-    #expect(!layout.isTwoColumn)
-    #expect(!layout.usesRail)
+  @Test func anUnfoldedDuoHeldUprightHasOneColumn() {
+    #expect(!ChatShell.Layout(width: 669).isTwoColumn)
   }
 
-  @Test func aPhoneOnItsSideHasOneColumnAndTheRail() {
-    let layout = ChatShell.Layout(width: 844, height: 390)
-    #expect(!layout.isTwoColumn)
-    #expect(layout.usesRail)
+  @Test func aPhoneOnItsSideHasOneColumn() {
+    #expect(!ChatShell.Layout(width: 844).isTwoColumn)
   }
 
-  @Test func anIPadHasTwoColumnsAndTheRail() {
-    let layout = ChatShell.Layout(width: 1024, height: 1366)
-    #expect(layout.isTwoColumn)
-    #expect(layout.usesRail)
+  @Test func anIPadHasTwoColumns() {
+    #expect(ChatShell.Layout(width: 1024).isTwoColumn)
   }
 }
