@@ -1,6 +1,7 @@
 import Domain
 import Foundation
 import Observation
+import SwiftUI
 
 /// One room: its timeline, kept up to date, and the composer, as the Flutter app's `lib/pages/chat` shows them. The
 /// composer sends Markdown text, replies to a message or edits one of the user's own; a message's menu reacts, copies or
@@ -28,12 +29,23 @@ public final class RoomViewModel {
   public private(set) var isLoadingOlder = false
   public private(set) var reachedStart = false
   public private(set) var errorMessage: String?
+  /// The other members typing now, by name.
+  public private(set) var typingNames: [String] = []
+  /// How many attachments are uploading.
+  public private(set) var uploadCount = 0
+  /// The room's pinned messages, oldest pin first, and the one the banner shows.
+  public private(set) var pinned: [TimelineMessage] = []
+  public private(set) var pinnedIndex = 0
+  /// A short confirmation shown after an action ("Forwarded").
+  public private(set) var toast: String?
 
   @ObservationIgnored private let repository: any TimelineRepository
   /// Loads the pictures and files of messages.
   @ObservationIgnored public let media: any MediaRepository
   @ObservationIgnored private let detailsRepository: (any RoomDetailsRepository)?
   @ObservationIgnored private let onLeft: @MainActor () -> Void
+  /// The rooms a message can be forwarded to: the chat list's, given by the app (ADR 0005).
+  @ObservationIgnored public let forwardTargets: @MainActor () -> [RoomSummary]
   @ObservationIgnored private var startCount = 0
 
   /// The quick reactions of the Flutter message menu.
@@ -42,8 +54,10 @@ public final class RoomViewModel {
   public init(
     roomId: String, roomName: String, repository: any TimelineRepository,
     media: any MediaRepository,
-    details: (any RoomDetailsRepository)? = nil, onLeft: @escaping @MainActor () -> Void = {}
+    details: (any RoomDetailsRepository)? = nil, onLeft: @escaping @MainActor () -> Void = {},
+    forwardTargets: @escaping @MainActor () -> [RoomSummary] = { [] }
   ) {
+    self.forwardTargets = forwardTargets
     self.roomId = roomId
     self.roomName = roomName
     self.repository = repository
@@ -70,7 +84,14 @@ public final class RoomViewModel {
       return
     }
     Task { await self.loadOlder() }
+    let typing = Task { [repository] in
+      for await names in await repository.typingMembers() {
+        await MainActor.run { withTypingAnimation { self.typingNames = names } }
+      }
+    }
+    defer { typing.cancel() }
     await repository.markAsRead()
+    await loadPinned()
     for await list in items where thisStart == startCount {
       state = .loaded(list)
       if list.contains(where: { $0.kind == .timelineStart }) { reachedStart = true }
@@ -90,6 +111,106 @@ public final class RoomViewModel {
     }
   }
 
+  /// The rows the screen draws: messages grouped by sender, pictures sent together as albums.
+  public var rows: [ChatRow] {
+    guard case .loaded(let items) = state else { return [] }
+    return TimelineRows.rows(from: items)
+  }
+
+  /// Counts sent messages, so the send button and haptics react to each send.
+  public private(set) var sendCount = 0
+
+  /// The pinned message the banner shows now.
+  public var currentPinned: TimelineMessage? {
+    pinned.isEmpty ? nil : pinned[min(pinnedIndex, pinned.count - 1)]
+  }
+
+  public func loadPinned() async {
+    pinned = await repository.pinnedMessages()
+    pinnedIndex = max(0, pinned.count - 1)
+  }
+
+  /// The banner's tap: show the pin before this one, wrapping round, as Telegram cycles its pins.
+  public func showPreviousPinned() {
+    guard !pinned.isEmpty else { return }
+    pinnedIndex = pinnedIndex == 0 ? pinned.count - 1 : pinnedIndex - 1
+  }
+
+  public func isPinned(_ message: TimelineMessage) -> Bool {
+    pinned.contains { $0.eventId != nil && $0.eventId == message.eventId }
+  }
+
+  public func togglePin(_ message: TimelineMessage) async {
+    guard let eventId = message.eventId else { return }
+    let pin = !isPinned(message)
+    do {
+      try await repository.setPinned(pin, eventId: eventId)
+      await loadPinned()
+      showToast(pin ? "Pinned" : "Unpinned")
+    } catch {
+      errorMessage = "Could not pin the message."
+    }
+  }
+
+  public func forward(_ message: TimelineMessage, to room: RoomSummary) async {
+    guard let eventId = message.eventId else { return }
+    do {
+      try await repository.forward(eventId: eventId, to: room.id)
+      showToast("Forwarded to \(room.name)")
+    } catch {
+      errorMessage = "Could not forward the message."
+    }
+  }
+
+  private func showToast(_ text: String) {
+    toast = text
+    Task { [weak self] in
+      try? await Task.sleep(for: .seconds(2))
+      if self?.toast == text { self?.toast = nil }
+    }
+  }
+
+  /// "Alice is typing…", "Alice and Bob are typing…", "Alice and 2 others are typing…", or `nil`.
+  public var typingText: String? {
+    switch typingNames.count {
+    case 0: nil
+    case 1: "\(typingNames[0]) is typing…"
+    case 2: "\(typingNames[0]) and \(typingNames[1]) are typing…"
+    default: "\(typingNames[0]) and \(typingNames.count - 1) others are typing…"
+    }
+  }
+
+  /// Tells the room the user is typing while the draft has text, and stopped once it is empty.
+  public func draftDidChange(from old: String, to new: String) async {
+    let wasTyping = !old.isEmpty
+    let isTyping = !new.isEmpty
+    guard wasTyping != isTyping else { return }
+    await repository.setTyping(isTyping)
+  }
+
+  /// Uploads and sends a picked picture, video or file, as a reply when the composer is replying. The file at
+  /// `fileURL` must stay until the upload ends; the caller removes it after.
+  public func send(
+    attachment kind: OutgoingAttachment.Kind, fileURL: URL, mimeType: String?, size: Int?
+  ) async {
+    var replyTo: String?
+    if case .reply(let eventId, _) = composerMode {
+      replyTo = eventId
+      composerMode = .new
+    }
+    errorMessage = nil
+    uploadCount += 1
+    sendCount += 1
+    defer { uploadCount -= 1 }
+    do {
+      try await repository.sendAttachment(
+        OutgoingAttachment(
+          kind: kind, fileURL: fileURL, mimeType: mimeType, size: size, replyTo: replyTo))
+    } catch {
+      errorMessage = "Could not send the attachment. Please try again."
+    }
+  }
+
   public var canSend: Bool {
     !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
@@ -99,7 +220,9 @@ public final class RoomViewModel {
     let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { return }
     let mode = composerMode
+    sendCount += 1
     draft = ""
+    await repository.setTyping(false)
     composerMode = .new
     errorMessage = nil
     do {
@@ -204,4 +327,9 @@ public final class RoomViewModel {
     }
     return date.formatted(.dateTime.weekday(.wide).day().month(.wide).year())
   }
+}
+
+/// Runs a change to the typing names with the animation the indicator uses.
+@MainActor private func withTypingAnimation(_ change: () -> Void) {
+  withAnimation(.spring(response: 0.3, dampingFraction: 0.8), change)
 }

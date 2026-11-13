@@ -49,7 +49,7 @@ struct RoomViewModelTests {
     viewModel.draft = "  hi there \n"
     #expect(viewModel.canSend)
     await viewModel.send()
-    #expect(repository.calls == [.send("hi there")])
+    #expect(repository.calls == [.typing(false), .send("hi there")])
     #expect(viewModel.draft.isEmpty)
   }
 
@@ -80,7 +80,7 @@ struct RoomViewModelTests {
       viewModel.composerMode == .reply(eventId: "$1", to: .init(senderName: "Bob", text: "hello")))
     viewModel.draft = "sure"
     await viewModel.send()
-    #expect(repository.calls == [.reply("sure", "$1")])
+    #expect(repository.calls == [.typing(false), .reply("sure", "$1")])
     #expect(viewModel.composerMode == .new)
   }
 
@@ -91,7 +91,7 @@ struct RoomViewModelTests {
     #expect(viewModel.draft == "typo")
     viewModel.draft = "fixed"
     await viewModel.send()
-    #expect(repository.calls == [.edit("$1", "fixed")])
+    #expect(repository.calls == [.typing(false), .edit("$1", "fixed")])
   }
 
   @Test func onlyOwnMessagesCanBeEditedOrDeleted() async {
@@ -180,5 +180,180 @@ struct RoomMediaTests {
   @Test func sizesReadLikeFiles() {
     #expect(RoomViewModel.sizeText(nil) == nil)
     #expect(RoomViewModel.sizeText(1_200_000) != nil)
+  }
+}
+
+@MainActor
+struct RoomSendFeedbackTests {
+  @Test func eachSendBumpsTheSendCountForTheButtonAnimation() async {
+    let viewModel = RoomViewModel(
+      roomId: "!r", roomName: "Team", repository: FakeTimelineRepository(),
+      media: FakeMediaRepository())
+    viewModel.draft = "one"
+    await viewModel.send()
+    viewModel.draft = "two"
+    await viewModel.send()
+    #expect(viewModel.sendCount == 2)
+  }
+}
+
+@MainActor
+struct RoomAttachmentAndTypingTests {
+  private func viewModel(_ repository: FakeTimelineRepository) -> RoomViewModel {
+    RoomViewModel(
+      roomId: "!r", roomName: "Team", repository: repository, media: FakeMediaRepository())
+  }
+
+  @Test func anAttachmentIsSentAsAReplyWhenReplying() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = viewModel(repository)
+    viewModel.reply(
+      to: TimelineMessage(
+        eventId: "$1", senderId: "@b", senderName: "Bob", isOwn: false, date: .now,
+        body: .text("look")))
+    let url = URL(filePath: "/tmp/a.jpg")
+    await viewModel.send(
+      attachment: .image(width: 10, height: 20), fileURL: url, mimeType: "image/jpeg", size: 3)
+    #expect(
+      repository.calls == [
+        .attachment(
+          OutgoingAttachment(
+            kind: .image(width: 10, height: 20), fileURL: url, mimeType: "image/jpeg", size: 3,
+            replyTo: "$1"))
+      ])
+    #expect(viewModel.composerMode == .new)
+    #expect(viewModel.uploadCount == 0)
+  }
+
+  @Test func aFailedUploadShowsAnError() async {
+    let repository = FakeTimelineRepository()
+    repository.actionResult = .failure(.requestFailed)
+    let viewModel = viewModel(repository)
+    await viewModel.send(
+      attachment: .file, fileURL: URL(filePath: "/tmp/a.pdf"), mimeType: nil, size: nil)
+    #expect(viewModel.errorMessage == "Could not send the attachment. Please try again.")
+  }
+
+  @Test func typingIsSentWhenTheDraftStartsAndStops() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = viewModel(repository)
+    await viewModel.draftDidChange(from: "", to: "h")
+    await viewModel.draftDidChange(from: "h", to: "he")
+    await viewModel.draftDidChange(from: "he", to: "")
+    #expect(repository.calls == [.typing(true), .typing(false)])
+  }
+
+  @Test(.timeLimit(.minutes(1))) func theTypingTextNamesWhoIsTyping() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = viewModel(repository)
+    #expect(viewModel.typingText == nil)
+    let task = Task { await viewModel.start() }
+    // The room subscribes to typing in its own task; names published before that would be lost.
+    while !repository.isFollowingTyping { await Task.yield() }
+    repository.publishTyping(["Alice"])
+    while viewModel.typingNames != ["Alice"] { await Task.yield() }
+    #expect(viewModel.typingText == "Alice is typing…")
+    repository.publishTyping(["Alice", "Bob", "Carol"])
+    while viewModel.typingNames.count != 3 { await Task.yield() }
+    #expect(viewModel.typingText == "Alice and 2 others are typing…")
+    repository.finish()
+    await task.value
+  }
+}
+
+@MainActor
+struct RoomPinAndForwardTests {
+  private func message(_ id: String, _ text: String = "hi") -> TimelineMessage {
+    TimelineMessage(
+      eventId: id, senderId: "@b", senderName: "Bob", isOwn: false, date: .now, body: .text(text))
+  }
+
+  @Test func pinningReloadsThePinsAndShowsTheLatest() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = RoomViewModel(
+      roomId: "!r", roomName: "Team", repository: repository, media: FakeMediaRepository())
+    repository.pinned = [message("$1", "first"), message("$2", "second")]
+    await viewModel.togglePin(message("$3"))
+    #expect(repository.calls == [.pin(true, "$3")])
+    #expect(viewModel.currentPinned?.eventId == "$2")
+    #expect(viewModel.isPinned(message("$1")))
+    #expect(viewModel.toast == "Pinned")
+  }
+
+  @Test func theBannerCyclesBackwardsThroughThePins() async {
+    let repository = FakeTimelineRepository()
+    repository.pinned = [message("$1"), message("$2"), message("$3")]
+    let viewModel = RoomViewModel(
+      roomId: "!r", roomName: "Team", repository: repository, media: FakeMediaRepository())
+    await viewModel.loadPinned()
+    #expect(viewModel.pinnedIndex == 2)
+    viewModel.showPreviousPinned()
+    viewModel.showPreviousPinned()
+    viewModel.showPreviousPinned()
+    #expect(viewModel.pinnedIndex == 2)
+  }
+
+  @Test func unpinningAPinnedMessage() async {
+    let repository = FakeTimelineRepository()
+    repository.pinned = [message("$1")]
+    let viewModel = RoomViewModel(
+      roomId: "!r", roomName: "Team", repository: repository, media: FakeMediaRepository())
+    await viewModel.loadPinned()
+    await viewModel.togglePin(message("$1"))
+    #expect(repository.calls == [.pin(false, "$1")])
+  }
+
+  @Test func forwardingSendsToTheChosenRoom() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = RoomViewModel(
+      roomId: "!r", roomName: "Team", repository: repository, media: FakeMediaRepository())
+    let target = RoomSummary(
+      id: "!other", name: "Other", lastMessageText: nil, lastMessageSender: nil, lastActivity: nil)
+    await viewModel.forward(message("$1"), to: target)
+    #expect(repository.calls == [.forward("$1", "!other")])
+    #expect(viewModel.toast == "Forwarded to Other")
+  }
+
+  @Test func aFailedForwardShowsAnError() async {
+    let repository = FakeTimelineRepository()
+    repository.actionResult = .failure(.requestFailed)
+    let viewModel = RoomViewModel(
+      roomId: "!r", roomName: "Team", repository: repository, media: FakeMediaRepository())
+    let target = RoomSummary(
+      id: "!o", name: "O", lastMessageText: nil, lastMessageSender: nil, lastActivity: nil)
+    await viewModel.forward(message("$1"), to: target)
+    #expect(viewModel.errorMessage == "Could not forward the message.")
+  }
+}
+
+@MainActor
+struct VoiceMessageTests {
+  @Test func theWaveformKeepsTheLoudestSampleOfEachSlice() {
+    let samples: [Float] = [0.1, 0.9, 0.2, 0.3, 0.8, 0.1]
+    #expect(VoiceRecorder.downsample(samples, to: 3) == [0.9, 0.3, 0.8])
+    #expect(VoiceRecorder.downsample([0.5], to: 3) == [0.5])
+  }
+
+  @Test func durationsReadAsMinutesAndSeconds() {
+    #expect(AudioMessageRow.time(0) == "0:00")
+    #expect(AudioMessageRow.time(65.4) == "1:05")
+    #expect(AudioMessageRow.time(-3) == "0:00")
+  }
+
+  @Test func aVoiceMessageIsSentAsVoice() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = RoomViewModel(
+      roomId: "!r", roomName: "Team", repository: repository, media: FakeMediaRepository())
+    let url = URL(filePath: "/tmp/voice.m4a")
+    await viewModel.send(
+      attachment: .voice(duration: 3, waveform: [0.2, 0.8]), fileURL: url, mimeType: "audio/mp4",
+      size: nil)
+    #expect(
+      repository.calls == [
+        .attachment(
+          OutgoingAttachment(
+            kind: .voice(duration: 3, waveform: [0.2, 0.8]), fileURL: url, mimeType: "audio/mp4",
+            size: nil))
+      ])
   }
 }

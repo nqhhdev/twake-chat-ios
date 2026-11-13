@@ -36,6 +36,30 @@ public final class FakeRoomDetailsRepository: RoomDetailsRepository, @unchecked 
     members
   }
 
+  private var _mode: (NotificationMode, Bool) = (.allMessages, true)
+  private var _setModeResult: Result<Void, RoomDetailsError> = .success(())
+
+  public var setModeResult: Result<Void, RoomDetailsError> {
+    get { lock.withLock { _setModeResult } }
+    set { lock.withLock { _setModeResult = newValue } }
+  }
+
+  public var mode: (NotificationMode, Bool) { lock.withLock { _mode } }
+
+  public func notificationMode(roomId: String) async throws(RoomDetailsError)
+    -> (mode: NotificationMode, isDefault: Bool)
+  {
+    let current = mode
+    return (current.0, current.1)
+  }
+
+  public func setNotificationMode(_ mode: NotificationMode?, roomId: String)
+    async throws(RoomDetailsError)
+  {
+    try setModeResult.get()
+    lock.withLock { _mode = mode.map { ($0, false) } ?? (.allMessages, true) }
+  }
+
   public func leave(roomId: String) async throws(RoomDetailsError) {
     lock.withLock { _leftRooms.append(roomId) }
     try leaveResult.get()

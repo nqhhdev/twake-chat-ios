@@ -105,21 +105,28 @@ struct ChatListRow: View {
       VStack(alignment: .leading, spacing: 2) {
         HStack {
           Text(room.name)
-            .textStyle(TextStyles.titleMedium)
+            .textStyle(
+              room.unreadCount > 0
+                ? TextStyles.titleMedium.with(weight: .semibold) : TextStyles.titleMedium
+            )
             .foregroundStyle(SysColors.onSurface)
             .lineLimit(1)
           Spacer(minLength: 4)
           if let date = room.lastActivity {
             Text(ChatListViewModel.timeText(date))
               .textStyle(TextStyles.labelSmall)
-              .foregroundStyle(SysColors.textSecondary)
+              .foregroundStyle(room.unreadCount > 0 ? SysColors.primary : SysColors.textSecondary)
           }
         }
-        if let preview = ChatListViewModel.preview(of: room) {
-          Text(preview)
-            .textStyle(TextStyles.bodyMedium)
-            .foregroundStyle(SysColors.textSecondary)
-            .lineLimit(1)
+        HStack {
+          if let preview = ChatListViewModel.preview(of: room) {
+            Text(preview)
+              .textStyle(TextStyles.bodyMedium)
+              .foregroundStyle(SysColors.textSecondary)
+              .lineLimit(1)
+          }
+          Spacer(minLength: 4)
+          UnreadBadge(unread: room.unreadCount, mentions: room.mentionCount)
         }
       }
     }
@@ -127,5 +134,37 @@ struct ChatListRow: View {
     .frame(minHeight: 72)
     .background(isSelected ? SysColors.secondaryContainer : ColorToken(0x0000_0000))
     .contentShape(Rectangle())
+  }
+}
+
+/// The unread count of a room, as the Flutter chat list shows it: "@" for a mention, then the count in a `primary`
+/// capsule. A new count pops and rolls to its value.
+struct UnreadBadge: View {
+  let unread: Int
+  let mentions: Int
+
+  var body: some View {
+    HStack(spacing: 4) {
+      if mentions > 0 {
+        Text("@")
+          .textStyle(TextStyles.labelMedium)
+          .foregroundStyle(SysColors.onPrimary)
+          .frame(width: 20, height: 20)
+          .background(SysColors.primary, in: Circle())
+          .transition(.scale.combined(with: .opacity))
+      }
+      if unread > 0 {
+        Text(unread > 999 ? "999+" : "\(unread)")
+          .textStyle(TextStyles.labelMedium)
+          .foregroundStyle(SysColors.onPrimary)
+          .contentTransition(.numericText(value: Double(unread)))
+          .padding(.horizontal, 6)
+          .frame(minWidth: 20, minHeight: 20)
+          .background(SysColors.primary, in: Capsule())
+          .transition(.scale.combined(with: .opacity))
+      }
+    }
+    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: unread)
+    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: mentions)
   }
 }

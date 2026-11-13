@@ -2,7 +2,9 @@ import Authentication
 import ChatList
 import DesignSystem
 import Domain
+import People
 import Room
+import Settings
 import SwiftUI
 
 /// The signed-in screens, laid out as twake-on-matrix `AppAdaptiveScaffold` (ADR 0022). The Contacts, Chats and
@@ -17,6 +19,11 @@ struct ChatShell: View {
 
   let chatList: ChatListViewModel
   let signedIn: SignedInViewModel
+  let settings: SettingsViewModel
+  /// Makes a people search; the closure it is given opens the chat it found or created.
+  let makePeopleSearch:
+    (PeopleSearchViewModel.Mode, @escaping @MainActor (String, String) -> Void) ->
+      PeopleSearchViewModel
   /// Makes a room's screen model; the closure it is given closes the room (after the user left it).
   let makeRoom: (RoomSummary, @escaping @MainActor () -> Void) -> RoomViewModel
 
@@ -37,6 +44,8 @@ struct ChatShell: View {
   @State private var tab = Tab.chats
   @State private var room: RoomViewModel?
   @State private var isRoomPushed = false
+  @State private var newChat: PeopleSearchViewModel?
+  @State private var contacts: PeopleSearchViewModel?
 
   var body: some View {
     GeometryReader { geometry in
@@ -69,7 +78,11 @@ struct ChatShell: View {
           NavigationStack {
             VStack(spacing: 0) {
               tabContent(isBesideChat: false)
-              if !usesRail { TwakeBottomBar(selection: $tab, items: navigationItems) }
+              if !usesRail {
+                // The bar stays at the bottom while the keyboard is up, as a tab bar does.
+                TwakeBottomBar(selection: $tab, items: navigationItems)
+                  .ignoresSafeArea(.keyboard, edges: .bottom)
+              }
             }
             .navigationDestination(isPresented: $isRoomPushed) {
               if let room { RoomScreen(viewModel: room).id(room.roomId) }
@@ -91,7 +104,7 @@ struct ChatShell: View {
         Image(systemName: "message.fill").font(.system(size: 22))
       },
       .init(value: Tab.settings, title: "Settings") { isSelected in
-        TwakeAvatar(name: signedIn.displayName, size: 28)
+        TwakeAvatar(name: settings.displayName, size: 28)
           .overlay(
             Circle().strokeBorder(isSelected ? SysColors.primary : ColorToken(0), lineWidth: 2))
       },
@@ -112,7 +125,7 @@ struct ChatShell: View {
       Button {
         tab = .settings
       } label: {
-        TwakeAvatar(name: signedIn.displayName, size: 56)
+        TwakeAvatar(name: settings.displayName, size: 56)
       }
       .buttonStyle(.plain)
       .accessibilityLabel("Settings")
@@ -124,18 +137,51 @@ struct ChatShell: View {
   @ViewBuilder private func tabContent(isBesideChat: Bool) -> some View {
     switch tab {
     case .contacts:
-      ContentUnavailableView(
-        "Contacts", systemImage: "person.2.circle",
-        description: Text("Contacts are not available in this version yet.")
-      )
-      .frame(maxHeight: .infinity)
-      .twakeTitle("Contacts")
+      // The Contacts tab keeps its search while the app runs.
+      Group {
+        if let contacts { ContactsScreen(viewModel: contacts) } else { Color.clear }
+      }
+      .task {
+        guard contacts == nil else { return }
+        contacts = makePeopleSearch(.direct) { roomId, name in
+          tab = .chats
+          open(
+            RoomSummary(
+              id: roomId, name: name, lastMessageText: nil, lastMessageSender: nil,
+              lastActivity: nil))
+        }
+      }
     case .chats:
       ChatListScreen(
-        viewModel: chatList, selectedRoomId: isBesideChat ? room?.roomId : nil, onSelect: open)
+        viewModel: chatList, selectedRoomId: isBesideChat ? room?.roomId : nil, onSelect: open
+      )
+      .overlay(alignment: .bottomTrailing) { newChatButton }
+      .sheet(item: $newChat) { search in NewChatScreen(viewModel: search) }
     case .settings:
-      SettingsScreen(viewModel: signedIn)
+      SettingsScreen(viewModel: settings)
     }
+  }
+
+  /// `TwakeFloatingActionButton` with the pencil, as the Flutter chat list's new chat button.
+  private var newChatButton: some View {
+    Button {
+      newChat = makePeopleSearch(.direct) { roomId, name in
+        newChat = nil
+        open(
+          RoomSummary(
+            id: roomId, name: name, lastMessageText: nil, lastMessageSender: nil, lastActivity: nil)
+        )
+      }
+    } label: {
+      Image(systemName: "square.and.pencil")
+        .font(.system(size: 22, weight: .medium))
+        .foregroundStyle(SysColors.onPrimary)
+        .frame(width: 56, height: 56)
+        .background(SysColors.primary, in: .rect(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.18), radius: 8, y: 3)
+    }
+    .accessibilityLabel("New chat")
+    .padding(16)
   }
 
   private func open(_ summary: RoomSummary) {

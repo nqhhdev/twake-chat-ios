@@ -3,12 +3,31 @@ import Domain
 import SwiftUI
 
 /// The chat details page. It shows the view model's state and forwards taps; it holds no logic.
+enum NotificationChoice: Hashable {
+  case followDefault
+  case mode(NotificationMode)
+}
+
 public struct RoomDetailsScreen: View {
   @Bindable var viewModel: RoomDetailsViewModel
   @State private var isConfirmingLeave = false
 
   public init(viewModel: RoomDetailsViewModel) {
     self.viewModel = viewModel
+  }
+
+  private var notificationBinding: Binding<NotificationChoice> {
+    Binding {
+      if viewModel.followsDefault { return .followDefault }
+      return viewModel.notificationMode.map(NotificationChoice.mode) ?? .followDefault
+    } set: { choice in
+      Task {
+        switch choice {
+        case .followDefault: await viewModel.setNotificationMode(nil)
+        case .mode(let mode): await viewModel.setNotificationMode(mode)
+        }
+      }
+    }
   }
 
   public var body: some View {
@@ -49,6 +68,20 @@ public struct RoomDetailsScreen: View {
           if !details.isDirect {
             LabeledContent("Visibility", value: details.isPublic ? "Public" : "Private")
           }
+        }
+        Section("Notifications") {
+          Picker(selection: notificationBinding) {
+            Text("Default").tag(NotificationChoice.followDefault)
+            Text("All messages").tag(NotificationChoice.mode(.allMessages))
+            Text("Mentions and keywords").tag(NotificationChoice.mode(.mentionsAndKeywords))
+            Text("Mute").tag(NotificationChoice.mode(.mute))
+          } label: {
+            Label(
+              "Notifications",
+              systemImage: viewModel.notificationMode == .mute && !viewModel.followsDefault
+                ? "bell.slash" : "bell")
+          }
+          .disabled(viewModel.notificationMode == nil)
         }
         Section("\(details.joinedMemberCount) members") {
           ForEach(viewModel.filteredMembers) { member in

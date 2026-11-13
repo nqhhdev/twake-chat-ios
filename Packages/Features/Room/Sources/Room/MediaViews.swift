@@ -14,11 +14,14 @@ struct MessageMediaView: View {
   @State private var isViewerShown = false
   @State private var downloaded: DownloadedFile?
   @State private var isDownloading = false
+  @State private var video: DownloadedFile?
 
   var body: some View {
     switch message.body {
     case .image, .sticker, .video:
       thumbnail
+    case .audio:
+      AudioMessageRow(message: message, viewModel: viewModel)
     default:
       fileRow
     }
@@ -31,30 +34,39 @@ struct MessageMediaView: View {
     return CGSize(width: min(width, height / ratio), height: height)
   }
 
+  /// A button rather than a tap gesture, so a long press still reaches the bubble's message menu.
   private var thumbnail: some View {
     let size = thumbnailSize
-    return RemoteImage(media: media, size: size, repository: viewModel.media)
-      .frame(width: size.width, height: size.height)
-      .clipShape(.rect(cornerRadius: 12))
-      .overlay {
-        if case .video = message.body {
-          Image(systemName: "play.circle.fill")
-            .font(.system(size: 44))
-            .foregroundStyle(.white.opacity(0.9))
+    return Button {
+      if case .video = message.body {
+        Task { await playVideo() }
+      } else {
+        isViewerShown = true
+      }
+    } label: {
+      RemoteImage(media: media, size: size, repository: viewModel.media)
+        .frame(width: size.width, height: size.height)
+        .clipShape(.rect(cornerRadius: 12))
+        .overlay {
+          if case .video = message.body {
+            if isDownloading {
+              ProgressView().tint(.white).controlSize(.large)
+            } else {
+              Image(systemName: "play.circle.fill")
+                .font(.system(size: 44))
+                .foregroundStyle(.white.opacity(0.9))
+            }
+          }
         }
-      }
-      .contentShape(Rectangle())
-      .onTapGesture {
-        if case .video = message.body {
-          Task { await download() }
-        } else {
-          isViewerShown = true
-        }
-      }
-      .fullScreenCover(isPresented: $isViewerShown) {
-        ImageViewer(media: media, repository: viewModel.media, title: message.senderName)
-      }
-      .sheet(item: $downloaded) { file in ShareSheetLink(url: file.url) }
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .fullScreenCover(item: $video) { file in VideoPlayerScreen(url: file.url) }
+    .fullScreenCover(isPresented: $isViewerShown) {
+      ImageViewer(
+        pictures: [media], startIndex: 0, repository: viewModel.media, title: message.senderName)
+    }
+    .sheet(item: $downloaded) { file in ShareSheetLink(url: file.url) }
   }
 
   private var isAudio: Bool {
@@ -89,6 +101,13 @@ struct MessageMediaView: View {
     .buttonStyle(.plain)
     .disabled(isDownloading)
     .sheet(item: $downloaded) { file in ShareSheetLink(url: file.url) }
+  }
+
+  private func playVideo() async {
+    guard !isDownloading else { return }
+    isDownloading = true
+    defer { isDownloading = false }
+    video = await viewModel.file(of: message).map(DownloadedFile.init(url:))
   }
 
   private func download() async {
@@ -137,6 +156,7 @@ struct RemoteImage: View {
     ZStack {
       if let image {
         Image(uiImage: image).resizable().scaledToFill()
+          .transition(.opacity)
       } else {
         Rectangle().fill(SysColors.surface)
         if failed {
@@ -150,7 +170,7 @@ struct RemoteImage: View {
       do {
         let data = try await repository.thumbnail(
           media, width: Int(size.width * scale), height: Int(size.height * scale))
-        image = UIImage(data: data)
+        withAnimation(.easeIn(duration: 0.25)) { image = UIImage(data: data) }
         failed = image == nil
       } catch {
         failed = true
@@ -159,43 +179,52 @@ struct RemoteImage: View {
   }
 }
 
-/// A picture full screen, pinch to zoom, with Close and Share, as the Flutter image viewer.
+/// Pictures full screen, as the Flutter image viewer: swipe between the pictures of an album, pinch or double-tap to
+/// zoom, Close and Share.
 struct ImageViewer: View {
-  let media: MediaReference
+  let pictures: [MediaReference]
   let repository: any MediaRepository
   let title: String
 
+  let startIndex: Int
+
   @Environment(\.dismiss) private var dismiss
-  @State private var image: UIImage?
-  @State private var failed = false
-  @State private var zoom: CGFloat = 1
-  @State private var lastZoom: CGFloat = 1
+  @State private var index: Int?
+  @State private var images: [Int: UIImage] = [:]
+
+  init(pictures: [MediaReference], startIndex: Int, repository: any MediaRepository, title: String)
+  {
+    self.pictures = pictures
+    self.repository = repository
+    self.title = title
+    self.startIndex = startIndex
+  }
+
+  private var currentIndex: Int { index ?? startIndex }
 
   var body: some View {
     NavigationStack {
-      ZStack {
-        Color.black.ignoresSafeArea()
-        if let image {
-          Image(uiImage: image)
-            .resizable()
-            .scaledToFit()
-            .scaleEffect(zoom)
-            .gesture(
-              MagnifyGesture()
-                .onChanged { zoom = max(1, lastZoom * $0.magnification) }
-                .onEnded { _ in lastZoom = zoom }
-            )
-            .onTapGesture(count: 2) {
-              zoom = zoom > 1 ? 1 : 2
-              lastZoom = zoom
+      // A paged scroll view, not a TabView: a paged TabView ignores the page it is first given.
+      ScrollView(.horizontal) {
+        LazyHStack(spacing: 0) {
+          ForEach(pictures.indices, id: \.self) { position in
+            ZoomablePicture(media: pictures[position], repository: repository) {
+              images[position] = $0
             }
-        } else if failed {
-          Label("Could not load the picture.", systemImage: "photo").foregroundStyle(.white)
-        } else {
-          ProgressView().tint(.white)
+            .containerRelativeFrame([.horizontal, .vertical])
+            .id(position)
+          }
         }
+        .scrollTargetLayout()
       }
-      .navigationTitle(title)
+      .scrollTargetBehavior(.paging)
+      .scrollIndicators(.hidden)
+      .scrollPosition(id: $index)
+      // The next picture must not show through the Duo's side status area.
+      .clipped()
+      .onAppear { index = startIndex }
+      .background(Color.black.ignoresSafeArea())
+      .navigationTitle(pictures.count > 1 ? "\(currentIndex + 1) / \(pictures.count)" : title)
       .navigationBarTitleDisplayMode(.inline)
       .toolbarBackground(.black, for: .navigationBar)
       .toolbarColorScheme(.dark, for: .navigationBar)
@@ -203,22 +232,151 @@ struct ImageViewer: View {
         ToolbarItem(placement: .topBarLeading) {
           Button("Close", systemImage: "xmark") { dismiss() }
         }
-        if let image {
+        if let image = images[currentIndex] {
           ToolbarItem(placement: .topBarTrailing) {
             ShareLink(
               item: Image(uiImage: image),
-              preview: SharePreview(title, image: Image(uiImage: image)))
+              preview: SharePreview(title, image: Image(uiImage: image))
+            ) {
+              Image(systemName: "square.and.arrow.up")
+            }
+            .accessibilityLabel("Share")
           }
         }
       }
     }
-    .task {
+  }
+}
+
+/// One picture of the viewer: it loads, fades in, and zooms with a pinch or a double tap.
+struct ZoomablePicture: View {
+  let media: MediaReference
+  let repository: any MediaRepository
+  let onLoad: (UIImage) -> Void
+
+  @State private var image: UIImage?
+  @State private var failed = false
+  @State private var zoom: CGFloat = 1
+  @State private var lastZoom: CGFloat = 1
+
+  var body: some View {
+    ZStack {
+      if let image {
+        Image(uiImage: image)
+          .resizable()
+          .scaledToFit()
+          .scaleEffect(zoom)
+          .gesture(
+            MagnifyGesture()
+              .onChanged { zoom = max(1, lastZoom * $0.magnification) }
+              .onEnded { _ in
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { zoom = min(zoom, 4) }
+                lastZoom = zoom
+              }
+          )
+          .onTapGesture(count: 2) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+              zoom = zoom > 1 ? 1 : 2.5
+            }
+            lastZoom = zoom
+          }
+          .transition(.opacity.combined(with: .scale(scale: 0.96)))
+      } else if failed {
+        Label("Could not load the picture.", systemImage: "photo").foregroundStyle(.white)
+      } else {
+        ProgressView().tint(.white)
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .task(id: media.source) {
       do {
-        image = UIImage(data: try await repository.content(media))
-        failed = image == nil
+        let loaded = UIImage(data: try await repository.content(media))
+        withAnimation(.easeOut(duration: 0.25)) { image = loaded }
+        failed = loaded == nil
+        if let loaded { onLoad(loaded) }
       } catch {
         failed = true
       }
     }
   }
+}
+
+/// Pictures sent together, as one album (Flutter `images_builder`, Telegram albums): two side by side, three as one
+/// wide and two below, four or more in a two-column grid, at most six cells with "+N" on the last. A tap opens the
+/// viewer on that picture.
+struct AlbumGrid: View {
+  let album: AlbumRowModel
+  let width: CGFloat
+  let viewModel: RoomViewModel
+
+  @State private var viewerStart: ViewerStart?
+
+  private static let spacing: CGFloat = 2
+  private static let maxCells = 6
+
+  private var pictures: [MediaReference] { album.messages.compactMap(\.media) }
+
+  var body: some View {
+    let cells = Array(pictures.prefix(Self.maxCells).enumerated())
+    let half = (width - Self.spacing) / 2
+    VStack(spacing: Self.spacing) {
+      if cells.count == 3 {
+        cell(cells[0], width: width, height: half)
+        HStack(spacing: Self.spacing) {
+          cell(cells[1], width: half, height: half)
+          cell(cells[2], width: half, height: half)
+        }
+      } else {
+        ForEach(Array(stride(from: 0, to: cells.count, by: 2)), id: \.self) { row in
+          HStack(spacing: Self.spacing) {
+            cell(cells[row], width: row + 1 < cells.count ? half : width, height: half)
+            if row + 1 < cells.count { cell(cells[row + 1], width: half, height: half) }
+          }
+        }
+      }
+    }
+    .clipShape(.rect(cornerRadius: 12))
+    .fullScreenCover(item: $viewerStart) { start in
+      ImageViewer(
+        pictures: pictures, startIndex: start.index, repository: viewModel.media,
+        title: album.messages.first?.senderName ?? "")
+    }
+  }
+
+  private func cell(
+    _ entry: (offset: Int, element: MediaReference), width: CGFloat, height: CGFloat
+  ) -> some View {
+    Button {
+      viewerStart = ViewerStart(index: entry.offset)
+    } label: {
+      cellImage(entry, width: width, height: height)
+    }
+    .buttonStyle(.plain)
+  }
+
+  private func cellImage(
+    _ entry: (offset: Int, element: MediaReference), width: CGFloat, height: CGFloat
+  ) -> some View {
+    RemoteImage(
+      media: entry.element, size: CGSize(width: width, height: height), repository: viewModel.media
+    )
+    .frame(width: width, height: height)
+    .clipped()
+    .overlay {
+      let hidden = pictures.count - Self.maxCells
+      if entry.offset == Self.maxCells - 1, hidden > 0 {
+        ZStack {
+          Color.black.opacity(0.45)
+          Text("+\(hidden)").textStyle(TextStyles.headlineSmall).foregroundStyle(.white)
+        }
+      }
+    }
+    .contentShape(Rectangle())
+  }
+}
+
+/// Which picture of an album the viewer opens on.
+struct ViewerStart: Identifiable {
+  let index: Int
+  var id: Int { index }
 }

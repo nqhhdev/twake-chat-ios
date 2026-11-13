@@ -35,6 +35,8 @@ struct TwakeChatApp: App {
         makeTimeline: { TimelineProxy(roomId: $0, authentication: repository) },
         media: MediaProxy(authentication: repository),
         roomDetails: RoomDetailsProxy(authentication: repository),
+        accountSettings: AccountSettingsProxy(authentication: repository),
+        people: PeopleProxy(authentication: repository),
         signInConfiguration: configuration, webAuthenticator: SystemWebAuthenticator()))
   }
 

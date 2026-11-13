@@ -49,6 +49,20 @@
     },
     {
       "target" : {
+        "containerPath" : "container:Packages\/Features\/Settings",
+        "identifier" : "SettingsTests",
+        "name" : "SettingsTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:Packages\/Features\/People",
+        "identifier" : "PeopleTests",
+        "name" : "PeopleTests"
+      }
+    },
+    {
+      "target" : {
         "containerPath" : "container:TwakeChat.xcodeproj",
         "identifier" : "A10000000000000000000077",
         "name" : "MatrixDataTests"

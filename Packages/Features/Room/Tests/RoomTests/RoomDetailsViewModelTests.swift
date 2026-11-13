@@ -76,3 +76,29 @@ struct RoomDetailsViewModelTests {
     #expect(room.makeDetails() == nil)
   }
 }
+
+@MainActor
+struct RoomNotificationModeTests {
+  @Test func mutingTheRoomAndGoingBackToTheDefault() async {
+    let repository = FakeRoomDetailsRepository()
+    let viewModel = RoomDetailsViewModel(roomId: "!r", repository: repository, onLeft: {})
+    await viewModel.load()
+    #expect(viewModel.followsDefault)
+    await viewModel.setNotificationMode(.mute)
+    #expect(viewModel.notificationMode == .mute)
+    #expect(!viewModel.followsDefault)
+    await viewModel.setNotificationMode(nil)
+    #expect(viewModel.followsDefault)
+    #expect(viewModel.notificationMode == .allMessages)
+  }
+
+  @Test func aFailedChangeGoesBack() async {
+    let repository = FakeRoomDetailsRepository()
+    repository.setModeResult = .failure(.requestFailed)
+    let viewModel = RoomDetailsViewModel(roomId: "!r", repository: repository, onLeft: {})
+    await viewModel.load()
+    await viewModel.setNotificationMode(.mute)
+    #expect(viewModel.followsDefault)
+    #expect(viewModel.errorMessage != nil)
+  }
+}

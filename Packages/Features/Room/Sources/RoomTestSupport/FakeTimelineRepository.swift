@@ -12,6 +12,10 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
     case redact(String)
     case toggleReaction(String, String)
     case markAsRead, close
+    case attachment(OutgoingAttachment)
+    case typing(Bool)
+    case pin(Bool, String)
+    case forward(String, String)
   }
 
   private let lock = NSLock()
@@ -72,6 +76,50 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
   public func send(text: String) async throws(TimelineError) {
     record(.send(text))
     try actionResult.get()
+  }
+
+  public func sendAttachment(_ attachment: OutgoingAttachment) async throws(TimelineError) {
+    record(.attachment(attachment))
+    try actionResult.get()
+  }
+
+  public func setTyping(_ isTyping: Bool) async { record(.typing(isTyping)) }
+
+  private var _pinned: [TimelineMessage] = []
+
+  /// What `pinnedMessages()` returns.
+  public var pinned: [TimelineMessage] {
+    get { lock.withLock { _pinned } }
+    set { lock.withLock { _pinned = newValue } }
+  }
+
+  public func setPinned(_ pinned: Bool, eventId: String) async throws(TimelineError) {
+    record(.pin(pinned, eventId))
+    try actionResult.get()
+  }
+
+  public func pinnedMessages() async -> [TimelineMessage] { pinned }
+
+  public func forward(eventId: String, to roomId: String) async throws(TimelineError) {
+    record(.forward(eventId, roomId))
+    try actionResult.get()
+  }
+
+  private var typingContinuation: AsyncStream<[String]>.Continuation?
+
+  /// Whether someone follows `typingMembers()`; a test waits for it before it publishes.
+  public var isFollowingTyping: Bool { lock.withLock { typingContinuation != nil } }
+
+  /// Sends the names typing now to the stream `typingMembers()` returned.
+  public func publishTyping(_ names: [String]) {
+    let continuation = lock.withLock { typingContinuation }
+    continuation?.yield(names)
+  }
+
+  public func typingMembers() async -> AsyncStream<[String]> {
+    let (stream, continuation) = AsyncStream<[String]>.makeStream()
+    lock.withLock { typingContinuation = continuation }
+    return stream
   }
 
   public func reply(text: String, to eventId: String) async throws(TimelineError) {

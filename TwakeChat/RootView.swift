@@ -4,7 +4,9 @@ import DesignSystem
 import Domain
 import Foundation
 import Observation
+import People
 import Room
+import Settings
 import SwiftUI
 
 /// The root coordinator. At launch it restores the saved session, then hands over to the authentication flow, which
@@ -34,6 +36,8 @@ final class RootCoordinator {
   @ObservationIgnored private let makeTimeline: (String) -> any TimelineRepository
   @ObservationIgnored private let media: any MediaRepository
   @ObservationIgnored private let roomDetails: (any RoomDetailsRepository)?
+  @ObservationIgnored private let accountSettings: (any AccountSettingsRepository)?
+  @ObservationIgnored private let people: (any PeopleRepository)?
   @ObservationIgnored private let signInConfiguration: SignInConfiguration
   @ObservationIgnored private let webAuthenticator: any WebAuthenticator
 
@@ -47,6 +51,8 @@ final class RootCoordinator {
     makeTimeline: @escaping (String) -> any TimelineRepository = { _ in UnavailableTimeline() },
     media: any MediaRepository = UnavailableMedia(),
     roomDetails: (any RoomDetailsRepository)? = nil,
+    accountSettings: (any AccountSettingsRepository)? = nil,
+    people: (any PeopleRepository)? = nil,
     signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator
   ) {
     self.repository = repository
@@ -54,6 +60,8 @@ final class RootCoordinator {
     self.makeTimeline = makeTimeline
     self.media = media
     self.roomDetails = roomDetails
+    self.accountSettings = accountSettings
+    self.people = people
     self.signInConfiguration = signInConfiguration
     self.webAuthenticator = webAuthenticator
   }
@@ -81,7 +89,32 @@ final class RootCoordinator {
     RoomViewModel(
       roomId: summary.id, roomName: summary.name, repository: makeTimeline(summary.id),
       media: media,
-      details: roomDetails, onLeft: onLeft)
+      details: roomDetails, onLeft: onLeft,
+      forwardTargets: { [weak self] in self?.chatList?.viewModel.visibleRooms ?? [] })
+  }
+
+  @ObservationIgnored private var settings:
+    (signedIn: SignedInViewModel, viewModel: SettingsViewModel)?
+
+  /// The Settings tab of a signed-in state, created once per sign-in; its Logout runs the signed-in state's logout.
+  func settings(for signedIn: SignedInViewModel) -> SettingsViewModel {
+    if let settings, settings.signedIn === signedIn { return settings.viewModel }
+    let viewModel = SettingsViewModel(
+      userId: signedIn.userId, repository: accountSettings ?? UnavailableAccountSettings()
+    ) { [weak signedIn] in
+      guard let signedIn else { return false }
+      await signedIn.logOut()
+      return signedIn.errorMessage == nil
+    }
+    settings = (signedIn, viewModel)
+    return viewModel
+  }
+
+  /// A people search for the new chat sheet or the Contacts tab.
+  func peopleSearch(
+    mode: PeopleSearchViewModel.Mode, onOpen: @escaping @MainActor (String, String) -> Void
+  ) -> PeopleSearchViewModel {
+    PeopleSearchViewModel(mode: mode, repository: people ?? UnavailablePeople(), onOpen: onOpen)
   }
 
   @ObservationIgnored private var started = false
@@ -154,7 +187,10 @@ struct RootView: View {
     } else if let authentication = coordinator.authentication {
       AuthenticationCoordinatorView(coordinator: authentication) { signedIn in
         if let chatList = coordinator.chatList(for: signedIn) {
-          ChatShell(chatList: chatList, signedIn: signedIn, makeRoom: coordinator.room(for:onLeft:))
+          ChatShell(
+            chatList: chatList, signedIn: signedIn, settings: coordinator.settings(for: signedIn),
+            makePeopleSearch: coordinator.peopleSearch(mode:onOpen:),
+            makeRoom: coordinator.room(for:onLeft:))
         }
       }
     } else {
@@ -171,6 +207,16 @@ struct UnavailableTimeline: TimelineRepository {
   func open() async throws(TimelineError) -> AsyncStream<[TimelineItem]> { throw .unavailable }
   func loadOlder() async throws(TimelineError) -> Bool { throw .unavailable }
   func send(text: String) async throws(TimelineError) { throw .unavailable }
+  func sendAttachment(_ attachment: OutgoingAttachment) async throws(TimelineError) {
+    throw .unavailable
+  }
+  func setTyping(_ isTyping: Bool) async {}
+  func setPinned(_ pinned: Bool, eventId: String) async throws(TimelineError) { throw .unavailable }
+  func pinnedMessages() async -> [TimelineMessage] { [] }
+  func forward(eventId: String, to roomId: String) async throws(TimelineError) {
+    throw .unavailable
+  }
+  func typingMembers() async -> AsyncStream<[String]> { AsyncStream { $0.finish() } }
   func reply(text: String, to eventId: String) async throws(TimelineError) { throw .unavailable }
   func edit(eventId: String, text: String) async throws(TimelineError) { throw .unavailable }
   func redact(eventId: String) async throws(TimelineError) { throw .unavailable }
@@ -189,6 +235,29 @@ struct UnavailableMedia: MediaRepository {
   }
   func content(_ media: MediaReference) async throws(MediaError) -> Data { throw .notSignedIn }
   func file(_ media: MediaReference, filename: String) async throws(MediaError) -> URL {
+    throw .notSignedIn
+  }
+}
+
+/// The account settings of a root built without them (tests): nothing is known and nothing changes.
+struct UnavailableAccountSettings: AccountSettingsRepository {
+  func displayName() async -> String? { nil }
+  func recoveryStatus() async -> RecoveryStatus { .unknown }
+  func recover(recoveryKey: String) async throws(SettingsError) { throw .notSignedIn }
+  func enableRecovery() async throws(SettingsError) -> String { throw .notSignedIn }
+  func defaultNotificationMode(isDirect: Bool) async -> NotificationMode { .allMessages }
+  func setDefaultNotificationMode(_ mode: NotificationMode, isDirect: Bool)
+    async throws(SettingsError)
+  {
+    throw .notSignedIn
+  }
+}
+
+/// People of a root built without them (tests): nobody is found.
+struct UnavailablePeople: PeopleRepository {
+  func search(_ text: String) async throws(PeopleError) -> [Person] { throw .notSignedIn }
+  func directChat(with userId: String) async throws(PeopleError) -> String { throw .notSignedIn }
+  func createGroup(name: String, inviting userIds: [String]) async throws(PeopleError) -> String {
     throw .notSignedIn
   }
 }

@@ -18,6 +18,9 @@ public final class RoomDetailsViewModel {
   public private(set) var isLeaving = false
   public private(set) var errorMessage: String?
   public var memberQuery = ""
+  /// The room's notification mode, and whether it follows the account's default.
+  public private(set) var notificationMode: NotificationMode?
+  public private(set) var followsDefault = true
 
   @ObservationIgnored private let repository: any RoomDetailsRepository
   @ObservationIgnored private let onLeft: @MainActor () -> Void
@@ -38,6 +41,30 @@ public final class RoomDetailsViewModel {
       return
     }
     members = (try? await repository.members(roomId: roomId)) ?? []
+    if let current = try? await repository.notificationMode(roomId: roomId) {
+      notificationMode = current.mode
+      followsDefault = current.isDefault
+    }
+  }
+
+  /// Sets the room's own mode, or the account default with `nil`; goes back on failure.
+  public func setNotificationMode(_ mode: NotificationMode?) async {
+    let previous = (notificationMode, followsDefault)
+    if let mode {
+      notificationMode = mode
+      followsDefault = false
+    } else {
+      followsDefault = true
+    }
+    do {
+      try await repository.setNotificationMode(mode, roomId: roomId)
+      if mode == nil, let current = try? await repository.notificationMode(roomId: roomId) {
+        notificationMode = current.mode
+      }
+    } catch {
+      (notificationMode, followsDefault) = previous
+      errorMessage = "Could not change the notifications. Please try again."
+    }
   }
 
   /// The members whose name or Matrix id contains the search text.
