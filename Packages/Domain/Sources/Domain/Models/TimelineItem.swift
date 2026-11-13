@@ -15,13 +15,25 @@ public struct TimelineItem: Sendable, Equatable, Identifiable {
     case timelineStart
   }
 
+  /// Which chat setting can hide an item (Flutter `EventVisibilityGroup`).
+  public enum Visibility: Sendable, Equatable {
+    /// Messages and the room events that matter: always shown.
+    case always
+    /// A room setting changed, such as encryption, the description or the permissions.
+    case unimportant
+    /// An event the app cannot show as anything more than its type.
+    case unknown
+  }
+
   /// Stable across updates of the same item.
   public let id: String
   public let kind: Kind
+  public let visibility: Visibility
 
-  public init(id: String, kind: Kind) {
+  public init(id: String, kind: Kind, visibility: Visibility = .always) {
     self.id = id
     self.kind = kind
+    self.visibility = visibility
   }
 }
 
@@ -56,12 +68,15 @@ public struct TimelineMessage: Sendable, Equatable {
     public let key: String
     public let count: Int
     public let includesOwn: Bool
+    /// The Matrix ids of the people who sent it, oldest first.
+    public let senderIds: [String]
     public var id: String { key }
 
-    public init(key: String, count: Int, includesOwn: Bool) {
+    public init(key: String, count: Int, includesOwn: Bool, senderIds: [String] = []) {
       self.key = key
       self.count = count
       self.includesOwn = includesOwn
+      self.senderIds = senderIds
     }
   }
 
@@ -91,12 +106,27 @@ public struct TimelineMessage: Sendable, Equatable {
   public let media: MediaReference?
   /// A text of only emojis, which the room shows large and without a bubble, as iMessage and Telegram do.
   public let isEmojiOnly: Bool
+  /// The sender's picture, or `nil` when they have none.
+  public let senderAvatar: MediaReference?
+  /// How many people other than the user have their read receipt on this message. A receipt sits on the newest
+  /// message a person has read only, so a message is read when it or any later message has one.
+  public let readCount: Int
+  /// The Matrix ids of those people.
+  public let readerIds: [String]
+  /// The event the message replies to, so the room can jump to it.
+  public let replyToEventId: String?
+  /// The text, emote or notice as its sender formatted it (bold, links, mentions, quotes, lists), from its HTML body;
+  /// `nil` when it has none, and the plain `body` shows.
+  public let formatted: AttributedString?
 
   public init(
     eventId: String?, senderId: String, senderName: String, isOwn: Bool, date: Date, body: Body,
     isEdited: Bool = false, reactions: [Reaction] = [], reply: Reply? = nil,
-    sendState: SendState = .sent, media: MediaReference? = nil, isEmojiOnly: Bool = false
+    sendState: SendState = .sent, media: MediaReference? = nil, isEmojiOnly: Bool = false,
+    senderAvatar: MediaReference? = nil, readCount: Int = 0, readerIds: [String] = [],
+    replyToEventId: String? = nil, formatted: AttributedString? = nil
   ) {
+    self.formatted = formatted
     self.eventId = eventId
     self.senderId = senderId
     self.senderName = senderName
@@ -109,6 +139,10 @@ public struct TimelineMessage: Sendable, Equatable {
     self.sendState = sendState
     self.media = media
     self.isEmojiOnly = isEmojiOnly
+    self.senderAvatar = senderAvatar
+    self.readCount = readCount
+    self.readerIds = readerIds
+    self.replyToEventId = replyToEventId
   }
 }
 

@@ -31,6 +31,18 @@ public enum SettingsError: Error, Sendable, Equatable {
 public protocol AccountSettingsRepository: Sendable {
   /// The user's display name, or `nil` when the profile has none.
   func displayName() async -> String?
+  /// The user's own picture, or `nil`.
+  func avatar() async -> MediaReference?
+  /// The people the user blocked (Matrix "ignored users"), by name.
+  func blockedUsers() async throws(SettingsError) -> [BlockedUser]
+  /// Unblocks someone: their messages and invitations show again.
+  func unblock(userId: String) async throws(SettingsError)
+  /// Changes the user's display name, as others see it.
+  func setDisplayName(_ name: String) async throws(SettingsError)
+  /// Uploads a picture and makes it the user's avatar.
+  func setAvatar(_ picture: PictureUpload) async throws(SettingsError)
+  /// Removes the user's avatar; others see their initials.
+  func removeAvatar() async throws(SettingsError)
 
   func recoveryStatus() async -> RecoveryStatus
 
@@ -45,4 +57,19 @@ public protocol AccountSettingsRepository: Sendable {
 
   func setDefaultNotificationMode(_ mode: NotificationMode, isDirect: Bool)
     async throws(SettingsError)
+}
+
+/// Someone the user blocked.
+public struct BlockedUser: Sendable, Equatable, Identifiable {
+  /// The Matrix user id.
+  public let id: String
+  public let displayName: String?
+
+  public init(id: String, displayName: String?) {
+    self.id = id
+    self.displayName = displayName
+  }
+
+  /// The name shown, or the Matrix id when there is none.
+  public var name: String { displayName.flatMap { $0.isEmpty ? nil : $0 } ?? id }
 }
