@@ -67,7 +67,11 @@ Release. SSO pages open through the feature's `WebAuthenticator` protocol, which
 Info.plist keys, which the `TWAKE_*` build settings fill: staging in Debug, Twake SaaS in Release.
 
 ## Signed-in shell and room (built)
-`TwakeChat/ChatShell.swift` joins the ChatList and Room features after sign-in and lays them out by
+`TwakeChat/ChatShell.swift` joins the ChatList, Room and Authentication (Settings) features after sign-in. Its
+Contacts, Chats and Settings tabs are the Twake bottom bar on a phone held upright or a folded Duo and the Twake
+navigation rail on an unfolded Duo, an iPad or a landscape screen; Contacts shows that it is not built yet, Settings
+shows the profile and Logout. The chat list has the Flutter header: the centred "Chats" title and a search field that
+filters the rooms by name. The shell lays the screens out by
 [ADR 0022](../../adr/0022-adaptive-layout-flutter-breakpoints.md): one stack under 905 pt (phones, a folded Duo), the
 472 pt chat list beside the chat from 905 pt (an unfolded Duo, iPads). `Packages/Features/Room/` (Domain and
 DesignSystem only) is the chat: `RoomViewModel` follows the room's `TimelineRepository`, loads older messages, and

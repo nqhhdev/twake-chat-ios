@@ -37,3 +37,4 @@
 * **Change**: The room (timeline and composer) and the adaptive signed-in shell are built; ADR 0022 (decided under the owner's delegation, for review) follows the Flutter width breakpoints for phones, the Duo and iPads. The UI and Data pages describe them. The app has the Twake app icon.
 * **Change**: Messages show their media: thumbnails, a full-screen picture viewer, and file downloads through `MediaRepository` (`MediaProxy`). The UI page describes them.
 * **Change**: The chat details page (members, search, leave) is built; the UI page describes it.
+* **Change**: The signed-in shell has the Contacts, Chats and Settings tabs, as a bottom bar on a phone or folded Duo and a navigation rail on an unfolded Duo, an iPad or in landscape (ADR 0022, owner request). The chat list has the Flutter header and search; Log out moved to Settings.
