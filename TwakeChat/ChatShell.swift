@@ -7,19 +7,26 @@ import Room
 import Settings
 import SwiftUI
 
-/// The signed-in screens, laid out as twake-on-matrix `AppAdaptiveScaffold` (ADR 0022). The Contacts, Chats and
-/// Settings tabs switch the first column. On a phone held upright and on a folded Duo, the tabs are the Twake bottom bar
-/// and a chat is pushed over them; on an unfolded Duo, an iPad or any landscape screen they are the Twake navigation
-/// rail at the leading edge, and from 905 pt the first column is 472 pt beside the open chat. Folding, unfolding or
-/// rotating keeps the tab and the chat. The shell joins the features, which do not know each other (ADR 0005).
+/// The signed-in screens, laid out as twake-on-matrix `AppAdaptiveScaffold` (ADR 0022) inside Apple's system tab view
+/// (owner decision 2026-11-13): Contacts, Chats and Settings are SwiftUI `Tab`s in a `.sidebarAdaptable` `TabView`, so
+/// iOS draws its own tab bar (or sidebar where the system offers one) on every screen, folded or unfolded. On a phone
+/// held upright and on a folded Duo a chat is pushed over the list and hides the tab bar, as Messages does; from 905 pt
+/// the chat list is a 472 pt column beside the open chat. Folding, unfolding or rotating keeps the tab and the chat. The
+/// shell joins the features, which do not know each other (ADR 0005).
 struct ChatShell: View {
-  enum Tab: Hashable {
+  enum Destination: Hashable {
     case contacts, chats, settings
   }
 
   let chatList: ChatListViewModel
   let signedIn: SignedInViewModel
   let settings: SettingsViewModel
+  /// Opens the room of a tapped notification.
+  let push: PushCenter
+  /// Matrix links tapped in the app or handed to it.
+  @Bindable var links: LinkRouter
+  /// Items other apps shared, waiting for a chat.
+  let shares: ShareCenter
   /// Makes a people search; the closure it is given opens the chat it found or created.
   let makePeopleSearch:
     (PeopleSearchViewModel.Mode, @escaping @MainActor (String, String) -> Void) ->
@@ -27,169 +34,251 @@ struct ChatShell: View {
   /// Makes a room's screen model; the closure it is given closes the room (after the user left it).
   let makeRoom: (RoomSummary, @escaping @MainActor () -> Void) -> RoomViewModel
 
-  /// How the shell lays out a screen of `width` × `height` points (safe areas included, as Flutter measures).
+  /// How the shell lays out a screen of `width` points (safe areas included, as Flutter measures).
   struct Layout: Equatable {
     /// The chat list beside the chat (ADR 0022).
     let isTwoColumn: Bool
-    /// The navigation rail at the leading edge instead of the bottom bar: on a wide screen and on any screen on its
-    /// side, where a bottom bar would take height the chat needs.
-    let usesRail: Bool
 
-    init(width: CGFloat, height: CGFloat) {
+    init(width: CGFloat) {
       isTwoColumn = TwakeLayout.isTwoColumn(width: width)
-      usesRail = isTwoColumn || width > height
     }
   }
 
-  @State private var tab = Tab.chats
+  @State private var destination = Destination.chats
   @State private var room: RoomViewModel?
   @State private var isRoomPushed = false
   @State private var newChat: PeopleSearchViewModel?
   @State private var contacts: PeopleSearchViewModel?
+  @State private var settingsPage: SettingsPage? = .security
+  /// Privacy & Security over the chat, from the banner that warns encrypted messages may not show.
+  @State private var isFixingSession = false
 
   var body: some View {
     GeometryReader { geometry in
       // Flutter's breakpoints compare the whole screen width (MediaQuery), safe areas included.
       let layout = Layout(
         width: geometry.size.width + geometry.safeAreaInsets.leading
-          + geometry.safeAreaInsets.trailing,
-        height: geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom)
-      let isTwoColumn = layout.isTwoColumn
-      let usesRail = layout.usesRail
-      HStack(spacing: 0) {
-        if usesRail {
-          rail
-          Rectangle().fill(SysColors.surface).frame(width: 1)
+          + geometry.safeAreaInsets.trailing)
+      TabView(selection: $destination) {
+        Tab("Contacts", systemImage: "person.2", value: Destination.contacts) {
+          NavigationStack { contactsContent }
         }
-        if isTwoColumn {
-          NavigationStack { tabContent(isBesideChat: true) }
-            .frame(width: TwakeLayout.listColumnWidth)
-          Rectangle().fill(SysColors.surface).frame(width: 1)
-          NavigationStack {
-            if let room {
-              RoomScreen(viewModel: room).id(room.roomId)
-            } else {
-              TwakeLogo(TwakeLogo.welcomeResource)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(SysColors.background)
-            }
-          }
-        } else {
-          NavigationStack {
-            VStack(spacing: 0) {
-              tabContent(isBesideChat: false)
-              if !usesRail {
-                // The bar stays at the bottom while the keyboard is up, as a tab bar does.
-                TwakeBottomBar(selection: $tab, items: navigationItems)
-                  .ignoresSafeArea(.keyboard, edges: .bottom)
+        Tab("Chats", systemImage: "message", value: Destination.chats) {
+          chatsContent(isTwoColumn: layout.isTwoColumn)
+        }
+        Tab("Settings", systemImage: "gearshape", value: Destination.settings) {
+          settingsContent(isTwoColumn: layout.isTwoColumn)
+        }
+      }
+      .tabViewStyle(.sidebarAdaptable)
+      // A request from another of the user's devices opens the verification sheet wherever the user is.
+      .task { await settings.verification?.follow() }
+      .sheet(
+        isPresented: Binding(
+          get: { settings.verification?.isPresentingRequest == true },
+          set: { if !$0 { Task { await settings.verification?.dismiss() } } })
+      ) {
+        if let verification = settings.verification {
+          VerificationSheet(viewModel: verification)
+        }
+      }
+      .onChange(of: push.pendingRoomId, initial: true) { _, roomId in
+        guard let roomId else { return }
+        push.pendingRoomId = nil
+        destination = .chats
+        open(
+          chatList.visibleRooms.first { $0.id == roomId }
+            ?? RoomSummary(
+              id: roomId, name: "Chat", lastMessageText: nil, lastMessageSender: nil,
+              lastActivity: nil))
+      }
+      .onChange(of: links.opening) { _, opening in
+        guard let opening else { return }
+        links.opening = nil
+        destination = .chats
+        open(
+          chatList.visibleRooms.first { $0.id == opening.roomId }
+            ?? RoomSummary(
+              id: opening.roomId, name: "Chat", lastMessageText: nil, lastMessageSender: nil,
+              lastActivity: nil),
+          at: opening.eventId)
+      }
+      .sheet(item: $links.joining) { joining in JoinRoomSheet(joining: joining, router: links) }
+      .sheet(
+        isPresented: $isFixingSession,
+        onDismiss: { Task { await room?.refreshSessionWarning() } }
+      ) {
+        NavigationStack {
+          SettingsPageView(page: .security, viewModel: settings)
+            .task { await settings.load() }
+            .toolbar {
+              ToolbarItem(placement: .confirmationAction) {
+                Button("Done") { isFixingSession = false }
               }
             }
-            .navigationDestination(isPresented: $isRoomPushed) {
-              if let room { RoomScreen(viewModel: room).id(room.roomId) }
-            }
-          }
+        }
+      }
+      .sheet(
+        isPresented: Binding(
+          get: { shares.pending != nil },
+          set: { if !$0, shares.pending != nil { shares.cancel() } }
+        )
+      ) {
+        if let items = shares.pending {
+          ShareTargetSheet(
+            items: items, rooms: Self.shareTargets(chatList.state),
+            onPick: { summary in
+              guard let share = shares.take() else { return }
+              destination = .chats
+              open(summary)
+              room?.receive(share)
+            },
+            onCancel: { shares.cancel() })
+        }
+      }
+      .confirmationDialog(
+        "Chat with \(links.person ?? "")?",
+        isPresented: Binding(get: { links.person != nil }, set: { if !$0 { links.person = nil } }),
+        titleVisibility: .visible
+      ) {
+        if let person = links.person {
+          Button("Message") { Task { await links.message(person) } }
+          Button("Copy ID") { UIPasteboard.general.string = person }
+        }
+      }
+      .alert(
+        links.errorMessage ?? "",
+        isPresented: Binding(
+          get: { links.errorMessage != nil && links.joining == nil },
+          set: { if !$0 { links.clearError() } })
+      ) {
+        Button("OK", role: .cancel) {}
+      }
+      // A matrix.to link in a message opens here; any other link goes to the system (Safari).
+      .environment(
+        \.openURL, OpenURLAction { url in links.handle(url) ? .handled : .systemAction }
+      )
+      .twakeTabBarMinimizesOnScroll()
+      .tint(SysColors.primary)
+    }
+  }
+
+  /// Settings: on a phone a pushed page; from 905 pt the list with the chosen page beside it, as iPad Settings.
+  @ViewBuilder private func settingsContent(isTwoColumn: Bool) -> some View {
+    if isTwoColumn {
+      HStack(spacing: 0) {
+        NavigationStack { SettingsScreen(viewModel: settings, selection: $settingsPage) }
+          .ignoresSafeArea(.container, edges: .trailing)
+          .frame(width: TwakeLayout.listColumnWidth)
+        Rectangle().fill(SysColors.surface).frame(width: 1)
+        NavigationStack {
+          SettingsPageView(page: settingsPage ?? .security, viewModel: settings)
+            .id(settingsPage)
         }
       }
       .background(SysColors.background)
+    } else {
+      NavigationStack { SettingsScreen(viewModel: settings) }
     }
   }
 
-  /// Contacts, Chats and Settings (`AdaptiveDestinationEnum`); on the bottom bar Settings shows the user's avatar.
-  private var navigationItems: [TwakeNavigationItem<Tab>] {
-    [
-      .init(value: Tab.contacts, title: "Contacts") { _ in
-        Image(systemName: "person.2.circle").font(.system(size: 24))
-      },
-      .init(value: Tab.chats, title: "Chats") { _ in
-        Image(systemName: "message.fill").font(.system(size: 22))
-      },
-      .init(value: Tab.settings, title: "Settings") { isSelected in
-        TwakeAvatar(name: settings.displayName, size: 28)
-          .overlay(
-            Circle().strokeBorder(isSelected ? SysColors.primary : ColorToken(0), lineWidth: 2))
-      },
-    ]
-  }
-
-  /// On the rail Settings is a gear, and the user's avatar sits at the bottom, as in the Flutter rail.
-  private var rail: some View {
-    TwakeNavigationRail(
-      selection: $tab,
-      items: [
-        navigationItems[0], navigationItems[1],
-        .init(value: Tab.settings, title: "Settings") { _ in
-          Image(systemName: "gearshape").font(.system(size: 22))
-        },
-      ]
-    ) {
-      Button {
-        tab = .settings
-      } label: {
-        TwakeAvatar(name: settings.displayName, size: 56)
-      }
-      .buttonStyle(.plain)
-      .accessibilityLabel("Settings")
+  /// The Contacts tab keeps its search while the app runs; a contact opens their chat in the Chats tab.
+  private var contactsContent: some View {
+    Group {
+      if let contacts { ContactsScreen(viewModel: contacts) } else { Color.clear }
     }
-  }
-
-  /// The selected tab. Beside the chat, the open room is highlighted in the list; on a phone the chat covers the list,
-  /// so nothing is.
-  @ViewBuilder private func tabContent(isBesideChat: Bool) -> some View {
-    switch tab {
-    case .contacts:
-      // The Contacts tab keeps its search while the app runs.
-      Group {
-        if let contacts { ContactsScreen(viewModel: contacts) } else { Color.clear }
-      }
-      .task {
-        guard contacts == nil else { return }
-        contacts = makePeopleSearch(.direct) { roomId, name in
-          tab = .chats
-          open(
-            RoomSummary(
-              id: roomId, name: name, lastMessageText: nil, lastMessageSender: nil,
-              lastActivity: nil))
-        }
-      }
-    case .chats:
-      ChatListScreen(
-        viewModel: chatList, selectedRoomId: isBesideChat ? room?.roomId : nil, onSelect: open
-      )
-      .overlay(alignment: .bottomTrailing) { newChatButton }
-      .sheet(item: $newChat) { search in NewChatScreen(viewModel: search) }
-    case .settings:
-      SettingsScreen(viewModel: settings)
-    }
-  }
-
-  /// `TwakeFloatingActionButton` with the pencil, as the Flutter chat list's new chat button.
-  private var newChatButton: some View {
-    Button {
-      newChat = makePeopleSearch(.direct) { roomId, name in
-        newChat = nil
+    .task {
+      guard contacts == nil else { return }
+      contacts = makePeopleSearch(.direct) { roomId, name in
+        destination = .chats
         open(
           RoomSummary(
             id: roomId, name: name, lastMessageText: nil, lastMessageSender: nil, lastActivity: nil)
         )
       }
-    } label: {
-      Image(systemName: "square.and.pencil")
-        .font(.system(size: 22, weight: .medium))
-        .foregroundStyle(SysColors.onPrimary)
-        .frame(width: 56, height: 56)
-        .background(SysColors.primary, in: .rect(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.18), radius: 8, y: 3)
     }
-    .accessibilityLabel("New chat")
-    .padding(16)
   }
 
-  private func open(_ summary: RoomSummary) {
-    if room?.roomId != summary.id {
-      room = makeRoom(summary) { [room = $room, pushed = $isRoomPushed] in
+  /// The chat list, with the open chat beside it from 905 pt, or pushed over it below. Beside the chat the open room is
+  /// highlighted in the list; on a phone the chat covers the list, so nothing is.
+  @ViewBuilder private func chatsContent(isTwoColumn: Bool) -> some View {
+    if isTwoColumn {
+      HStack(spacing: 0) {
+        NavigationStack { chatListScreen(isBesideChat: true) }
+          .frame(width: TwakeLayout.listColumnWidth)
+        Rectangle().fill(SysColors.surface).frame(width: 1)
+        NavigationStack {
+          if let room {
+            RoomScreen(viewModel: room).id(room.roomId)
+              .onAppear { push.openRoomId = room.roomId }
+              .onDisappear { if push.openRoomId == room.roomId { push.openRoomId = nil } }
+          } else {
+            TwakeLogo(TwakeLogo.welcomeResource)
+              .frame(maxWidth: .infinity, maxHeight: .infinity)
+              .background(SysColors.background)
+          }
+        }
+        // Another chat starts its own stack: the details or search pushed over the last one must not stay.
+        .id(room?.roomId)
+      }
+      .background(SysColors.background)
+    } else {
+      NavigationStack {
+        chatListScreen(isBesideChat: false)
+          .navigationDestination(isPresented: $isRoomPushed) {
+            if let room {
+              // The composer takes the bottom of the screen, so the tab bar steps aside, as in Messages.
+              RoomScreen(viewModel: room).id(room.roomId)
+                .onAppear { push.openRoomId = room.roomId }
+                .onDisappear { if push.openRoomId == room.roomId { push.openRoomId = nil } }
+                .toolbar(.hidden, for: .tabBar)
+            }
+          }
+      }
+    }
+  }
+
+  private func chatListScreen(isBesideChat: Bool) -> some View {
+    ChatListScreen(
+      viewModel: chatList, selectedRoomId: isBesideChat ? room?.roomId : nil,
+      onSelect: { open($0) },
+      onCompose: startNewChat, isBesideChat: isBesideChat
+    )
+    // Beside the chat the list does not reach the trailing edge, yet it is handed the inset of the side strip and the
+    // system tab bar there, which left an empty band on the unfolded Duo; the chat column keeps that inset.
+    .ignoresSafeArea(.container, edges: isBesideChat ? .trailing : [])
+    .sheet(item: $newChat) { search in NewChatScreen(viewModel: search) }
+  }
+
+  /// The compose button in the chat list's navigation bar: the new chat sheet, which opens the chat it finds or makes.
+  private func startNewChat() {
+    newChat = makePeopleSearch(.direct) { roomId, name in
+      newChat = nil
+      open(
+        RoomSummary(
+          id: roomId, name: name, lastMessageText: nil, lastMessageSender: nil, lastActivity: nil))
+    }
+  }
+
+  /// Every chat the user is in, whatever the list's search and filter show.
+  static func shareTargets(_ state: ChatListViewModel.State) -> [RoomSummary] {
+    guard case .loaded(let rooms) = state else { return [] }
+    return rooms.filter { !$0.isInvite }
+  }
+
+  /// Opens a room; with an event, scrolls to that message once the room shows (a link to a message).
+  private func open(_ summary: RoomSummary, at eventId: String? = nil) {
+    push.openRoomId = summary.id
+    if let room, room.roomId == summary.id {
+      if let eventId { Task { await room.jump(toEvent: eventId, maxPages: 50) } }
+    } else {
+      let made = makeRoom(summary) { [room = $room, pushed = $isRoomPushed] in
         pushed.wrappedValue = false
         room.wrappedValue = nil
       }
+      made.pendingEventId = eventId
+      made.onFixSession = { [fixing = $isFixingSession] in fixing.wrappedValue = true }
+      room = made
     }
     isRoomPushed = true
   }
