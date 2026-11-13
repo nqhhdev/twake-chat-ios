@@ -18,6 +18,7 @@
 		A10000000000000000000085 /* Domain in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000086 /* Domain */; };
 		A10000000000000000000087 /* AppShared in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000088 /* AppShared */; };
 		A1000000000000000000B005 /* Authentication in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D005 /* Authentication */; };
+		A1000000000000000000B006 /* ChatList in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D006 /* ChatList */; };
 		A1000000000000000000008B /* AuthenticationTestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000008C /* AuthenticationTestSupport */; };
 /* End PBXBuildFile section */
 
@@ -40,6 +41,7 @@
 		A1000000000000000000E003 /* DesignSystem */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = DesignSystem; path = Packages/DesignSystem; sourceTree = "<group>"; };
 		A1000000000000000000E004 /* MatrixData */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = MatrixData; path = Packages/MatrixData; sourceTree = "<group>"; };
 		A1000000000000000000E005 /* Authentication */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = Authentication; path = Packages/Features/Authentication; sourceTree = "<group>"; };
+		A1000000000000000000E006 /* ChatList */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = ChatList; path = Packages/Features/ChatList; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -85,6 +87,7 @@
 				A1000000000000000000B003 /* DesignSystem in Frameworks */,
 				A1000000000000000000B004 /* MatrixData in Frameworks */,
 				A1000000000000000000B005 /* Authentication in Frameworks */,
+				A1000000000000000000B006 /* ChatList in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -131,6 +134,7 @@
 				A1000000000000000000E003 /* DesignSystem */,
 				A1000000000000000000E004 /* MatrixData */,
 				A1000000000000000000E005 /* Authentication */,
+				A1000000000000000000E006 /* ChatList */,
 			);
 			name = Packages;
 			sourceTree = "<group>";
@@ -170,6 +174,7 @@
 				A1000000000000000000D003 /* DesignSystem */,
 				A1000000000000000000D004 /* MatrixData */,
 				A1000000000000000000D005 /* Authentication */,
+				A1000000000000000000D006 /* ChatList */,
 			);
 			productName = TwakeChat;
 			productReference = A10000000000000000000002 /* TwakeChat.app */;
@@ -264,6 +269,7 @@
 				A1000000000000000000C003 /* XCLocalSwiftPackageReference "Packages/DesignSystem" */,
 				A1000000000000000000C004 /* XCLocalSwiftPackageReference "Packages/MatrixData" */,
 				A1000000000000000000C005 /* XCLocalSwiftPackageReference "Packages/Features/Authentication" */,
+				A1000000000000000000C006 /* XCLocalSwiftPackageReference "Packages/Features/ChatList" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000005 /* Products */;
@@ -562,6 +568,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/Features/Authentication;
 		};
+		A1000000000000000000C006 /* XCLocalSwiftPackageReference "Packages/Features/ChatList" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Features/ChatList;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -608,6 +618,10 @@
 		A1000000000000000000D005 /* Authentication */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Authentication;
+		};
+		A1000000000000000000D006 /* ChatList */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ChatList;
 		};
 		A1000000000000000000008C /* AuthenticationTestSupport */ = {
 			isa = XCSwiftPackageProductDependency;

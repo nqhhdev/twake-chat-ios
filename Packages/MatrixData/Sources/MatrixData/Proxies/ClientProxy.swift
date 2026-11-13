@@ -2,8 +2,8 @@ import AppShared
 import Foundation
 import MatrixRustSDK
 
-/// Wraps the SDK `Client` of one signed-in session (ADR 0006). Later cards add sync and the room list here.
-/// Nothing public on it uses an SDK type.
+/// Wraps the SDK `Client` of one signed-in session and its sync service (ADR 0006). Nothing public on it uses an SDK
+/// type.
 ///
 /// The client's stores live under `storeDirectory`: production passes AppShared's App Group SDK directory (ADR 0007),
 /// tests a temporary one. The store is opened with the SDK's cross-process lock so the app and the extension can
@@ -12,6 +12,7 @@ import MatrixRustSDK
 /// (`KeychainClientSessionDelegate`), never re-creating a session that sign-out deleted.
 public final class ClientProxy: Sendable {
   let client: Client
+  private let sync = SyncServiceHolder()
 
   private init(client: Client) {
     self.client = client
@@ -58,9 +59,29 @@ public final class ClientProxy: Sendable {
     return ClientProxy(client: client)
   }
 
-  /// Signs this device out on the server. Removing the local store is the caller's job, so it happens even when this
-  /// throws.
+  /// Starts the client's sync service once and returns its room list service; later calls reuse the running service.
+  func startSync() async throws -> RoomListService {
+    try await sync.start(client: client).roomListService()
+  }
+
+  /// Keeps SDK objects that feed on the running sync (a room list, its controller and its entries `TaskHandle`) until
+  /// sync stops, which cancels the handle and releases them while the client is still alive: the SDK aborts the
+  /// process when a room list is freed after its client. Returns `false`, keeping nothing, when sync is not running
+  /// (it stopped meanwhile); the caller then cancels and drops them itself.
+  func keepWhileSyncing(_ objects: SyncBoundObjects) async -> Bool {
+    await sync.keep(objects)
+  }
+
+  /// Stops the sync service, after releasing what `keepWhileSyncing` kept. Does nothing when it is not running.
+  func stopSync() async {
+    await sync.stop()
+  }
+
+  /// Stops sync for good, then signs this device out on the server. Removing the local store is the caller's job, so it
+  /// happens even when this throws; sync is stopped first, and cannot start again on this client, so nothing writes to
+  /// the store while it is removed.
   func logout() async throws {
+    await sync.close()
     try await client.logout()
   }
 
@@ -84,6 +105,60 @@ public final class ClientProxy: Sendable {
       .crossProcessLockConfig(crossProcessLockConfig: .multiProcess(holderName: lockHolderName))
       .setSessionDelegate(sessionDelegate: delegate)
       .build()
+  }
+}
+
+/// SDK objects that live only while sync runs: `entries` is cancelled and `objects` released when sync stops.
+struct SyncBoundObjects: Sendable {
+  let entries: TaskHandle
+  let objects: [any Sendable]
+}
+
+/// Builds and starts at most one `SyncService` per client, also when two callers start it together, and stops it.
+/// Stopping first releases the objects kept with `keep(_:)`. Once closed (logout), it stops and never starts again.
+private actor SyncServiceHolder {
+  private var running: Task<SyncService, any Error>?
+  private var kept: [SyncBoundObjects] = []
+  private var isClosed = false
+
+  struct Closed: Error {}
+
+  func keep(_ objects: SyncBoundObjects) -> Bool {
+    guard running != nil else { return false }
+    kept.append(objects)
+    return true
+  }
+
+  func start(client: Client) async throws -> SyncService {
+    guard !isClosed else { throw Closed() }
+    let task =
+      running
+      ?? Task {
+        let service = try await client.syncService().finish()
+        await service.start()
+        return service
+      }
+    running = task
+    do {
+      return try await task.value
+    } catch {
+      if running == task { running = nil }
+      throw error
+    }
+  }
+
+  func stop() async {
+    for objects in kept { objects.entries.cancel() }
+    kept = []
+    guard let task = running else { return }
+    running = nil
+    if let service = try? await task.value { await service.stop() }
+  }
+
+  /// Stops sync and refuses every later `start`, so no sync service is built while the store is being removed.
+  func close() async {
+    isClosed = true
+    await stop()
   }
 }
 

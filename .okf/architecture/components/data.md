@@ -9,7 +9,8 @@ status: draft
 
 | | |
 |---|---|
-| Folder | `Packages/MatrixData/`: `Proxies/ClientProxy.swift`, `Repositories/MatrixAuthenticationRepository.swift`, `Mappers/UserSessionMapper.swift` (TWAK-64) |
+| Folder | `Packages/MatrixData/`: `Proxies/ClientProxy.swift`, `Repositories/MatrixAuthenticationRepository.swift`, `Mappers/UserSessionMapper.swift` (TWAK-64), `MatrixPlatform.swift` (TWAK-67) |
+| Folder | `Packages/MatrixData/`: `Proxies/ClientProxy.swift`, `Repositories/MatrixAuthenticationRepository.swift`, `Mappers/UserSessionMapper.swift` (TWAK-64); `Proxies/RoomListProxy.swift`, `Proxies/ListDiff.swift`, `Mappers/RoomSummaryMapper.swift` (TWAK-66) |
 | Holds | Proxies around SDK objects, repository implementations, mappers from SDK types to Domain models |
 | May import | [Domain](domain.md), `AppShared`, the Matrix SDK |
 | Must not import | [Features](ui.md), [Design System](design-system.md) |
@@ -20,8 +21,8 @@ Each long-lived SDK object is wrapped once, behind a protocol, so the rest of th
 
 | Proxy | Wraps | Responsibility |
 |---|---|---|
-| `ClientProxy` | the SDK client | **Implemented (TWAK-64):** password login, session restore and sign-out. Later: sync start and stop, pusher registration |
-| `RoomListProxy` | the SDK room list | The ordered list of rooms as a stream of Domain `RoomSummary` values |
+| `ClientProxy` | the SDK client | **Implemented (TWAK-64):** password login, session restore and sign-out. **TWAK-66:** sync start and stop; sign-out stops sync first. Later: pusher registration |
+| `RoomListProxy` | the SDK room list | **Implemented (TWAK-66):** the joined rooms, in the SDK's order, as a stream of Domain `RoomSummary` values |
 | `RoomProxy` | one room | Send, reply, react, mark as read, room state |
 | `TimelineProxy` | one room's timeline | Applies the SDK's incremental updates and publishes `[TimelineItem]`; pagination |
 | `EncryptionProxy` | the SDK encryption API | Recovery state, entering a recovery key, session verification |
@@ -40,7 +41,37 @@ the session, including its sliding sync version, in `KeychainSessionStore` and e
 later cards. `logout()` first restores a client when none runs yet (cold launch), so the server still signs the device
 out; it deletes the store directory and the Keychain item even when the server call fails, then reports that failure. `UserSessionMapper` is internal: it maps `M_FORBIDDEN` to `invalidCredentials`,
 connection failures and an unreachable server to `serverUnreachable`, a bad server name or well-known to
-`invalidHomeserverURL`, and everything else to `unknown`. No caller wires it into the app yet.
+`invalidHomeserverURL`, and everything else to `unknown`. The app's composition root wires it (TWAK-65).
+
+**What exists (TWAK-66).** `RoomListProxy` (an actor) implements the Domain `RoomListRepository`. `start()` asks the
+authentication repository for the signed-in `ClientProxy` (`notSignedIn` without one), which starts the client's sync
+service once and shares it; it then subscribes to all rooms through the dynamic adapters with one page of 200 and the
+joined filter, keeping the entries task handle alive. The SDK listener only queues each batch of updates; one task
+applies them in order. Each update is turned into the generic `ListDiff<Element>` (the eleven cases of the SDK's list
+update), only the rooms it carries are mapped to `RoomSummary` (`RoomSummaryMapper`: display name or else the room
+id; the body of a message as text, `nil` for other events; the sender's display name or else their Matrix id; the
+millisecond timestamp as a date), and the diff is applied to the published list, which is never re-sorted.
+The SDK room list, its controller and the entries task handle are kept by the `ClientProxy`
+(`keepWhileSyncing`), which cancels and releases them whenever sync stops: the SDK aborts the process when a room list
+is freed after its client, so they must never outlive it, and the applying task holds the client until it ends.
+`stop()` ends the subscription and stops sync. `ClientProxy.logout()` stops sync for good (a `start()` after it
+fails, so no sync service is built while the store is removed), and so releases the room list, before the server
+sign-out, so nothing writes to the store while `MatrixAuthenticationRepository` deletes it, also
+when the chat list calls `stop()` only after logout. Nothing here logs: the summaries hold
+message content ([ADR 0009](../../adr/0009-push-gateway-and-nse-decryption.md)). `ListDiff` and the mapper are tested
+in `MatrixDataTests`; the mapper fixtures are enum cases only, because the SDK's struct initializers are in a binary
+that bundle does not link. The message-text path (a message's body and sender) has no automated test: the opt-in
+staging test `RoomListIntegrationTests` checks only that a non-empty list of rooms with ids and names arrives, and the
+text is checked by hand on the simulator (a message sent from a second account updates the row).
+
+## Platform
+`MatrixPlatform.setUp()` (`MatrixPlatform.swift`, TWAK-67) sets up the SDK's runtime and logs. It is the first call in
+`TwakeChatApp.init`, before any client is built; without it a password login reached the server but never returned.
+It reaches the SDK once per process (a lazily set `static let`), never throws and logs nothing of its own; later calls
+do nothing. Debug: level info, written to stdout and the system log. Release: level warn, written nowhere. No trace log
+packs, no log files, no Sentry. The app uses the full tokio runtime; the
+[Notification Service Extension](../containers/notification-service-extension.md) will use the lightweight one when it
+is built.
 
 SDK class and method names are not written here on purpose: they change between releases and must be read from the
 pinned version when the code is written. For the pinned version they are in

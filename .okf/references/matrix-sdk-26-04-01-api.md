@@ -78,6 +78,13 @@ that need them ([ADR 0006](../adr/0006-sdk-behind-proxy-protocols.md), [ADR 0011
 | Paging and filters | `RoomListDynamicEntriesController.addOnePage()`, `resetToOnePage()`, `setFilter(kind: RoomListEntriesDynamicFilterKind) -> Bool` (class at line 10829) | 10882, 10889, 10896 |
 | Listener | `protocol RoomListEntriesListener { func onUpdate(roomEntriesUpdate: [RoomListEntriesUpdate]) }` | 43437, 43439 |
 | Diff type | `enum RoomListEntriesUpdate { append(values: [Room]), clear, pushFront(value: Room), pushBack(value: Room), popFront, popBack, insert(index: UInt32, value: Room), set(index: UInt32, value: Room), remove(index: UInt32), truncate(length: UInt32), reset(values: [Room]) }` | 35707-35726 |
+| Joined rooms filter | `RoomListEntriesDynamicFilterKind.joined` (enum at line 35510); pass it to `setFilter(kind:)`, without which the dynamic adapters publish nothing | 35521 |
+| Room id | `Room.id() -> String` | 8864 |
+| Room name | `Room.displayName() -> String?` | 8682 |
+| Latest event | `Room.latestEvent() async -> LatestEventValue` | 9109 |
+| Latest event value | `enum LatestEventValue { none, remote(timestamp:sender:isOwn:profile:content:), remoteInvite(timestamp:inviter:inviterProfile:), local(timestamp:sender:profile:content:state:) }`; `timestamp` is a `Timestamp`, a `UInt64` of milliseconds since 1970 | 30921 |
+| Sender's profile | `enum ProfileDetails { unavailable, pending, ready(displayName: String?, displayNameAmbiguous: Bool, avatarUrl: String?), error(message:) }` | 33808 |
+| Message text | `TimelineItemContent.msgLike(content: MsgLikeContent)`, `MsgLikeContent.kind: MsgLikeKind`, `MsgLikeKind.message(content: MessageContent)`, `MessageContent.body: String` | 39622, 20212, 32525, 20145 |
 
 ## Timeline and sending
 
@@ -92,6 +99,20 @@ that need them ([ADR 0006](../adr/0006-sdk-behind-proxy-protocols.md), [ADR 0011
 | Send | `Timeline.send(msg: RoomMessageEventContentWithoutRelation) async throws -> SendHandle` | 16014 |
 | Text content | `messageEventContentFromMarkdown(md: String) -> RoomMessageEventContentWithoutRelation` (free function) | 50146 |
 | Text content, given HTML | `messageEventContentFromHtml(body: String, htmlBody: String) -> RoomMessageEventContentWithoutRelation` (free function) | 50130 |
+
+## Platform setup (TWAK-67)
+
+Called once per process before any `ClientBuilder`; without it the SDK has no tokio runtime and `login` can wait forever.
+
+| What | Name and signature | Line |
+|---|---|---|
+| Set up runtime and logs | `initPlatform(config: TracingConfiguration, useLightweightTokioRuntime: Bool) throws` (a free function) | 50006 |
+| Log settings | `struct TracingConfiguration`: `logLevel: LogLevel`, `traceLogPacks: [TraceLogPacks]`, `extraTargets: [String]`, `writeToStdoutOrSystem: Bool`, `writeToFiles: TracingFileConfiguration?`, `sentryConfig: SentryConfig?`; memberwise `init` in that order | 24864, 24896 |
+| Levels | `enum LogLevel { case error, warn, info, debug, trace }` | 31021 |
+
+At `.info` the SDK still sets some of its own targets lower (its "Logging has been set up" line lists them, e.g.
+`matrix_sdk::client=trace`, `matrix_sdk_crypto=debug`, `matrix_sdk::http_client=debug`). These lines carry request
+URIs and user ids, not request bodies; this was seen on the simulator, not checked in the Rust source.
 
 ## What 26.04.01 answers for Open Verifications
 - **SSO login-token flow:** the API exists: `startSsoLogin` returns an `SsoHandler`, whose `url()` is opened and whose

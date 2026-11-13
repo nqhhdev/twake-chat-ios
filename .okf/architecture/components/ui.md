@@ -33,13 +33,13 @@ Reasoning: [ADR 0004](../../adr/0004-swiftui-observable-coordinators.md).
   username, password, a loading state and one message per `AuthenticationError`. As in the Flutter app's
   `lib/pages/login/login.dart` `login()`, an empty username or password shows its own message and is not sent, and a
   tap while a sign-in runs does nothing. A homeserver that is not an absolute URL is not sent either.
-- `SignedInScreen` and `SignedInViewModel`: the signed-in user id and Log out. A logout error keeps the signed-in
-  screen with an error so the user can try again. `MatrixAuthenticationRepository` deletes the local session even
-  when the server call fails, so trying again then succeeds at once; the user is never shown as signed out while the
-  session is still saved. The room list replaces this screen in a later card.
+- `SignedInViewModel`: the signed-in user id and the logout. A logout error keeps the user signed in with an error so
+  they can try again. `MatrixAuthenticationRepository` deletes the local session even when the server call fails, so
+  trying again then succeeds at once; the user is never shown as signed out while the session is still saved. Its
+  screen was removed by TWAK-66: the app shows the chat list for it, and the chat list's Log out runs this logout.
 - `AuthenticationCoordinator` and `AuthenticationCoordinatorView`: start from the session restored at launch, switch
-  between the two screens and create their view models. There is no push navigation yet, so there is no
-  `NavigationStack`.
+  between the sign-in form and the signed-in state and create their view models. The view takes the signed-in
+  content from the app (TWAK-66), so this feature does not know the chat list.
 - `AuthenticationTestSupport` (a library target of the same package) holds `FakeAuthenticationRepository`, used by
   `AuthenticationTests` and by `TwakeChatTests`. It is not in a Domain test support target, because the TWAK-34/35
   acceptance locks hold Domain to one product and one test target; the owner decides whether to move it when a
@@ -63,6 +63,18 @@ keeps the password flow out of the Release binary, as ADR 0019 requires. The com
 `TwakeChat/TwakeChatApp.swift`, builds `KeychainSessionStore` and `MatrixAuthenticationRepository` and reads the
 default homeserver from the `DefaultHomeserver` Info.plist key, which the Debug configuration's
 `TWAKE_DEFAULT_HOMESERVER` build setting fills.
+
+## Chat list (built, TWAK-66)
+`Packages/Features/ChatList/` (Domain and DesignSystem only) shows the joined rooms after sign-in, in the order the
+`RoomListRepository` gives them (the SDK's, most recent activity first, as the Flutter app's `lib/pages/chat_list`
+shows), each with its name and a "sender: text" preview of the last message, and keeps them up to date.
+- `ChatListViewModel`: a `loading`, `loaded`, `empty` or `failed` state, started by the screen's `.task` and stopped
+  when the screen goes away; Log out runs the closure the app passes in and shows an error when it fails.
+- `ChatListScreen`: the list, the empty and error states, and the Log out button.
+- `ChatListTestSupport` holds `FakeRoomListRepository`, used by `ChatListTests`.
+Unread counts, invitations, archive, avatars, search and spaces are not part of it. The app's `RootCoordinator`
+joins the two features: for the signed-in state it builds one `ChatListViewModel` with MatrixData's `RoomListProxy`
+and a logout closure that runs `SignedInViewModel.logOut()`.
 
 ## The Features index package
 `Packages/Features/Package.swift` (with `Sources/Features/Features.swift`, which only imports each feature) is not a

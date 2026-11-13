@@ -98,10 +98,12 @@ done
 for p in "${PACKAGES[@]}"; do
   files="$(cd "Packages/$p" && find Sources -type f ! -name .DS_Store | sort | tr '\n' ' ' | sed 's/ $//')"
   case "$p" in
-    Domain) want="Sources/Domain/Domain.swift Sources/Domain/Models/UserSession.swift Sources/Domain/Repositories/AuthenticationError.swift Sources/Domain/Repositories/AuthenticationRepository.swift" ;;
+    # TWAK-66 adds the room summary and the room list repository with its error.
+    Domain) want="Sources/Domain/Domain.swift Sources/Domain/Models/RoomSummary.swift Sources/Domain/Models/UserSession.swift Sources/Domain/Repositories/AuthenticationError.swift Sources/Domain/Repositories/AuthenticationRepository.swift Sources/Domain/Repositories/RoomListError.swift Sources/Domain/Repositories/RoomListRepository.swift" ;;
     AppShared) want="Sources/AppShared/AppGroupContainer.swift Sources/AppShared/AppShared.swift Sources/AppShared/KeychainSessionStore.swift" ;;
     # TWAK-64 adds the client proxy, the authentication repository and their mapper.
-    MatrixData) want="Sources/MatrixData/Mappers/UserSessionMapper.swift Sources/MatrixData/MatrixData.swift Sources/MatrixData/Proxies/ClientProxy.swift Sources/MatrixData/Repositories/MatrixAuthenticationRepository.swift" ;;
+    # TWAK-66 adds the room list proxy, its diff applier and the room summary mapper.
+    MatrixData) want="Sources/MatrixData/Mappers/RoomSummaryMapper.swift Sources/MatrixData/Mappers/UserSessionMapper.swift Sources/MatrixData/MatrixData.swift Sources/MatrixData/Proxies/ClientProxy.swift Sources/MatrixData/Proxies/ListDiff.swift Sources/MatrixData/Proxies/RoomListProxy.swift Sources/MatrixData/Repositories/MatrixAuthenticationRepository.swift" ;;
     *) want="Sources/$p/$p.swift" ;;
   esac
   [ "$files" = "$want" ] && pass "$p: source files are exactly '$want'" \
@@ -161,14 +163,16 @@ for f in (field(fw[0], 'files') if fw else []):
     ref = field(objs[f], 'productRef')
     if ref and ref in objs: linked.add(field(objs[ref], 'productName'))
 # TWAK-65: the app also links its first feature package, Packages/Features/Authentication (ADR 0005).
-want = {"Domain", "AppShared", "DesignSystem", "MatrixData", "Authentication"}
+# TWAK-66: and the second, Packages/Features/ChatList.
+features = {"Authentication", "ChatList"}
+want = {"Domain", "AppShared", "DesignSystem", "MatrixData"} | features
 report(linked == want, f"Frameworks phase links exactly {sorted(want)} (got {sorted(linked)})")
 deps = {field(objs[i], 'productName') for i in field(t, 'packageProductDependencies') or []}
 report(deps == want, f"packageProductDependencies are exactly {sorted(want)} (got {sorted(deps)})")
 proj = [b for b in objs.values() if 'isa = PBXProject' in b][0]
 refs = {field(objs[i], 'relativePath') for i in field(proj, 'packageReferences') or []}
-want_refs = {f"Packages/{n}" for n in want - {"Authentication"}} | {"Packages/Features/Authentication"}
-report(refs == want_refs, f"project package references are the four layer packages and Features/Authentication (got {sorted(refs)})")
+want_refs = {f"Packages/{n}" for n in want - features} | {f"Packages/Features/{n}" for n in features}
+report(refs == want_refs, f"project package references are the four layer packages and the feature packages (got {sorted(refs)})")
 sys.exit(1 if bad else 0)
 PY
 [ $? -eq 0 ] || FAILURES=$((FAILURES + 1))

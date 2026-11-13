@@ -52,6 +52,44 @@ struct StagingCredentials {
   }
 }
 
+/// Lets one staging integration test talk to staging at a time (ADR 0020): two sign-ins running together stalled until
+/// the time limit.
+enum StagingTurn {
+  private static let turns = Turns()
+
+  /// Runs `body` once no other staging test is running.
+  static func run<T>(
+    isolation: isolated (any Actor)? = #isolation, _ body: () async throws -> T
+  ) async throws -> T {
+    await turns.take()
+    do {
+      let value = try await body()
+      await turns.give()
+      return value
+    } catch {
+      await turns.give()
+      throw error
+    }
+  }
+
+  private actor Turns {
+    private var busy = false
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+
+    func take() async {
+      guard busy else {
+        busy = true
+        return
+      }
+      await withCheckedContinuation { waiting.append($0) }
+    }
+
+    func give() {
+      if waiting.isEmpty { busy = false } else { waiting.removeFirst().resume() }
+    }
+  }
+}
+
 /// Logs in to staging, restores the saved session in a fresh client on the same store, then logs out and checks that
 /// the store directory and the Keychain item are gone. Opt-in and local only (ADR 0020).
 @Suite(.serialized)
@@ -76,9 +114,11 @@ struct AuthenticationIntegrationTests {
     let repository = MatrixAuthenticationRepository(
       storeDirectory: storeDirectory, sessionStore: sessionStore, lockHolderName: "tests")
     do {
-      try await Self.loginRestoreLogout(
-        credentials: credentials, repository: repository, storeDirectory: storeDirectory,
-        sessionStore: sessionStore)
+      try await StagingTurn.run {
+        try await Self.loginRestoreLogout(
+          credentials: credentials, repository: repository, storeDirectory: storeDirectory,
+          sessionStore: sessionStore)
+      }
     } catch {
       // A failed or skipped run must not leave a session behind: sign out on the saved session, awaited here.
       let cleanup = MatrixAuthenticationRepository(

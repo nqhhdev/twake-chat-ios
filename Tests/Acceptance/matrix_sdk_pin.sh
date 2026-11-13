@@ -106,7 +106,10 @@ for root, _, files in os.walk(src_dir):
         path = os.path.join(root, f)
         for n, line in enumerate(open(path), 1):
             if re.match(r"^\s*(?:@\w+\s+)*(?:public|open)\b", line):
-                hit = sorted(set(re.findall(r"\w+", line.split("//")[0])) & names)
+                # A name qualified with Domain. is the Domain type of that name (TWAK-66: Domain.RoomListError, which
+                # the SDK also declares), not the SDK's.
+                code = re.sub(r"\bDomain\.\w+", "", line.split("//")[0])
+                hit = sorted(set(re.findall(r"\w+", code)) & names)
                 if hit: bad.append(f"{path}:{n} {hit}")
 ok = len(names) > 100
 print(("ok   " if ok and not bad else "FAIL ") + f"MatrixData public declarations name no SDK type ({len(names)} SDK types)"

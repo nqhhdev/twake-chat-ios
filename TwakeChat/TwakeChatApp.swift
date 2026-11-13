@@ -7,8 +7,9 @@ import SwiftUI
 struct TwakeChatApp: App {
   @State private var root: RootCoordinator
 
-  /// The composition root (ADR 0004): builds the session store and the repository, and passes them down.
+  /// The composition root (ADR 0004): builds the session store and the repositories, and passes them down.
   init() {
+    MatrixPlatform.setUp()
     guard let storeDirectory = AppGroupContainer().sdkStoreDirectory(),
       let accessGroup = Bundle.main.object(forInfoDictionaryKey: "KeychainAccessGroup") as? String
     else {
@@ -26,7 +27,9 @@ struct TwakeChatApp: App {
       let defaultHomeserver: URL? = nil
     #endif
     _root = State(
-      initialValue: RootCoordinator(repository: repository, defaultHomeserver: defaultHomeserver))
+      initialValue: RootCoordinator(
+        repository: repository, roomList: RoomListProxy(authentication: repository),
+        defaultHomeserver: defaultHomeserver))
   }
 
   var body: some Scene {

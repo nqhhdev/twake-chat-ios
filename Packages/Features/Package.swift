@@ -11,13 +11,15 @@ let package = Package(
     .library(name: "Features", targets: ["Features"])
   ],
   dependencies: [
-    .package(path: "Authentication")
+    .package(path: "Authentication"),
+    .package(path: "ChatList"),
   ],
   targets: [
     .target(
       name: "Features",
       dependencies: [
-        .product(name: "Authentication", package: "Authentication")
+        .product(name: "Authentication", package: "Authentication"),
+        .product(name: "ChatList", package: "ChatList"),
       ],
       swiftSettings: [.treatAllWarnings(as: .error)]
     )

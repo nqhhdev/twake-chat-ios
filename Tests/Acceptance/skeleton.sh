@@ -86,9 +86,9 @@ check "MatrixData imports MatrixRustSDK" grep -qE '^import MatrixRustSDK$' Packa
 # .build is excluded: `swift test` (TWAK-35) generates a test entry point there that uses @available.
 check "no #available or @available anywhere" bash -c "! grep -rnE --include='*.swift' --exclude-dir=.build '#available|#unavailable|@available' TwakeChat Packages"
 # ADR 0011: the Features folder is created with its first feature. TWAK-65 adds it with Authentication, so the lock now
-# checks that the folder holds only the index manifest and that one feature package.
-check "Features holds only the index and Authentication (TWAK-65)" bash -c \
-  "[ \"\$(cd Packages/Features && ls | sort | tr '\\n' ' ')\" = 'Authentication Package.swift Sources ' ]"
+# checks that the folder holds only the index manifest and the feature packages. TWAK-66 adds ChatList.
+check "Features holds only the index, Authentication and ChatList (TWAK-65, TWAK-66)" bash -c \
+  "[ \"\$(cd Packages/Features && ls | sort | tr '\\n' ' ')\" = 'Authentication ChatList Package.swift Sources ' ]"
 
 # App target
 check "entry point TwakeChat/TwakeChatApp.swift is @main and shows RootView" bash -c \

@@ -48,8 +48,10 @@ want = sorted([("TwakeChatTests", "container:TwakeChat.xcodeproj"),
                ("DesignSystemTests", "container:Packages/DesignSystem"),
                ("MatrixDataTests", "container:TwakeChat.xcodeproj"),
                # TWAK-65: the first feature package's tests run on the simulator (DesignSystem is iOS-only).
-               ("AuthenticationTests", "container:Packages/Features/Authentication")])
-report(got == want, f"test plan lists exactly TwakeChatTests, DesignSystemTests, MatrixDataTests, AuthenticationTests (got {got})")
+               ("AuthenticationTests", "container:Packages/Features/Authentication"),
+               # TWAK-66: the chat list feature's tests, the same way.
+               ("ChatListTests", "container:Packages/Features/ChatList")])
+report(got == want, f"test plan lists exactly TwakeChatTests, DesignSystemTests, MatrixDataTests, AuthenticationTests, ChatListTests (got {got})")
 report(not any(t["name"] in ("DomainTests", "AppSharedTests") for t in targets),
        "test plan leaves out DomainTests and AppSharedTests (they run on the host)")
 app = [t for t in targets if t["name"] == "TwakeChatTests"]
@@ -99,7 +101,8 @@ check "test bundles set none of SWIFT_VERSION, SWIFT_STRICT_CONCURRENCY, SWIFT_T
 allowed_test_imports() {
   case "$1" in
     # TWAK-64: hosted staging test. TWAK-65: the root restore tests use the Authentication flow and its fake.
-    TwakeChat) echo "Testing Foundation TwakeChat SwiftUI AppShared Domain MatrixData Authentication AuthenticationTestSupport" ;;
+    # TWAK-66: the root joins Authentication and ChatList, so its tests name both.
+    TwakeChat) echo "Testing Foundation TwakeChat SwiftUI AppShared Domain MatrixData Authentication AuthenticationTestSupport ChatList" ;;
     MatrixData) echo "Testing Foundation MatrixData Domain AppShared" ;; # TWAK-64: mapper tests
     *) echo "Testing Foundation $1" ;;
   esac

@@ -35,6 +35,13 @@
     },
     {
       "target" : {
+        "containerPath" : "container:Packages\/Features\/ChatList",
+        "identifier" : "ChatListTests",
+        "name" : "ChatListTests"
+      }
+    },
+    {
+      "target" : {
         "containerPath" : "container:TwakeChat.xcodeproj",
         "identifier" : "A10000000000000000000077",
         "name" : "MatrixDataTests"

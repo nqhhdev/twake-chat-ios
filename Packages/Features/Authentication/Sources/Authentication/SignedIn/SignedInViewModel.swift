@@ -4,7 +4,8 @@
   import Foundation
   import Observation
 
-  /// The minimal signed-in screen: the user id and a log-out action. The room list replaces it in a later card.
+  /// The signed-in state: the user id and the log-out action. The app shows the chat list for it (TWAK-66) and wires the
+  /// chat list's Log out button to `logOut()`.
   @MainActor @Observable
   public final class SignedInViewModel {
     public let userId: String

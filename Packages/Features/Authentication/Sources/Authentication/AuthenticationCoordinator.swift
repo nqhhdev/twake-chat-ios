@@ -68,18 +68,24 @@
     }
   }
 
-  /// Shows the coordinator's current screen.
-  public struct AuthenticationCoordinatorView: View {
+  /// Shows the coordinator's current screen. The signed-in content comes from the app, which joins this feature to the
+  /// chat list (ADR 0005: a feature does not import another feature).
+  public struct AuthenticationCoordinatorView<SignedInContent: View>: View {
     let coordinator: AuthenticationCoordinator
+    let signedIn: (SignedInViewModel) -> SignedInContent
 
-    public init(coordinator: AuthenticationCoordinator) {
+    public init(
+      coordinator: AuthenticationCoordinator,
+      @ViewBuilder signedIn: @escaping (SignedInViewModel) -> SignedInContent
+    ) {
       self.coordinator = coordinator
+      self.signedIn = signedIn
     }
 
     public var body: some View {
       switch coordinator.screen {
       case .passwordLogin(let viewModel): PasswordLoginScreen(viewModel: viewModel)
-      case .signedIn(let viewModel): SignedInScreen(viewModel: viewModel)
+      case .signedIn(let viewModel): signedIn(viewModel)
       }
     }
   }
