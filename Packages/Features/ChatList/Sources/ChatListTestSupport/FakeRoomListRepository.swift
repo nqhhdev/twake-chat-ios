@@ -38,6 +38,35 @@ public final class FakeRoomListRepository: RoomListRepository, @unchecked Sendab
     continuation?.finish()
   }
 
+  private var _decisions: [String] = []
+
+  /// "accept !id" or "decline !id", in order.
+  public var decisions: [String] { lock.withLock { _decisions } }
+
+  public func accept(roomId: String) async throws(RoomListError) {
+    lock.withLock { _decisions.append("accept \(roomId)") }
+  }
+
+  public func setUnread(_ unread: Bool, roomId: String) async throws(RoomListError) {
+    lock.withLock { _decisions.append("\(unread ? "unread" : "read") \(roomId)") }
+  }
+
+  public func setFavourite(_ favourite: Bool, roomId: String) async throws(RoomListError) {
+    lock.withLock { _decisions.append("\(favourite ? "favourite" : "unfavourite") \(roomId)") }
+  }
+
+  public func setMuted(_ muted: Bool, roomId: String) async throws(RoomListError) {
+    lock.withLock { _decisions.append("\(muted ? "mute" : "unmute") \(roomId)") }
+  }
+
+  public func leave(roomId: String) async throws(RoomListError) {
+    lock.withLock { _decisions.append("leave \(roomId)") }
+  }
+
+  public func decline(roomId: String) async throws(RoomListError) {
+    lock.withLock { _decisions.append("decline \(roomId)") }
+  }
+
   public func start() async throws(RoomListError) -> AsyncStream<[RoomSummary]> {
     let error = lock.withLock {
       _startCallCount += 1
