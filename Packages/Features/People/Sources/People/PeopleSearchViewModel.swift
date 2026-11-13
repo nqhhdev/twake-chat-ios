@@ -10,6 +10,8 @@ public final class PeopleSearchViewModel {
   public enum Mode: Equatable {
     case direct
     case group
+    /// Picks people to invite into an existing room.
+    case invite
   }
 
   public var query = "" {
@@ -27,16 +29,35 @@ public final class PeopleSearchViewModel {
   @ObservationIgnored private let onOpen: @MainActor (_ roomId: String, _ name: String) -> Void
   @ObservationIgnored private var searchTask: Task<Void, Never>?
   @ObservationIgnored private let debounce: Duration
+  /// Invites the picked people (their Matrix ids) and says whether it worked; for `.invite`.
+  @ObservationIgnored private let inviteAction: (@MainActor ([String]) async -> Bool)?
+  /// Set once the picked people were invited; the invite screen closes.
+  public private(set) var didInvite = false
 
   /// - Parameter onOpen: Opens the chat that was found or created, with its name.
   public init(
     mode: Mode = .direct, repository: any PeopleRepository, debounce: Duration = .milliseconds(300),
-    onOpen: @escaping @MainActor (String, String) -> Void
+    onOpen: @escaping @MainActor (String, String) -> Void,
+    invite: (@MainActor ([String]) async -> Bool)? = nil
   ) {
     self.mode = mode
     self.repository = repository
     self.debounce = debounce
     self.onOpen = onOpen
+    self.inviteAction = invite
+  }
+
+  /// Invites the picked people into the room (`.invite` mode).
+  public func inviteSelected() async {
+    guard !selected.isEmpty, !isCreating, let inviteAction else { return }
+    isCreating = true
+    defer { isCreating = false }
+    errorMessage = nil
+    if await inviteAction(selected.map(\.id)) {
+      didInvite = true
+    } else {
+      errorMessage = "Could not invite. Please try again."
+    }
   }
 
   public func switchMode(_ mode: Mode) {
@@ -75,10 +96,10 @@ public final class PeopleSearchViewModel {
 
   public func isSelected(_ person: Person) -> Bool { selected.contains(person) }
 
-  /// Direct mode opens the chat; group mode adds or removes the person.
+  /// Direct mode opens the chat; group and invite modes add or remove the person.
   public func tap(_ person: Person) async {
     switch mode {
-    case .group:
+    case .group, .invite:
       if let index = selected.firstIndex(of: person) {
         selected.remove(at: index)
       } else {
