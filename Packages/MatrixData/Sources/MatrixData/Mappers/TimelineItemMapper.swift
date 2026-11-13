@@ -7,6 +7,20 @@ import MatrixRustSDK
 /// message content (ADR 0009).
 enum TimelineItemMapper {
   /// `nil` for an SDK item the room screen does not show. `ownUserId` tells which reactions the user sent.
+  /// A single event as a message, for the pinned messages; `nil` when it is not message-like.
+  static func message(from event: EventTimelineItem, ownUserId: String?) -> TimelineMessage? {
+    guard case .msgLike(let content) = event.content else { return nil }
+    return message(
+      event, content, sender: name(event.sender, event.senderProfile), ownUserId: ownUserId)
+  }
+
+  /// A short text made only of emojis (up to three), which the room shows large.
+  private static func isEmojiOnly(_ body: TimelineMessage.Body, _ event: EventTimelineItem) -> Bool
+  {
+    guard case .text(let text) = body, text.count <= 3 else { return false }
+    return event.lazyProvider.containsOnlyEmojis()
+  }
+
   static func item(_ item: MatrixRustSDK.TimelineItem, ownUserId: String?) -> Domain.TimelineItem? {
     let id = item.uniqueId().id
     if let virtual = item.asVirtual() {
@@ -76,7 +90,8 @@ enum TimelineItemMapper {
     return TimelineMessage(
       eventId: eventId, senderId: event.sender, senderName: sender, isOwn: event.isOwn,
       date: date(event.timestamp), body: body, isEdited: isEdited, reactions: reactions,
-      reply: content.inReplyTo.map(reply), sendState: sendState(event.localSendState), media: media)
+      reply: content.inReplyTo.map(reply), sendState: sendState(event.localSendState), media: media,
+      isEmojiOnly: isEmojiOnly(body, event))
   }
 
   static func body(_ type: MessageType) -> TimelineMessage.Body {

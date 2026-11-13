@@ -63,4 +63,12 @@ public protocol RoomDetailsRepository: Sendable {
   func members(roomId: String) async throws(RoomDetailsError) -> [RoomMember]
   /// Leaves the room; it disappears from the chat list.
   func leave(roomId: String) async throws(RoomDetailsError)
+
+  /// How the room notifies the user now, and whether that is the account's default.
+  func notificationMode(roomId: String) async throws(RoomDetailsError) -> (
+    mode: NotificationMode, isDefault: Bool
+  )
+
+  /// Sets the room's own mode, or goes back to the account's default with `nil`.
+  func setNotificationMode(_ mode: NotificationMode?, roomId: String) async throws(RoomDetailsError)
 }

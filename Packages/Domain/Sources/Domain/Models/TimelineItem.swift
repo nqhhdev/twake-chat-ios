@@ -89,11 +89,13 @@ public struct TimelineMessage: Sendable, Equatable {
   public let sendState: SendState
   /// The picture, video, voice message, file or sticker of the message; `nil` for text.
   public let media: MediaReference?
+  /// A text of only emojis, which the room shows large and without a bubble, as iMessage and Telegram do.
+  public let isEmojiOnly: Bool
 
   public init(
     eventId: String?, senderId: String, senderName: String, isOwn: Bool, date: Date, body: Body,
     isEdited: Bool = false, reactions: [Reaction] = [], reply: Reply? = nil,
-    sendState: SendState = .sent, media: MediaReference? = nil
+    sendState: SendState = .sent, media: MediaReference? = nil, isEmojiOnly: Bool = false
   ) {
     self.eventId = eventId
     self.senderId = senderId
@@ -106,6 +108,7 @@ public struct TimelineMessage: Sendable, Equatable {
     self.reply = reply
     self.sendState = sendState
     self.media = media
+    self.isEmojiOnly = isEmojiOnly
   }
 }
 

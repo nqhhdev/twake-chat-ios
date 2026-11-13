@@ -5,9 +5,16 @@ import MatrixRustSDK
 /// Builds the Domain `RoomSummary` from an SDK room (ADR 0006). Nothing here logs: the summary holds message content
 /// (ADR 0009).
 enum RoomSummaryMapper {
-  /// Reads the room's id, display name and latest event.
+  /// Reads the room's id, display name, latest event and unread counts.
   static func summary(for room: Room) async -> RoomSummary {
-    summary(id: room.id(), displayName: room.displayName(), latestEvent: await room.latestEvent())
+    let base = summary(
+      id: room.id(), displayName: room.displayName(), latestEvent: await room.latestEvent())
+    guard let info = try? await room.roomInfo() else { return base }
+    return RoomSummary(
+      id: base.id, name: base.name, lastMessageText: base.lastMessageText,
+      lastMessageSender: base.lastMessageSender, lastActivity: base.lastActivity,
+      unreadCount: Int(clamping: max(info.numUnreadMessages, info.isMarkedUnread ? 1 : 0)),
+      mentionCount: Int(clamping: info.numUnreadMentions))
   }
 
   /// - Name: the display name, or the room id when the room has none.

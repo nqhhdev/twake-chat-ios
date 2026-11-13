@@ -13,16 +13,22 @@ public struct RoomSummary: Sendable, Equatable, Identifiable {
   public let lastMessageSender: String?
   /// When the last event was sent, or `nil` when the room has none.
   public let lastActivity: Date?
+  /// Messages the user has not read yet.
+  public let unreadCount: Int
+  /// Unread messages that mention the user.
+  public let mentionCount: Int
 
   public init(
     id: String, name: String, lastMessageText: String?, lastMessageSender: String?,
-    lastActivity: Date?
+    lastActivity: Date?, unreadCount: Int = 0, mentionCount: Int = 0
   ) {
     self.id = id
     self.name = name
     self.lastMessageText = lastMessageText
     self.lastMessageSender = lastMessageSender
     self.lastActivity = lastActivity
+    self.unreadCount = unreadCount
+    self.mentionCount = mentionCount
   }
 }
 

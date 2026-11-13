@@ -64,6 +64,39 @@ public actor RoomDetailsProxy: RoomDetailsRepository {
     }
   }
 
+  public func notificationMode(roomId: String) async throws(RoomDetailsError)
+    -> (mode: NotificationMode, isDefault: Bool)
+  {
+    let room = try await room(roomId)
+    guard let client = await clientProxy() else { throw .notSignedIn }
+    do {
+      let isEncrypted = await room.isEncrypted()
+      let isDirect = await room.isDirect()
+      let settings = try await client.client.getNotificationSettings().getRoomNotificationSettings(
+        roomId: roomId, isEncrypted: isEncrypted, isOneToOne: isDirect)
+      return (NotificationModeMapper.domain(settings.mode), settings.isDefault)
+    } catch {
+      throw .requestFailed
+    }
+  }
+
+  public func setNotificationMode(_ mode: NotificationMode?, roomId: String)
+    async throws(RoomDetailsError)
+  {
+    guard let client = await clientProxy() else { throw .notSignedIn }
+    let settings = await client.client.getNotificationSettings()
+    do {
+      if let mode {
+        try await settings.setRoomNotificationMode(
+          roomId: roomId, mode: NotificationModeMapper.sdk(mode))
+      } else {
+        try await settings.restoreDefaultRoomNotificationMode(roomId: roomId)
+      }
+    } catch {
+      throw .requestFailed
+    }
+  }
+
   private func room(_ roomId: String) async throws(RoomDetailsError) -> Room {
     guard let client = await clientProxy() else { throw .notSignedIn }
     guard let room = try? client.client.getRoom(roomId: roomId) else { throw .roomNotFound }
