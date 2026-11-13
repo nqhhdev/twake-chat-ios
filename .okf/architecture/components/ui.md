@@ -66,6 +66,16 @@ Release. SSO pages open through the feature's `WebAuthenticator` protocol, which
 `SignInConfiguration` from the `RegistrationURL`, `WorkplaceHomeserver`, `DefaultHomeserver` and `PrivacyURL`
 Info.plist keys, which the `TWAKE_*` build settings fill: staging in Debug, Twake SaaS in Release.
 
+## Signed-in shell and room (built)
+`TwakeChat/ChatShell.swift` joins the ChatList and Room features after sign-in and lays them out by
+[ADR 0022](../../adr/0022-adaptive-layout-flutter-breakpoints.md): one stack under 905 pt (phones, a folded Duo), the
+472 pt chat list beside the chat from 905 pt (an unfolded Duo, iPads). `Packages/Features/Room/` (Domain and
+DesignSystem only) is the chat: `RoomViewModel` follows the room's `TimelineRepository`, loads older messages, and
+sends, replies to, edits, deletes and reacts to messages; `RoomScreen` shows Twake bubbles (own on the right in
+`primaryContainer`, others white with the sender's avatar and name), day dividers, room events as one-line notices,
+reply quotes and reactions, with the Flutter message menu as a context menu, then `ComposerView`. Media show a label
+and an icon; pictures, files and voice are not downloaded yet. `RoomTestSupport` holds `FakeTimelineRepository`.
+
 ## Chat list (built, TWAK-66)
 `Packages/Features/ChatList/` (Domain and DesignSystem only) shows the joined rooms after sign-in, in the order the
 `RoomListRepository` gives them (the SDK's, most recent activity first, as the Flutter app's `lib/pages/chat_list`

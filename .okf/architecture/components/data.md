@@ -104,3 +104,11 @@ The SDK's own store (state, event cache, crypto) is the only database in v1. It 
 `AppShared` does not import Domain ([ADR 0005](../../adr/0005-layered-local-swift-packages.md)), so MatrixData will map
 `StoredSession` to Domain `UserSession` when it implements `AuthenticationRepository` (a later card). The app reads its
 expanded Keychain group from the `KeychainAccessGroup` key of `TwakeChat/Info.plist`.
+
+**Timeline (built).** `TimelineProxy` implements the Domain `TimelineRepository` for one room: it opens the SDK
+room's timeline on the running sync, applies each `TimelineDiff` with `ListDiff` and publishes Domain
+`TimelineItem` values (`TimelineItemMapper`: messages, day dividers, read marker, room events as the Flutter one-line
+notices). Sending uses `messageEventContentFromMarkdown` as the Flutter composer sends Markdown. The SDK room, timeline
+and listener handle are kept by the client while sync runs and released by `ClientProxy.release(_:)` when the room
+closes, so no SDK object outlives the client and closed rooms do not pile up.
+
