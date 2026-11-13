@@ -27,7 +27,7 @@ struct TimelineRowsTests {
       switch row {
       case .message(let model): result[model.id] = model.position
       case .album(let model): result[model.id] = model.position
-      case .other: continue
+      case .other, .notices: continue
       }
     }
     return result
@@ -108,5 +108,56 @@ struct TimelineRowsTests {
     }
     #expect(first.messages.count == 10)
     #expect(rows.count == 2)
+  }
+
+  private func own(_ id: String, at seconds: TimeInterval, readers: Int = 0) -> TimelineItem {
+    TimelineItem(
+      id: id,
+      kind: .message(
+        TimelineMessage(
+          eventId: "$\(id)", senderId: "@me", senderName: "Me", isOwn: true,
+          date: start.addingTimeInterval(seconds), body: .text("hi"), readCount: readers)))
+  }
+
+  private func readIds(_ rows: [ChatRow]) -> [String] {
+    rows.compactMap { row in
+      if case .message(let model) = row, model.isRead { model.id } else { nil }
+    }
+  }
+
+  @Test func aReceiptOnALaterMessageMarksTheEarlierOnesRead() {
+    let rows = TimelineRows.rows(from: [
+      own("1", at: 0), own("2", at: 10, readers: 1), own("3", at: 20),
+    ])
+    #expect(readIds(rows) == ["1", "2"])
+  }
+
+  @Test func aLaterMessageFromSomeoneElseMarksTheUsersMessagesRead() {
+    let rows = TimelineRows.rows(from: [own("1", at: 0), item("2", from: "@bob", at: 10)])
+    #expect(readIds(rows).contains("1"))
+  }
+
+  @Test func withoutReceiptsNothingIsRead() {
+    let rows = TimelineRows.rows(from: [own("1", at: 0), own("2", at: 10)])
+    #expect(readIds(rows).isEmpty)
+  }
+
+  private func notice(_ id: String) -> TimelineItem {
+    TimelineItem(id: id, kind: .stateNotice("event \(id)"))
+  }
+
+  @Test func threeOrMoreRoomEventsInARowFoldIntoOneLine() {
+    let rows = TimelineRows.rows(from: [
+      notice("n1"), notice("n2"), notice("n3"), item("m", from: "@bob", at: 0), notice("n4"),
+      notice("n5"),
+    ])
+    guard case .notices(let folded) = rows.first else {
+      Issue.record("expected folded notices first")
+      return
+    }
+    #expect(folded.id == "n1")
+    #expect(folded.texts == ["event n1", "event n2", "event n3"])
+    // Two events in a row stay as they are.
+    #expect(rows.count == 4)
   }
 }

@@ -64,4 +64,100 @@ public final class FakeRoomDetailsRepository: RoomDetailsRepository, @unchecked 
     lock.withLock { _leftRooms.append(roomId) }
     try leaveResult.get()
   }
+
+  private var _changes: [String] = []
+  private var _changeResult: Result<Void, RoomDetailsError> = .success(())
+
+  /// "name …", "topic …" and "invite …" in order.
+  public var changes: [String] { lock.withLock { _changes } }
+
+  /// What rename, setTopic and invite throw, if anything.
+  public var changeResult: Result<Void, RoomDetailsError> {
+    get { lock.withLock { _changeResult } }
+    set { lock.withLock { _changeResult = newValue } }
+  }
+
+  public func rename(_ name: String, roomId: String) async throws(RoomDetailsError) {
+    try changeResult.get()
+    lock.withLock { _changes.append("name \(name)") }
+  }
+
+  public func setTopic(_ topic: String, roomId: String) async throws(RoomDetailsError) {
+    try changeResult.get()
+    lock.withLock { _changes.append("topic \(topic)") }
+  }
+
+  public func invite(userIds: [String], roomId: String) async throws(RoomDetailsError) {
+    try changeResult.get()
+    lock.withLock { _changes.append("invite \(userIds.joined(separator: ","))") }
+  }
+
+  public func setAvatar(_ picture: PictureUpload, roomId: String) async throws(RoomDetailsError) {
+    try changeResult.get()
+    lock.withLock { _changes.append("avatar \(picture.width)x\(picture.height)") }
+  }
+
+  public func removeAvatar(roomId: String) async throws(RoomDetailsError) {
+    try changeResult.get()
+    lock.withLock { _changes.append("remove avatar") }
+  }
+
+  public func remove(userId: String, roomId: String) async throws(RoomDetailsError) {
+    try changeResult.get()
+    lock.withLock {
+      _changes.append("remove \(userId)")
+      _members.removeAll { $0.id == userId }
+    }
+  }
+
+  private var _banned: [RoomMember] = []
+
+  /// The people banned; banning moves a member here, unbanning drops them.
+  public var bannedMembers: [RoomMember] {
+    get { lock.withLock { _banned } }
+    set { lock.withLock { _banned = newValue } }
+  }
+
+  public func ban(userId: String, roomId: String) async throws(RoomDetailsError) {
+    try changeResult.get()
+    lock.withLock {
+      _changes.append("ban \(userId)")
+      if let member = _members.first(where: { $0.id == userId }) {
+        _banned.append(
+          RoomMember(id: member.id, displayName: member.displayName, membership: .banned))
+      }
+      _members.removeAll { $0.id == userId }
+    }
+  }
+
+  public func banned(roomId: String) async throws(RoomDetailsError) -> [RoomMember] {
+    bannedMembers
+  }
+
+  public func unban(userId: String, roomId: String) async throws(RoomDetailsError) {
+    try changeResult.get()
+    lock.withLock {
+      _changes.append("unban \(userId)")
+      _banned.removeAll { $0.id == userId }
+    }
+  }
+
+  public func setRole(_ role: RoomMember.Role, userId: String, roomId: String)
+    async throws(RoomDetailsError)
+  {
+    try changeResult.get()
+    lock.withLock { _changes.append("role \(userId) \(role)") }
+  }
+
+  public func setJoinRule(_ rule: RoomDetails.JoinRule, roomId: String)
+    async throws(RoomDetailsError)
+  {
+    try changeResult.get()
+    lock.withLock { _changes.append("join rule \(rule)") }
+  }
+
+  public func enableEncryption(roomId: String) async throws(RoomDetailsError) {
+    try changeResult.get()
+    lock.withLock { _changes.append("encryption") }
+  }
 }

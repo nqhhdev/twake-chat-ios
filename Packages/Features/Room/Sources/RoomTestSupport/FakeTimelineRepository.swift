@@ -16,6 +16,9 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
     case typing(Bool)
     case pin(Bool, String)
     case forward(String, String)
+    case report(String, String?)
+    case retry
+    case ignore(String)
   }
 
   private let lock = NSLock()
@@ -100,6 +103,17 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
 
   public func pinnedMessages() async -> [TimelineMessage] { pinned }
 
+  private var _draft: String?
+
+  /// The draft the fake keeps.
+  public var draft: String? {
+    get { lock.withLock { _draft } }
+    set { lock.withLock { _draft = newValue } }
+  }
+
+  public func loadDraft() async -> String? { draft }
+  public func saveDraft(_ text: String) async { draft = text.isEmpty ? nil : text }
+
   public func forward(eventId: String, to roomId: String) async throws(TimelineError) {
     record(.forward(eventId, roomId))
     try actionResult.get()
@@ -139,6 +153,18 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
 
   public func toggleReaction(_ key: String, on eventId: String) async throws(TimelineError) {
     record(.toggleReaction(key, eventId))
+    try actionResult.get()
+  }
+
+  public func retryFailedSends() async { record(.retry) }
+
+  public func report(eventId: String, reason: String?) async throws(TimelineError) {
+    record(.report(eventId, reason))
+    try actionResult.get()
+  }
+
+  public func ignore(userId: String) async throws(TimelineError) {
+    record(.ignore(userId))
     try actionResult.get()
   }
 

@@ -15,6 +15,14 @@ struct ComposerView: View {
 
   var body: some View {
     VStack(spacing: 0) {
+      let suggestions = viewModel.mentionSuggestions
+      if !suggestions.isEmpty {
+        MentionSuggestions(members: suggestions, viewModel: viewModel) { member in
+          viewModel.pickMention(member)
+          isFocused = true
+        }
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+      }
       banner
       if let typing = viewModel.typingText {
         TypingIndicator(text: typing)
@@ -52,8 +60,12 @@ struct ComposerView: View {
     .animation(.spring(response: 0.3, dampingFraction: 0.8), value: viewModel.typingText)
     .animation(.easeInOut(duration: 0.2), value: viewModel.uploadCount)
     .onChange(of: viewModel.draft) { old, new in
-      Task { await viewModel.draftDidChange(from: old, to: new) }
+      Task {
+        await viewModel.draftDidChange(from: old, to: new)
+        await viewModel.loadMembersIfNeeded()
+      }
     }
+    .animation(.spring(response: 0.3, dampingFraction: 0.85), value: viewModel.mentionSuggestions)
     .onChange(of: viewModel.composerMode) { _, mode in
       if mode != .new { isFocused = true }
     }
@@ -202,5 +214,52 @@ private struct ComposerBanner: View {
     .padding(.horizontal, 16)
     .padding(.vertical, 8)
     .background(SysColors.surface)
+  }
+}
+
+/// The people matching the "@" being typed, above the composer, as Telegram and the Flutter app show them: a tap
+/// writes the mention.
+struct MentionSuggestions: View {
+  let members: [RoomMember]
+  let viewModel: RoomViewModel
+  let pick: (RoomMember) -> Void
+
+  var body: some View {
+    VStack(spacing: 0) {
+      ForEach(members) { member in
+        Button {
+          pick(member)
+        } label: {
+          HStack(spacing: 10) {
+            TwakeAvatar(
+              name: member.name, size: 32, pictureID: member.avatar?.source,
+              load: member.avatar.map { reference in
+                { @Sendable [viewModel] in await viewModel.picture(reference) }
+              })
+            VStack(alignment: .leading, spacing: 0) {
+              Text(member.name)
+                .textStyle(TextStyles.bodyMedium)
+                .foregroundStyle(SysColors.onSurface)
+                .lineLimit(1)
+              Text(member.id)
+                .textStyle(TextStyles.labelSmall)
+                .foregroundStyle(SysColors.textSecondary)
+                .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+          }
+          .padding(.horizontal, 12)
+          .frame(height: 48)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(MenuRowButtonStyle())
+        .accessibilityLabel("Mention \(member.name)")
+      }
+    }
+    .background(.regularMaterial, in: .rect(cornerRadius: 14))
+    .clipShape(.rect(cornerRadius: 14))
+    .shadow(color: .black.opacity(0.10), radius: 8, y: -2)
+    .padding(.horizontal, 12)
+    .padding(.bottom, 4)
   }
 }

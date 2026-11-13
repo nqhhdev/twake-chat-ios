@@ -9,6 +9,13 @@ import SwiftUI
 public struct RoomScreen: View {
   @Bindable var viewModel: RoomViewModel
   @State private var details: RoomDetailsViewModel?
+  @State private var search: RoomSearchViewModel?
+  @State private var forwarding: ForwardItem?
+  @State private var showsPinnedList = false
+  @State private var reporting: TimelineMessage?
+  @State private var reportReason = ""
+  @State private var blocking: TimelineMessage?
+  @Environment(\.scenePhase) private var scenePhase
 
   public init(viewModel: RoomViewModel) {
     self.viewModel = viewModel
@@ -17,7 +24,16 @@ public struct RoomScreen: View {
   public var body: some View {
     GeometryReader { geometry in
       VStack(spacing: 0) {
+        if let warning = viewModel.sessionWarning {
+          SessionWarningBanner(warning: warning) { viewModel.onFixSession?() }
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
         PinnedBanner(viewModel: viewModel)
+          .contextMenu {
+            if !viewModel.pinned.isEmpty {
+              Button("All pinned messages", systemImage: "pin") { showsPinnedList = true }
+            }
+          }
         timeline(bubbleWidth: TwakeLayout.bubbleWidth(in: geometry.size.width))
         if let message = viewModel.errorMessage {
           Text(message)
@@ -26,8 +42,64 @@ public struct RoomScreen: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 4)
         }
-        ComposerView(viewModel: viewModel)
+        if viewModel.isArchived {
+          ArchivedRoomBar(viewModel: viewModel)
+        } else {
+          ComposerView(viewModel: viewModel)
+        }
       }
+      .overlay {
+        if let focus = viewModel.focus {
+          MessageActionsOverlay(
+            focus: focus, bubbleWidth: TwakeLayout.bubbleWidth(in: geometry.size.width),
+            viewModel: viewModel,
+            onForward: { message in forwarding = ForwardItem(message: message) },
+            onReport: { message in
+              reportReason = ""
+              reporting = message
+            },
+            onBlock: { message in blocking = message }
+          )
+          .transition(.opacity)
+        }
+      }
+    }
+    .sheet(item: $forwarding) { item in ForwardSheet(message: item.message, viewModel: viewModel) }
+    .sheet(item: $viewModel.peopleSheet) { sheet in
+      PeopleListSheet(sheet: sheet, viewModel: viewModel)
+    }
+    .sheet(isPresented: $showsPinnedList) {
+      PinnedListSheet(viewModel: viewModel) { eventId in
+        showsPinnedList = false
+        Task { await viewModel.jump(toEvent: eventId) }
+      }
+    }
+    .alert(
+      "Report this message?",
+      isPresented: Binding(get: { reporting != nil }, set: { if !$0 { reporting = nil } })
+    ) {
+      TextField("Reason (optional)", text: $reportReason)
+      Button("Cancel", role: .cancel) {}
+      Button("Report", role: .destructive) {
+        if let message = reporting {
+          Task { await viewModel.report(message, reason: reportReason) }
+        }
+      }
+    } message: {
+      Text("The server's moderators will see it.")
+    }
+    .confirmationDialog(
+      blocking.map { "Block \($0.senderName)?" } ?? "",
+      isPresented: Binding(get: { blocking != nil }, set: { if !$0 { blocking = nil } }),
+      titleVisibility: .visible
+    ) {
+      Button("Block", role: .destructive) {
+        if let message = blocking { Task { await viewModel.block(message) } }
+      }
+    } message: {
+      Text("You will no longer see their messages or invitations, in any chat.")
+    }
+    .sensoryFeedback(.impact(weight: .medium), trigger: viewModel.focus != nil) { _, shown in shown
     }
     .background(SysColors.background)
     .overlay(alignment: .top) {
@@ -35,6 +107,10 @@ public struct RoomScreen: View {
     }
     .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.toast)
     .animation(.spring(response: 0.4, dampingFraction: 0.85), value: viewModel.pinned)
+    .task { await viewModel.refreshSessionWarning() }
+    .onChange(of: scenePhase) { _, phase in
+      if phase == .active { Task { await viewModel.refreshSessionWarning() } }
+    }
     .sensoryFeedback(.success, trigger: viewModel.toast) { _, new in new != nil }
     .navigationTitle(viewModel.roomName)
     .navigationBarTitleDisplayMode(.inline)
@@ -45,15 +121,31 @@ public struct RoomScreen: View {
           details = viewModel.makeDetails()
         } label: {
           HStack(spacing: 8) {
-            TwakeAvatar(name: viewModel.roomName, size: 32)
+            TwakeAvatar(
+              name: viewModel.roomName, size: 32, pictureID: viewModel.roomAvatar?.source,
+              load: viewModel.roomAvatar.map { reference in
+                { @Sendable [viewModel] in await viewModel.picture(reference) }
+              })
             Text(viewModel.roomName).textStyle(TextStyles.titleMedium).lineLimit(1)
           }
         }
         .buttonStyle(.plain)
         .accessibilityHint("Shows the chat details")
       }
+      ToolbarItem(placement: .topBarTrailing) {
+        if viewModel.canSearch {
+          Button("Search", systemImage: "magnifyingglass") { search = viewModel.makeSearch() }
+        }
+      }
     }
     .navigationDestination(item: $details) { details in RoomDetailsScreen(viewModel: details) }
+    .navigationDestination(item: $search) { search in
+      RoomSearchScreen(viewModel: search) { eventId in
+        self.search = nil
+        // A search result may be far back: look further than for a reply.
+        Task { await viewModel.jump(toEvent: eventId, maxPages: 50) }
+      }
+    }
     .task(id: viewModel.roomId) { await viewModel.start() }
   }
 
@@ -83,11 +175,13 @@ struct TimelineScroll: View {
     ScrollView {
       LazyVStack(spacing: 0) {
         if !viewModel.reachedStart {
+          // While the spinner shows, keep loading pages: one page may not fill the screen or reach the start, and
+          // the spinner would otherwise stay with nothing asking for more.
           ProgressView()
             .padding()
-            .onAppear { Task { await viewModel.loadOlder() } }
+            .task { await viewModel.loadOlderWhileVisible() }
         }
-        if !rows.contains(where: Self.isMessage) {
+        if viewModel.reachedStart, !rows.contains(where: Self.isMessage) {
           Text("No message here yet")
             .textStyle(TextStyles.bodyMedium)
             .foregroundStyle(SysColors.textSecondary)
@@ -104,6 +198,13 @@ struct TimelineScroll: View {
       .animation(.spring(response: 0.38, dampingFraction: 0.78), value: rows.last?.id)
     }
     .scrollPosition($position)
+    .onChange(of: viewModel.scrollTarget) { _, target in
+      guard let target else { return }
+      withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+        position.scrollTo(id: target, anchor: .center)
+      }
+      viewModel.scrollTarget = nil
+    }
     // Open on the newest message, and stay on it as messages arrive or pictures load.
     .defaultScrollAnchor(.bottom)
     .defaultScrollAnchor(.bottom, for: .sizeChanges)
@@ -136,7 +237,10 @@ struct TimelineScroll: View {
   }
 
   private static func isMessage(_ row: ChatRow) -> Bool {
-    if case .other = row { false } else { true }
+    switch row {
+    case .message, .album: true
+    case .other, .notices: false
+    }
   }
 
   /// A new bubble grows from its sender's side and rises a little; other rows fade in.
@@ -145,7 +249,7 @@ struct TimelineScroll: View {
       switch row {
       case .message(let model): model.message.isOwn
       case .album(let model): model.messages.first?.isOwn
-      case .other: nil
+      case .other, .notices: nil
       }
     guard let isOwn else { return .opacity }
     return .asymmetric(
@@ -165,16 +269,59 @@ struct ChatRowView: View {
     switch row {
     case .message(let model):
       MessageRow(
-        message: model.message, position: model.position, bubbleWidth: bubbleWidth,
-        viewModel: viewModel)
+        message: model.message, position: model.position, isRead: model.isRead,
+        bubbleWidth: bubbleWidth, viewModel: viewModel)
     case .album(let model):
       MessageRow(
         message: model.messages[model.messages.count - 1], position: model.position,
-        bubbleWidth: bubbleWidth,
+        isRead: model.isRead, bubbleWidth: bubbleWidth,
         viewModel: viewModel, album: model)
     case .other(let item):
       OtherRow(item: item)
+    case .notices(let model):
+      NoticesRow(model: model)
     }
+  }
+}
+
+/// Room events in a row, folded as Element X and Messages fold them: a quiet capsule ("8 changes") that opens into
+/// the list of events and closes again.
+struct NoticesRow: View {
+  let model: NoticesRowModel
+  @State private var isOpen = false
+
+  var body: some View {
+    VStack(spacing: 4) {
+      Button {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { isOpen.toggle() }
+      } label: {
+        HStack(spacing: 6) {
+          Image(systemName: "info.circle")
+          Text(isOpen ? "Hide changes" : "\(model.texts.count) changes")
+          Image(systemName: "chevron.down")
+            .rotationEffect(.degrees(isOpen ? 180 : 0))
+        }
+        .font(.footnote.weight(.medium))
+        .foregroundStyle(SysColors.textSecondary)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(SysColors.surface, in: Capsule())
+      }
+      .buttonStyle(.plain)
+      .accessibilityHint(isOpen ? "Hides the room changes" : "Shows the room changes")
+      if isOpen {
+        ForEach(Array(model.texts.enumerated()), id: \.offset) { _, text in
+          Text(text)
+            .textStyle(TextStyles.bodySmall)
+            .foregroundStyle(SysColors.textSecondary)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+        }
+        .transition(.opacity.combined(with: .move(edge: .top)))
+      }
+    }
+    .padding(.vertical, 6)
+    .frame(maxWidth: .infinity)
   }
 }
 
@@ -207,19 +354,23 @@ struct OtherRow: View {
 
 /// A message bubble in its sender's group, as Telegram and iMessage show it: the sender's name on the first bubble,
 /// the avatar and the tail on the last, 2 pt between bubbles of a group and 8 pt between groups. Swipe it towards the
-/// leading edge to reply, double-tap it to send ❤️, long-press it for the Flutter message menu.
+/// leading edge to reply, double-tap it to send ❤️, long-press it to lift it with the tapbacks and actions, as iMessage.
 struct MessageRow: View {
   let message: TimelineMessage
   let position: GroupPosition
+  /// Someone else has read up to this message; own messages show a double tick.
+  let isRead: Bool
   let bubbleWidth: CGFloat
   let viewModel: RoomViewModel
   var album: AlbumRowModel?
+  /// Drawn in the long-press layer: no gestures, no menu.
+  var isPreview = false
 
   /// How far the bubble is dragged for swipe-to-reply.
   @State private var swipe: CGFloat = 0
   @State private var didReachReply = false
   @State private var heartBurst = 0
-  @State private var isForwarding = false
+  @State private var frameBox = FrameBox()
 
   /// The swipe that triggers a reply, as Telegram's.
   private static let replyThreshold: CGFloat = 56
@@ -230,7 +381,11 @@ struct MessageRow: View {
         if !message.isOwn {
           // The avatar sits by the last bubble of a group; the others keep its space so the bubbles line up.
           if position.isLast {
-            TwakeAvatar(name: message.senderName, size: 32)
+            TwakeAvatar(
+              name: message.senderName, size: 32, pictureID: message.senderAvatar?.source,
+              load: message.senderAvatar.map { reference in
+                { @Sendable [viewModel] in await viewModel.picture(reference) }
+              })
           } else {
             Color.clear.frame(width: 32, height: 1)
           }
@@ -239,16 +394,44 @@ struct MessageRow: View {
           if message.isEmojiOnly, message.reply == nil { bigEmoji } else { bubble }
         }
         .overlay { HeartBurst(trigger: heartBurst) }
-        .sheet(isPresented: $isForwarding) { ForwardSheet(message: message, viewModel: viewModel) }
+        .simultaneousGesture(
+          LongPressGesture(minimumDuration: 0.35).onEnded { _ in showActions() },
+          isEnabled: !isPreview
+        )
+        .accessibilityAction(named: "Message actions") { showActions() }
       }
       .offset(x: swipe)
       .background(alignment: .trailing) { replyHint }
-      .simultaneousGesture(swipeToReply)
+      .simultaneousGesture(swipeToReply, isEnabled: !isPreview)
       if !message.reactions.isEmpty { reactions }
     }
     .frame(maxWidth: .infinity, alignment: message.isOwn ? .trailing : .leading)
     .padding(.top, position.isFirst ? 8 : 2)
+    .background {
+      if !isPreview, message.eventId != nil, viewModel.highlightedEventId == message.eventId {
+        RoundedRectangle(cornerRadius: 14).fill(SysColors.primary.opacity(0.14))
+          .padding(.horizontal, -6)
+          .transition(.opacity)
+      }
+    }
+    .animation(.easeInOut(duration: 0.3), value: viewModel.highlightedEventId)
+    .onGeometryChange(for: CGRect.self) {
+      $0.frame(in: .global)
+    } action: {
+      frameBox.frame = $0
+    }
+    .opacity(!isPreview && viewModel.focus?.message == message ? 0 : 1)
     .sensoryFeedback(.impact(weight: .light), trigger: didReachReply) { _, reached in reached }
+  }
+
+  /// Lifts this message into the actions layer (long press, or the accessibility action).
+  private func showActions() {
+    guard !isPreview, viewModel.focus == nil else { return }
+    withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+      viewModel.focus = MessageFocus(
+        message: message, position: position, isRead: isRead, album: album,
+        frame: frameBox.frame)
+    }
   }
 
   /// The reply arrow that fades and grows in behind the bubble while it is swiped.
@@ -298,11 +481,10 @@ struct MessageRow: View {
     }
     .contentShape(Rectangle())
     .onTapGesture(count: 2) {
-      guard message.eventId != nil else { return }
+      guard !isPreview, message.eventId != nil else { return }
       heartBurst += 1
       Task { await viewModel.toggleReaction("❤️", on: message) }
     }
-    .contextMenu { menu }
   }
 
   /// The widest the text inside the bubble may be: the bubble's limit less its padding and, for others, the avatar.
@@ -337,6 +519,13 @@ struct MessageRow: View {
         .padding(.horizontal, 6)
         .background(SysColors.primary.opacity(0.06), in: .rect(cornerRadius: 8))
         .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture {
+          guard !isPreview, let target = message.replyToEventId else { return }
+          Task { await viewModel.jump(toEvent: target) }
+        }
+        .accessibilityAddTraits(message.replyToEventId == nil ? [] : .isButton)
+        .accessibilityHint(message.replyToEventId == nil ? "" : "Shows the original message")
       }
       if let album {
         AlbumGrid(album: album, width: contentWidth, viewModel: viewModel)
@@ -345,13 +534,27 @@ struct MessageRow: View {
         MessageMediaView(message: message, media: media, width: contentWidth, viewModel: viewModel)
         if let caption = Self.caption(of: message.body) { captionText(caption) }
       } else {
-        MessageBody(content: message.body)
+        MessageBody(content: message.body, formatted: message.formatted)
           .frame(maxWidth: .infinity, alignment: .leading)
+        if case .text(let text) = message.body, let link = RoomViewModel.previewLink(in: text) {
+          LinkPreviewCard(url: link, width: contentWidth, viewModel: viewModel)
+        }
       }
       HStack(spacing: 4) {
         if message.isEdited { Text("edited") }
         Text(message.date, format: .dateTime.hour().minute())
-        if message.isOwn { sendStateIcon }
+        if message.isOwn, message.sendState == .failed, !isPreview {
+          Button {
+            Task { await viewModel.retryFailedSends() }
+          } label: {
+            Label("Not sent, tap to retry", systemImage: "arrow.clockwise")
+              .foregroundStyle(SysColors.error)
+          }
+          .buttonStyle(.plain)
+        } else if message.isOwn {
+          sendStateIcon.animation(
+            .spring(response: 0.3, dampingFraction: 0.7), value: isRead)
+        }
       }
       .textStyle(TextStyles.labelSmall)
       .foregroundStyle(SysColors.textSecondary)
@@ -364,15 +567,13 @@ struct MessageRow: View {
       in: TwakeBubbleShape(isOwn: message.isOwn, isFirst: position.isFirst, isLast: position.isLast)
     )
     .shadow(color: .black.opacity(message.isOwn ? 0 : 0.10), radius: 1, y: 0.5)
-    .contentShape(.contextMenuPreview, TwakeBubbleShape(isOwn: message.isOwn))
     .onTapGesture(count: 2) {
       // Double-tap sends ❤️, as a tapback; pictures keep the single tap that opens them.
-      guard message.media == nil, message.eventId != nil else { return }
+      guard !isPreview, message.media == nil, message.eventId != nil else { return }
       heartBurst += 1
       Task { await viewModel.toggleReaction("❤️", on: message) }
     }
     .sensoryFeedback(.impact(weight: .medium), trigger: heartBurst)
-    .contextMenu { menu }
   }
 
   private func captionText(_ caption: String) -> some View {
@@ -391,18 +592,28 @@ struct MessageRow: View {
     }
   }
 
-  /// Sending, sent and failed swap with the symbol replace effect.
-  private var sendStateIcon: some View {
-    let symbol =
-      switch message.sendState {
-      case .sent: "checkmark"
-      case .sending: "clock"
-      case .failed: "exclamationmark.circle"
+  /// Sending, sent and failed swap with the symbol replace effect; once someone has read the message, a second
+  /// check slides in and both turn `primary`, as the Flutter chat's double tick.
+  @ViewBuilder private var sendStateIcon: some View {
+    if message.sendState == .sent, isRead {
+      HStack(spacing: -7) {
+        Image(systemName: "checkmark")
+        Image(systemName: "checkmark").transition(.move(edge: .leading).combined(with: .opacity))
       }
-    return Image(systemName: symbol)
-      .foregroundStyle(message.sendState == .failed ? SysColors.error : SysColors.textSecondary)
-      .contentTransition(.symbolEffect(.replace))
-      .animation(.default, value: message.sendState)
+      .foregroundStyle(SysColors.primary)
+      .accessibilityLabel("Read")
+    } else {
+      let symbol =
+        switch message.sendState {
+        case .sent: "checkmark"
+        case .sending: "clock"
+        case .failed: "exclamationmark.circle"
+        }
+      Image(systemName: symbol)
+        .foregroundStyle(message.sendState == .failed ? SysColors.error : SysColors.textSecondary)
+        .contentTransition(.symbolEffect(.replace))
+        .animation(.default, value: message.sendState)
+    }
   }
 
   /// Reaction chips: a new one pops in, a count rolls to its new value, and the user's own are highlighted.
@@ -429,45 +640,18 @@ struct MessageRow: View {
           )
         }
         .buttonStyle(PressScaleButtonStyle())
+        .contextMenu {
+          Button("See who reacted", systemImage: "person.2") { viewModel.showReactors(reaction) }
+        }
         .transition(.scale(scale: 0.3).combined(with: .opacity))
         .sensoryFeedback(.selection, trigger: reaction.includesOwn)
       }
     }
     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: message.reactions)
     .padding(.leading, message.isOwn ? 0 : 40)
+    .allowsHitTesting(!isPreview)
   }
 
-  @ViewBuilder private var menu: some View {
-    // A menu row holds three items, so the six quick reactions are two rows.
-    ForEach([0, 3], id: \.self) { start in
-      ControlGroup {
-        ForEach(RoomViewModel.quickReactions[start..<start + 3], id: \.self) { key in
-          Button(key) { Task { await viewModel.toggleReaction(key, on: message) } }
-        }
-      }
-    }
-    if message.eventId != nil {
-      Button("Reply", systemImage: "arrowshape.turn.up.left") { viewModel.reply(to: message) }
-    }
-    if let text = RoomViewModel.text(of: message.body) {
-      Button("Copy", systemImage: "doc.on.doc") { UIPasteboard.general.string = text }
-    }
-    if message.eventId != nil {
-      Button("Forward", systemImage: "arrowshape.turn.up.right") { isForwarding = true }
-      Button(
-        viewModel.isPinned(message) ? "Unpin" : "Pin",
-        systemImage: viewModel.isPinned(message) ? "pin.slash" : "pin"
-      ) { Task { await viewModel.togglePin(message) } }
-    }
-    if message.isOwn, case .text = message.body {
-      Button("Edit", systemImage: "pencil") { viewModel.edit(message) }
-    }
-    if message.isOwn, message.eventId != nil {
-      Button("Delete", systemImage: "trash", role: .destructive) {
-        Task { await viewModel.delete(message) }
-      }
-    }
-  }
 }
 
 /// The heart that bursts out of a bubble when it is double-tapped: it grows, rises and fades.
@@ -515,16 +699,42 @@ struct PressScaleButtonStyle: ButtonStyle {
   }
 }
 
-/// The content of a message, by kind.
+/// The content of a message, by kind. A text, emote or notice shows as its sender formatted it when it has an HTML
+/// body (bold, links, mentions, quotes, lists, code), as the web client draws it.
 struct MessageBody: View {
   let content: TimelineMessage.Body
+  var formatted: AttributedString?
+
+  /// A message without HTML: its inline Markdown (bold, italic, code, links) and bare addresses as links. The text is
+  /// never looked up as a localisation key.
+  static func plain(_ text: String) -> AttributedString {
+    let parsed =
+      (try? AttributedString(
+        markdown: text,
+        options: .init(
+          allowsExtendedAttributes: false, interpretedSyntax: .inlineOnlyPreservingWhitespace,
+          failurePolicy: .returnPartiallyParsedIfPossible)))
+      ?? AttributedString(text)
+    return MatrixHTML.linkingBareAddresses(parsed)
+  }
+
+  /// An emote, as "* text" in italics.
+  static func emote(_ text: AttributedString) -> AttributedString {
+    var line = AttributedString("* ") + text
+    for run in line.runs {
+      line[run.range].inlinePresentationIntent =
+        (run.inlinePresentationIntent ?? []).union(.emphasized)
+    }
+    return line
+  }
 
   var body: some View {
     Group {
       switch content {
-      case .text(let text): Text(LocalizedStringKey(text))
-      case .emote(let text): Text("* \(text)").italic()
-      case .notice(let text): Text(text).foregroundStyle(SysColors.textSecondary)
+      case .text(let text): Text(formatted ?? Self.plain(text))
+      case .emote(let text): Text(Self.emote(formatted ?? Self.plain(text)))
+      case .notice(let text):
+        Text(formatted ?? Self.plain(text)).foregroundStyle(SysColors.textSecondary)
       case .image(let caption): Label(caption ?? "Picture", systemImage: "photo")
       case .video(let caption): Label(caption ?? "Video", systemImage: "video")
       case .audio(let caption): Label(caption ?? "Audio", systemImage: "waveform")
@@ -536,8 +746,11 @@ struct MessageBody: View {
         Label("This message has been deleted", systemImage: "trash").foregroundStyle(
           SysColors.textSecondary)
       case .unableToDecrypt:
-        Label("This message has been encrypted", systemImage: "lock").foregroundStyle(
-          SysColors.textSecondary)
+        // As Element X says it: the keys may still arrive, or come back with the recovery key in Settings.
+        Label("Waiting for this message", systemImage: "lock.badge.clock").foregroundStyle(
+          SysColors.textSecondary
+        )
+        .accessibilityHint("The keys to read it have not arrived yet")
       case .unsupported:
         Text("Unknown event").foregroundStyle(SysColors.textSecondary)
       }
@@ -577,5 +790,137 @@ struct HuggingStack: Layout {
 
   private func width(of subviews: Subviews) -> CGFloat {
     min(maxWidth, subviews.map { $0.sizeThatFits(.unspecified).width }.max() ?? 0)
+  }
+}
+
+/// In place of the composer in a chat the user left: why it is read-only, and Rejoin.
+struct ArchivedRoomBar: View {
+  let viewModel: RoomViewModel
+
+  var body: some View {
+    VStack(spacing: 8) {
+      Text("You left this chat.")
+        .font(.subheadline)
+        .foregroundStyle(SysColors.textSecondary)
+      Button {
+        Task { await viewModel.rejoin() }
+      } label: {
+        Group {
+          if viewModel.isRejoining { ProgressView() } else { Text("Rejoin") }
+        }
+        .frame(maxWidth: 280)
+      }
+      .buttonStyle(.borderedProminent)
+      .disabled(viewModel.isRejoining)
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 12)
+    .background(.bar)
+  }
+}
+
+/// Above the timeline when encrypted messages may not show on this device (Flutter `ChatDeviceVerificationBanner`): why,
+/// and the button that opens Privacy & Security to verify the device or enter the recovery key. It stays until that is
+/// done, as on the Flutter app's phone layout.
+struct SessionWarningBanner: View {
+  let warning: SessionWarning
+  let onFix: () -> Void
+
+  var body: some View {
+    HStack(spacing: 12) {
+      Image(systemName: "exclamationmark.shield.fill")
+        .font(.title3)
+        .foregroundStyle(SysColors.warning)
+        .accessibilityHidden(true)
+      Text(message)
+        .font(.subheadline)
+        .foregroundStyle(SysColors.onSurface)
+        .fixedSize(horizontal: false, vertical: true)
+      Spacer(minLength: 4)
+      Button(action: onFix) {
+        Text(warning == .unverified ? "Verify" : "Enter Key").font(.subheadline.weight(.semibold))
+      }
+      .buttonStyle(.bordered)
+      .buttonBorderShape(.capsule)
+      .controlSize(.small)
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 10)
+    .frame(maxWidth: .infinity)
+    .background(.bar)
+    .overlay(alignment: .bottom) { Rectangle().fill(SysColors.surface).frame(height: 1) }
+  }
+
+  private var message: String {
+    switch warning {
+    case .unverified: "Encrypted messages may not show until this device is verified."
+    case .recoveryIncomplete: "Encrypted messages may not show until you enter your recovery key."
+    }
+  }
+}
+
+/// The card under a message's first web link (Flutter `TwakeLinkPreview`): the page's picture, site, title and
+/// description, as the homeserver previews it. It shows nothing until the preview arrives, or when there is none; a tap
+/// opens the link.
+struct LinkPreviewCard: View {
+  let url: URL
+  let width: CGFloat
+  let viewModel: RoomViewModel
+  @State private var preview: LinkPreview?
+  @Environment(\.openURL) private var openURL
+
+  var body: some View {
+    Group {
+      if let preview {
+        Button {
+          guard viewModel.focus == nil else { return }
+          openURL(preview.url)
+        } label: {
+          card(preview)
+        }
+        .buttonStyle(.plain)
+        .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+      }
+    }
+    .task(id: url) {
+      let loaded = await viewModel.linkPreview(of: url)
+      withAnimation(.easeOut(duration: 0.2)) { preview = loaded }
+    }
+  }
+
+  private func card(_ preview: LinkPreview) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      if let image = preview.image {
+        let height = min(160, width * (image.aspectRatio ?? 0.52))
+        RemoteImage(
+          media: image, size: CGSize(width: width, height: height), repository: viewModel.media
+        )
+        .frame(width: width, height: height)
+        .clipped()
+      }
+      VStack(alignment: .leading, spacing: 2) {
+        Text(preview.siteName ?? preview.url.host() ?? "")
+          .font(.caption.weight(.medium))
+          .foregroundStyle(SysColors.primary)
+          .lineLimit(1)
+        if let title = preview.title {
+          Text(title).font(.subheadline.weight(.semibold)).lineLimit(2)
+        }
+        if let description = preview.description {
+          Text(description).font(.footnote).foregroundStyle(SysColors.textSecondary).lineLimit(3)
+        }
+      }
+      .padding(.horizontal, 10)
+      .padding(.vertical, 8)
+    }
+    .frame(width: width, alignment: .leading)
+    .background(SysColors.surface.opacity(0.7))
+    .clipShape(.rect(cornerRadius: 10))
+    .overlay(alignment: .leading) {
+      Rectangle().fill(SysColors.primary).frame(width: 3)
+        .clipShape(.rect(topLeadingRadius: 10, bottomLeadingRadius: 10))
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityHint("Opens the link")
   }
 }

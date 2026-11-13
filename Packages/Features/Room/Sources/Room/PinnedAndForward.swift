@@ -118,3 +118,74 @@ struct ForwardSheet: View {
     .presentationDetents([.medium, .large])
   }
 }
+
+/// The people who reacted with one emoji, or who have seen a message, by name when they are room members.
+struct PeopleListSheet: View {
+  let sheet: RoomViewModel.PeopleSheet
+  let viewModel: RoomViewModel
+  @State private var members: [String: RoomMember] = [:]
+
+  var body: some View {
+    NavigationStack {
+      List(sheet.userIds, id: \.self) { userId in
+        let member = members[userId]
+        HStack(spacing: 12) {
+          TwakeAvatar(
+            name: member?.name ?? userId, size: 36, pictureID: member?.avatar?.source,
+            load: member?.avatar.map { reference in
+              { @Sendable [viewModel] in await viewModel.picture(reference) }
+            })
+          VStack(alignment: .leading, spacing: 0) {
+            Text(member?.name ?? userId).lineLimit(1)
+            if member?.displayName != nil {
+              Text(userId).font(.footnote).foregroundStyle(SysColors.textSecondary).lineLimit(1)
+            }
+          }
+        }
+      }
+      .overlay {
+        if sheet.userIds.isEmpty {
+          ContentUnavailableView("No one yet", systemImage: "person.2")
+        }
+      }
+      .navigationTitle(sheet.title)
+      .navigationBarTitleDisplayMode(.inline)
+    }
+    .presentationDetents([.medium, .large])
+    .task {
+      let list = await viewModel.roomMembers()
+      members = Dictionary(list.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+  }
+}
+
+/// All the pinned messages, newest pin first; a tap shows the message in the chat.
+struct PinnedListSheet: View {
+  let viewModel: RoomViewModel
+  let open: (String) -> Void
+
+  var body: some View {
+    NavigationStack {
+      List(viewModel.pinned.reversed(), id: \.eventId) { message in
+        Button {
+          if let eventId = message.eventId { open(eventId) }
+        } label: {
+          VStack(alignment: .leading, spacing: 2) {
+            Text(message.senderName).font(.subheadline.weight(.semibold))
+            Text(RoomViewModel.text(of: message.body) ?? "Attachment")
+              .lineLimit(2)
+              .foregroundStyle(SysColors.textSecondary)
+          }
+        }
+        .swipeActions {
+          Button("Unpin", systemImage: "pin.slash") {
+            Task { await viewModel.togglePin(message) }
+          }
+        }
+      }
+      .navigationTitle("Pinned messages")
+      .navigationBarTitleDisplayMode(.inline)
+    }
+    .presentationDetents([.medium, .large])
+  }
+}

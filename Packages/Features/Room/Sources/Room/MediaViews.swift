@@ -38,6 +38,8 @@ struct MessageMediaView: View {
   private var thumbnail: some View {
     let size = thumbnailSize
     return Button {
+      // The finger lifting after a long press must not open the picture under the actions layer.
+      guard viewModel.focus == nil else { return }
       if case .video = message.body {
         Task { await playVideo() }
       } else {
@@ -75,6 +77,7 @@ struct MessageMediaView: View {
 
   private var fileRow: some View {
     Button {
+      guard viewModel.focus == nil else { return }
       Task { await download() }
     } label: {
       HStack(spacing: 12) {
@@ -198,6 +201,9 @@ struct ImageViewer: View {
     self.repository = repository
     self.title = title
     self.startIndex = startIndex
+    // The scroll view reads its first page from here; set later, in `onAppear`, a long list of lazy pages could land
+    // on another one.
+    _index = State(initialValue: startIndex)
   }
 
   private var currentIndex: Int { index ?? startIndex }
@@ -222,7 +228,6 @@ struct ImageViewer: View {
       .scrollPosition(id: $index)
       // The next picture must not show through the Duo's side status area.
       .clipped()
-      .onAppear { index = startIndex }
       .background(Color.black.ignoresSafeArea())
       .navigationTitle(pictures.count > 1 ? "\(currentIndex + 1) / \(pictures.count)" : title)
       .navigationBarTitleDisplayMode(.inline)
@@ -347,6 +352,7 @@ struct AlbumGrid: View {
     _ entry: (offset: Int, element: MediaReference), width: CGFloat, height: CGFloat
   ) -> some View {
     Button {
+      guard viewModel.focus == nil else { return }
       viewerStart = ViewerStart(index: entry.offset)
     } label: {
       cellImage(entry, width: width, height: height)
