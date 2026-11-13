@@ -195,6 +195,71 @@ struct ChatListViewModelTests {
     #expect(ChatListViewModel.preview(of: Self.room("!a:b", "A", text: "Hi", sender: nil)) == "Hi")
     #expect(ChatListViewModel.preview(of: Self.room("!a:b", "A", text: nil)) == nil)
   }
+
+  @Test func favouritesComeFirstAndInvitesStayApart() async {
+    let repository = FakeRoomListRepository()
+    let viewModel = ChatListViewModel(repository: repository, logOut: { true })
+    let favourite = RoomSummary(
+      id: "!fav:example.org", name: "Fav", lastMessageText: nil, lastMessageSender: nil,
+      lastActivity: nil, isFavourite: true)
+    let invite = RoomSummary(
+      id: "!inv:example.org", name: "Inv", lastMessageText: nil, lastMessageSender: nil,
+      lastActivity: nil, isInvite: true)
+    let task = Task { await viewModel.start() }
+    await waitUntil { repository.isStarted }
+    repository.send([team, favourite, invite, family])
+    await waitUntil { viewModel.state != .loading }
+    #expect(viewModel.favouriteRooms.map(\.id) == [favourite.id])
+    #expect(viewModel.otherRooms.map(\.id) == [team.id, family.id])
+    #expect(viewModel.invites.map(\.id) == [invite.id])
+    task.cancel()
+    repository.finish()
+  }
+
+  @Test func swipeActionsAskTheRepository() async {
+    let repository = FakeRoomListRepository()
+    let viewModel = ChatListViewModel(repository: repository, logOut: { true })
+    await viewModel.setUnread(true, room: team)
+    await viewModel.setUnread(false, room: team)
+    await viewModel.setFavourite(true, room: family)
+    await viewModel.leave(family)
+    #expect(
+      repository.decisions == [
+        "unread !team:example.org", "read !team:example.org", "favourite !family:example.org",
+        "leave !family:example.org",
+      ])
+    #expect(viewModel.actionErrorMessage == nil)
+  }
+
+  @Test func filtersPickUnreadFavouritesPeopleAndGroups() async {
+    let repository = FakeRoomListRepository()
+    let viewModel = ChatListViewModel(repository: repository, logOut: { true })
+    let unreadDM = RoomSummary(
+      id: "!dm:example.org", name: "Alice", lastMessageText: nil, lastMessageSender: nil,
+      lastActivity: nil, unreadCount: 2, isDirect: true)
+    let group = RoomSummary(
+      id: "!g:example.org", name: "Team", lastMessageText: nil, lastMessageSender: nil,
+      lastActivity: nil, isFavourite: true)
+    let task = Task { await viewModel.start() }
+    await waitUntil { repository.isStarted }
+    repository.send([unreadDM, group])
+    await waitUntil { viewModel.state != .loading }
+    viewModel.filter = .unread
+    #expect(viewModel.joinedRooms.map(\.id) == [unreadDM.id])
+    viewModel.filter = .people
+    #expect(viewModel.joinedRooms.map(\.id) == [unreadDM.id])
+    viewModel.filter = .groups
+    #expect(viewModel.joinedRooms.map(\.id) == [group.id])
+    viewModel.filter = .favourites
+    #expect(viewModel.joinedRooms.map(\.id) == [group.id])
+    viewModel.selection = [unreadDM.id, group.id]
+    viewModel.filter = .all
+    await viewModel.toggleSelectionMuted()
+    #expect(repository.decisions == ["mute !dm:example.org", "mute !g:example.org"])
+    #expect(viewModel.selection.isEmpty)
+    task.cancel()
+    repository.finish()
+  }
 }
 
 @MainActor
@@ -220,5 +285,18 @@ struct ChatListSearchTests {
     #expect(viewModel.visibleRooms.count == 2)
     task.cancel()
     repository.finish()
+  }
+
+  @Test func acceptingAndDecliningAnInvitationAskTheRepository() async {
+    let repository = FakeRoomListRepository()
+    let viewModel = ChatListViewModel(repository: repository, logOut: { true })
+    let invite = RoomSummary(
+      id: "!new:example.org", name: "New", lastMessageText: nil, lastMessageSender: nil,
+      lastActivity: nil, isInvite: true)
+    await viewModel.answerInvite(invite, accept: true)
+    await viewModel.answerInvite(invite, accept: false)
+    #expect(repository.decisions == ["accept !new:example.org", "decline !new:example.org"])
+    #expect(viewModel.answering.isEmpty)
+    #expect(viewModel.inviteErrorMessage == nil)
   }
 }
