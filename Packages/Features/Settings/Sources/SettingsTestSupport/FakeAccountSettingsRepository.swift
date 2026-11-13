@@ -38,6 +38,59 @@ public final class FakeAccountSettingsRepository: AccountSettingsRepository, @un
   }
 
   public func displayName() async -> String? { name }
+  public func avatar() async -> MediaReference? { lock.withLock { _avatar } }
+
+  private var _avatar: MediaReference?
+  private var _avatarResult: Result<Void, SettingsError> = .success(())
+  private var _uploads: [PictureUpload] = []
+
+  /// What `setAvatar` and `removeAvatar` throw, if anything.
+  public var avatarResult: Result<Void, SettingsError> {
+    get { lock.withLock { _avatarResult } }
+    set { lock.withLock { _avatarResult = newValue } }
+  }
+  /// The pictures set so far.
+  public var uploads: [PictureUpload] { lock.withLock { _uploads } }
+
+  public func setAvatar(_ picture: PictureUpload) async throws(SettingsError) {
+    try avatarResult.get()
+    lock.withLock {
+      _uploads.append(picture)
+      _avatar = MediaReference(source: "mxc://example.org/avatar\(_uploads.count)")
+    }
+  }
+
+  public func removeAvatar() async throws(SettingsError) {
+    try avatarResult.get()
+    lock.withLock { _avatar = nil }
+  }
+
+  private var _blocked: [BlockedUser] = []
+
+  /// The people the fake has blocked; unblocking removes them.
+  public var blocked: [BlockedUser] {
+    get { lock.withLock { _blocked } }
+    set { lock.withLock { _blocked = newValue } }
+  }
+
+  public func blockedUsers() async throws(SettingsError) -> [BlockedUser] { blocked }
+
+  public func unblock(userId: String) async throws(SettingsError) {
+    lock.withLock { _blocked.removeAll { $0.id == userId } }
+  }
+
+  private var _setNameResult: Result<Void, SettingsError> = .success(())
+
+  /// What `setDisplayName` throws, if anything; on success the fake keeps the new name.
+  public var setNameResult: Result<Void, SettingsError> {
+    get { lock.withLock { _setNameResult } }
+    set { lock.withLock { _setNameResult = newValue } }
+  }
+
+  public func setDisplayName(_ name: String) async throws(SettingsError) {
+    try setNameResult.get()
+    self.name = name
+  }
   public func recoveryStatus() async -> RecoveryStatus { status }
 
   public func recover(recoveryKey: String) async throws(SettingsError) {

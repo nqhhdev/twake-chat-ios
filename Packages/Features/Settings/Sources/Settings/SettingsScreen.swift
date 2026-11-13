@@ -4,19 +4,76 @@ import SwiftUI
 
 /// The Settings tab: the profile card, then the Flutter sections with their icons, then Logout with its confirmation.
 /// It shows the view model's state and forwards taps; it holds no logic.
+/// The pages Settings opens.
+public enum SettingsPage: Hashable, CaseIterable, Sendable {
+  case chat, security, notifications, about
+}
+
+/// One Settings page on its own, for the column beside the list on a wide screen.
+public struct SettingsPageView: View {
+  let page: SettingsPage
+  let viewModel: SettingsViewModel
+
+  public init(page: SettingsPage, viewModel: SettingsViewModel) {
+    self.page = page
+    self.viewModel = viewModel
+  }
+
+  public var body: some View {
+    switch page {
+    case .chat: ChatSettingsScreen(viewModel: viewModel)
+    case .security: SecurityScreen(viewModel: viewModel)
+    case .notifications: NotificationSettingsScreen(viewModel: viewModel)
+    case .about: AboutScreen()
+    }
+  }
+}
+
+/// Settings as the iOS Settings app lays it out: the large title, the profile card (a tap renames), then the pages and
+/// Logout in inset groups. On a phone a page is pushed; on a wide screen the app shows the chosen page beside the list
+/// (`selection`), as iPad Settings does.
 public struct SettingsScreen: View {
   let viewModel: SettingsViewModel
+  let selection: Binding<SettingsPage?>?
   @State private var isConfirmingLogout = false
+  @State private var isRenaming = false
 
-  public init(viewModel: SettingsViewModel) {
+  public init(viewModel: SettingsViewModel, selection: Binding<SettingsPage?>? = nil) {
     self.viewModel = viewModel
+    self.selection = selection
+  }
+
+  /// A row that pushes its page on a phone, or selects it for the column beside the list on a wide screen.
+  @ViewBuilder private func pageRow(
+    _ page: SettingsPage, title: String, icon: String, detail: String?
+  )
+    -> some View
+  {
+    if let selection {
+      Button {
+        selection.wrappedValue = page
+      } label: {
+        SettingsRow(title: title, icon: icon, detail: detail)
+      }
+      .listRowBackground(
+        Rectangle().fill(
+          selection.wrappedValue == page ? SysColors.secondaryContainer : SysColors.onPrimary))
+    } else {
+      NavigationLink(value: page) {
+        SettingsRow(title: title, icon: icon, detail: detail)
+      }
+    }
   }
 
   public var body: some View {
     List {
       Section {
         HStack(spacing: 16) {
-          TwakeAvatar(name: viewModel.displayName, size: 64)
+          TwakeAvatar(
+            name: viewModel.displayName, size: 64, pictureID: viewModel.avatar?.source,
+            load: viewModel.avatar.map { reference in
+              { @Sendable [viewModel] in await viewModel.picture(reference) }
+            })
           VStack(alignment: .leading, spacing: 2) {
             Text(viewModel.displayName)
               .textStyle(TextStyles.titleLarge)
@@ -30,23 +87,19 @@ public struct SettingsScreen: View {
           }
         }
         .padding(.vertical, 8)
+        // The profile row opens the profile editor (picture and name), as the Flutter profile page does.
+        .contentShape(Rectangle())
+        .onTapGesture { isRenaming = true }
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Changes your picture and display name")
       }
       Section {
-        NavigationLink {
-          SecurityScreen(viewModel: viewModel)
-        } label: {
-          SettingsRow(title: "Privacy & Security", icon: "lock", detail: recoveryBadge)
+        if viewModel.hasChatPage {
+          pageRow(.chat, title: "Chat", icon: "bubble.left.and.bubble.right", detail: nil)
         }
-        NavigationLink {
-          NotificationSettingsScreen(viewModel: viewModel)
-        } label: {
-          SettingsRow(title: "Notifications", icon: "bell", detail: nil)
-        }
-        NavigationLink {
-          AboutScreen()
-        } label: {
-          SettingsRow(title: "About", icon: "info.circle", detail: nil)
-        }
+        pageRow(.security, title: "Privacy & Security", icon: "lock", detail: recoveryBadge)
+        pageRow(.notifications, title: "Notifications", icon: "bell", detail: nil)
+        pageRow(.about, title: "About", icon: "info.circle", detail: nil)
       }
       Section {
         Button(role: .destructive) {
@@ -61,11 +114,15 @@ public struct SettingsScreen: View {
         }
       }
     }
-    .scrollContentBackground(.hidden)
-    .background(SysColors.background)
-    .twakeTitle("Settings")
+    .listStyle(.insetGrouped)
+    .navigationTitle("Settings")
+    .navigationBarTitleDisplayMode(.large)
+    .navigationDestination(for: SettingsPage.self) { page in
+      SettingsPageView(page: page, viewModel: viewModel)
+    }
     .animation(.default, value: viewModel.displayName)
     .task { await viewModel.load() }
+    .sheet(isPresented: $isRenaming) { EditProfileSheet(viewModel: viewModel) }
     .confirmationDialog(
       "Are you sure you want to log out?", isPresented: $isConfirmingLogout,
       titleVisibility: .visible
@@ -91,17 +148,67 @@ struct SettingsRow: View {
         .font(.system(size: 18))
         .foregroundStyle(SysColors.primary)
         .frame(width: 28)
-      Text(title).textStyle(TextStyles.bodyLarge).foregroundStyle(SysColors.onSurface)
+      Text(title).textStyle(TextStyles.bodyLarge).foregroundStyle(SysColors.onSurface).lineLimit(1)
       Spacer()
       if let detail {
-        Text(detail)
-          .textStyle(TextStyles.labelMedium)
-          .foregroundStyle(SysColors.onError)
-          .padding(.horizontal, 8)
-          .padding(.vertical, 2)
-          .background(SysColors.error, in: Capsule())
+        // A red badge, as iOS Settings marks a page that needs attention; the words are for VoiceOver.
+        Image(systemName: "exclamationmark.circle.fill")
+          .font(.system(size: 20))
+          .foregroundStyle(SysColors.error)
+          .accessibilityLabel(detail)
       }
     }
+  }
+}
+
+/// App Lock (Flutter `setAppLockAction`): a switch named after the device's Face ID, Touch ID or passcode. Changing it
+/// asks the owner first, so the switch moves only when they pass.
+struct AppLockSection: View {
+  let lock: any AppLockSettings
+
+  var body: some View {
+    let method = lock.unlockMethod
+    Section {
+      Toggle(
+        "Require \(method?.name ?? "Passcode")",
+        isOn: Binding(
+          get: { lock.isEnabled },
+          set: { enabled in Task { await lock.setEnabled(enabled) } })
+      )
+      .disabled(method == nil)
+    } header: {
+      Text("App Lock")
+    } footer: {
+      if let method {
+        Text("Twake Chat asks for \(method.name) when it opens and each time you come back to it.")
+      } else {
+        Text("Set a passcode on this device to lock Twake Chat.")
+      }
+    }
+  }
+}
+
+/// Chat (Flutter `SettingsChatView`): which room events chats show. Both kinds are hidden by default; a change applies
+/// to the open chat at once.
+struct ChatSettingsScreen: View {
+  @Bindable var viewModel: SettingsViewModel
+
+  var body: some View {
+    List {
+      Section {
+        Toggle(
+          "Hide unimportant room events", isOn: $viewModel.chatDisplay.hidesUnimportantEvents)
+      } footer: {
+        Text("Changes to a chat's encryption, description, join rules, history or permissions.")
+      }
+      Section {
+        Toggle("Hide unknown events", isOn: $viewModel.chatDisplay.hidesUnknownEvents)
+      } footer: {
+        Text("Events this app cannot show, listed by their type.")
+      }
+    }
+    .listStyle(.insetGrouped)
+    .twakeTitle("Chat")
   }
 }
 
@@ -110,9 +217,54 @@ struct SettingsRow: View {
 struct SecurityScreen: View {
   let viewModel: SettingsViewModel
   @State private var key = ""
+  @State private var isVerifying = false
 
   var body: some View {
     List {
+      if let verification = viewModel.verification {
+        Section {
+          // A plain row: a Label inside LabeledContent made the row stretch to fill the page.
+          HStack {
+            Text("This device")
+            Spacer()
+            HStack(spacing: 6) {
+              Image(
+                systemName: verification.state == .verified
+                  ? "checkmark.seal.fill" : "exclamationmark.shield")
+              Text(verification.state == .verified ? "Verified" : "Not verified")
+            }
+            .foregroundStyle(verification.state == .verified ? SysColors.success : SysColors.error)
+          }
+          .accessibilityElement(children: .combine)
+          if verification.state != .verified {
+            Button("Verify with another device") {
+              isVerifying = true
+              Task { await verification.start() }
+            }
+          }
+        } footer: {
+          Text(
+            "A verified device is trusted by your other devices and can read your older encrypted messages."
+          )
+        }
+      }
+      if let appLock = viewModel.appLock {
+        AppLockSection(lock: appLock)
+      }
+      Section {
+        if let devices = viewModel.devices {
+          NavigationLink {
+            DevicesScreen(viewModel: devices)
+          } label: {
+            Label("Devices", systemImage: "laptopcomputer.and.iphone")
+          }
+        }
+        NavigationLink {
+          BlockedUsersScreen(viewModel: viewModel)
+        } label: {
+          Label("Blocked people", systemImage: "hand.raised")
+        }
+      }
       Section {
         LabeledContent("Chat backup", value: statusText)
       } footer: {
@@ -151,6 +303,12 @@ struct SecurityScreen: View {
       }
     }
     .twakeTitle("Privacy & Security")
+    .task { await viewModel.verification?.refreshState() }
+    .sheet(isPresented: $isVerifying) {
+      if let verification = viewModel.verification {
+        VerificationSheet(viewModel: verification)
+      }
+    }
     .animation(.spring(response: 0.35, dampingFraction: 0.8), value: viewModel.didRecover)
     .sheet(
       isPresented: Binding(
@@ -267,5 +425,63 @@ struct AboutScreen: View {
       }
     }
     .twakeTitle("About")
+  }
+}
+
+/// The people the user blocked; swipe or tap Unblock to see their messages and invitations again.
+struct BlockedUsersScreen: View {
+  let viewModel: SettingsViewModel
+  @State private var confirming: BlockedUser?
+
+  var body: some View {
+    Group {
+      if let users = viewModel.blockedUsers {
+        if users.isEmpty {
+          ContentUnavailableView(
+            "No one blocked", systemImage: "hand.raised",
+            description: Text("People you block from a chat show here."))
+        } else {
+          List {
+            ForEach(users) { user in
+              HStack(spacing: 12) {
+                TwakeAvatar(name: user.name, size: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                  Text(user.name).lineLimit(1)
+                  if user.displayName != nil {
+                    Text(user.id).font(.footnote).foregroundStyle(SysColors.textSecondary)
+                      .lineLimit(1)
+                  }
+                }
+                Spacer()
+                Button("Unblock") { confirming = user }
+                  .buttonStyle(.bordered)
+              }
+              .swipeActions {
+                Button("Unblock") { confirming = user }.tint(SysColors.primary)
+              }
+            }
+            if let message = viewModel.errorMessage {
+              Text(message).foregroundStyle(SysColors.error)
+            }
+          }
+          .refreshable { await viewModel.loadBlockedUsers() }
+        }
+      } else {
+        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+      }
+    }
+    .navigationTitle("Blocked people")
+    .task { await viewModel.loadBlockedUsers() }
+    .confirmationDialog(
+      confirming.map { "Unblock \($0.name)?" } ?? "",
+      isPresented: Binding(get: { confirming != nil }, set: { if !$0 { confirming = nil } }),
+      titleVisibility: .visible
+    ) {
+      Button("Unblock") {
+        if let user = confirming { Task { await viewModel.unblock(user) } }
+      }
+    } message: {
+      Text("Their messages and invitations will show again.")
+    }
   }
 }
