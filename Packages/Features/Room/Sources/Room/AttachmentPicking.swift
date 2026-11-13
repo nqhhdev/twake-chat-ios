@@ -1,3 +1,4 @@
+import AVFoundation
 import DesignSystem
 import Domain
 import Foundation
@@ -9,7 +10,8 @@ import UniformTypeIdentifiers
 /// documents from the Files app (iCloud Drive, Google Drive, Twake Drive or any other file provider). Each is copied into
 /// a temporary folder of the app, so the upload never reads a security-scoped or remote URL.
 enum AttachmentLoader {
-  struct Loaded {
+  struct Loaded: Identifiable {
+    let id = UUID()
     let kind: OutgoingAttachment.Kind
     let fileURL: URL
     let mimeType: String?
@@ -80,6 +82,8 @@ struct AttachmentButton: View {
   @State private var isGalleryShown = false
   @State private var isDocumentPickerShown = false
   @State private var pickedPhotos: [PhotosPickerItem] = []
+  /// What was picked, shown before sending.
+  @State private var preview: PickedBatch?
 
   var body: some View {
     Menu {
@@ -101,10 +105,11 @@ struct AttachmentButton: View {
       guard !items.isEmpty else { return }
       pickedPhotos = []
       Task {
+        var loaded: [AttachmentLoader.Loaded] = []
         for item in items {
-          guard let loaded = await AttachmentLoader.load(item) else { continue }
-          await send(loaded)
+          if let one = await AttachmentLoader.load(item) { loaded.append(one) }
         }
+        if !loaded.isEmpty { preview = PickedBatch(items: loaded) }
       }
     }
     .fileImporter(
@@ -113,20 +118,237 @@ struct AttachmentButton: View {
     ) {
       result in
       guard case .success(let urls) = result else { return }
-      Task {
-        for url in urls {
-          guard let loaded = AttachmentLoader.load(document: url) else { continue }
-          await send(loaded)
+      let loaded = urls.compactMap(AttachmentLoader.load(document:))
+      if !loaded.isEmpty { preview = PickedBatch(items: loaded) }
+    }
+    .sheet(item: $preview) { batch in
+      SendPreviewSheet(items: batch.items, viewModel: viewModel)
+    }
+  }
+}
+
+/// The items one pick returned, shown in the preview.
+struct PickedBatch: Identifiable {
+  let id = UUID()
+  let items: [AttachmentLoader.Loaded]
+}
+
+/// What is about to be sent (Flutter `send_media_native_dialog`): pictures and videos large, files as rows, each
+/// removable, and one caption for the batch, prefilled with the composer's draft. Cancel deletes the copies and
+/// sends nothing.
+struct SendPreviewSheet: View {
+  let viewModel: RoomViewModel
+  @State private var items: [AttachmentLoader.Loaded]
+  @State private var caption: String
+  @State private var page: UUID?
+  @Environment(\.dismiss) private var dismiss
+  @FocusState private var isCaptionFocused: Bool
+
+  init(items: [AttachmentLoader.Loaded], viewModel: RoomViewModel) {
+    self.viewModel = viewModel
+    _items = State(initialValue: items)
+    _caption = State(initialValue: viewModel.draft)
+  }
+
+  var body: some View {
+    NavigationStack {
+      VStack(spacing: 0) {
+        if items.allSatisfy(\.isVisual) {
+          pictures
+        } else {
+          files
+        }
+        captionBar
+      }
+      .background(SysColors.background)
+      .navigationTitle(title)
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Cancel") {
+            items.forEach(AttachmentLoader.remove)
+            dismiss()
+          }
+        }
+      }
+    }
+    .presentationDetents(items.allSatisfy(\.isVisual) ? [.large] : [.medium, .large])
+    .interactiveDismissDisabled()
+  }
+
+  private var title: String {
+    let count = items.count
+    if items.allSatisfy(\.isVisual) {
+      return count == 1 ? "1 item" : "\(count) items"
+    }
+    return count == 1 ? "1 file" : "\(count) files"
+  }
+
+  /// Pictures and videos, one per page, with the others as a strip of thumbnails to jump to or remove.
+  private var pictures: some View {
+    VStack(spacing: 12) {
+      ScrollView(.horizontal) {
+        LazyHStack(spacing: 0) {
+          ForEach(items) { item in
+            LocalPreview(item: item)
+              .containerRelativeFrame([.horizontal, .vertical])
+              .id(item.id)
+          }
+        }
+        .scrollTargetLayout()
+      }
+      .scrollTargetBehavior(.paging)
+      .scrollIndicators(.hidden)
+      .scrollPosition(id: $page)
+      if items.count > 1 {
+        ScrollView(.horizontal) {
+          HStack(spacing: 8) {
+            ForEach(items) { item in
+              Button {
+                withAnimation { page = item.id }
+              } label: {
+                LocalPreview(item: item)
+                  .frame(width: 56, height: 56)
+                  .clipShape(.rect(cornerRadius: 8))
+                  .overlay {
+                    RoundedRectangle(cornerRadius: 8)
+                      .stroke(SysColors.primary, lineWidth: page == item.id ? 2 : 0)
+                  }
+              }
+              .buttonStyle(.plain)
+              .overlay(alignment: .topTrailing) { removeButton(item).offset(x: 6, y: -6) }
+            }
+          }
+          .padding(.horizontal, 16)
+          .padding(.top, 6)
+        }
+        .scrollIndicators(.hidden)
+      }
+    }
+    .onAppear { page = items.first?.id }
+  }
+
+  private var files: some View {
+    List {
+      ForEach(items) { item in
+        HStack(spacing: 12) {
+          ZStack {
+            RoundedRectangle(cornerRadius: 8).fill(SysColors.primary.opacity(0.12))
+            Image(systemName: item.isVisual ? "photo" : "doc.fill")
+              .foregroundStyle(SysColors.primary)
+          }
+          .frame(width: 40, height: 40)
+          VStack(alignment: .leading, spacing: 2) {
+            Text(item.fileURL.lastPathComponent).lineLimit(2)
+            if let size = RoomViewModel.sizeText(item.size) {
+              Text(size).font(.footnote).foregroundStyle(SysColors.textSecondary)
+            }
+          }
+        }
+        .swipeActions {
+          Button("Remove", systemImage: "trash", role: .destructive) { remove(item) }
         }
       }
     }
   }
 
-  private func send(_ loaded: AttachmentLoader.Loaded) async {
-    await viewModel.send(
-      attachment: loaded.kind, fileURL: loaded.fileURL, mimeType: loaded.mimeType, size: loaded.size
-    )
-    AttachmentLoader.remove(loaded)
+  private func removeButton(_ item: AttachmentLoader.Loaded) -> some View {
+    Button {
+      remove(item)
+    } label: {
+      Image(systemName: "xmark.circle.fill")
+        .symbolRenderingMode(.palette)
+        .foregroundStyle(.white, .black.opacity(0.6))
+        .font(.system(size: 18))
+    }
+    .accessibilityLabel("Remove")
+  }
+
+  private func remove(_ item: AttachmentLoader.Loaded) {
+    AttachmentLoader.remove(item)
+    withAnimation { items.removeAll { $0.id == item.id } }
+    if items.isEmpty {
+      dismiss()
+    } else if page == item.id {
+      page = items.first?.id
+    }
+  }
+
+  private var captionBar: some View {
+    HStack(alignment: .bottom, spacing: 10) {
+      TextField("Add a caption…", text: $caption, axis: .vertical)
+        .lineLimit(1...4)
+        .focused($isCaptionFocused)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(SysColors.surface, in: .rect(cornerRadius: 20))
+      Button {
+        let batch = items
+        let text = caption
+        dismiss()
+        Task { await viewModel.send(batch: batch, caption: text) }
+      } label: {
+        Image(systemName: "arrow.up")
+          .font(.system(size: 18, weight: .bold))
+          .foregroundStyle(.white)
+          .frame(width: 40, height: 40)
+          .background(SysColors.primary, in: Circle())
+      }
+      .accessibilityLabel("Send")
+      .disabled(items.isEmpty)
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 10)
+    .background(.bar)
+  }
+}
+
+/// A picked picture, or a video's first frame, read from its local copy.
+private struct LocalPreview: View {
+  let item: AttachmentLoader.Loaded
+  @State private var image: UIImage?
+
+  var body: some View {
+    ZStack {
+      Color.black.opacity(0.04)
+      if let image {
+        Image(uiImage: image).resizable().scaledToFit()
+      } else {
+        ProgressView()
+      }
+      if case .video = item.kind {
+        Image(systemName: "play.circle.fill")
+          .font(.system(size: 36))
+          .foregroundStyle(.white.opacity(0.9))
+          .shadow(radius: 3)
+      }
+    }
+    .task(id: item.id) { image = await item.previewImage() }
+  }
+}
+
+extension AttachmentLoader.Loaded {
+  /// A picture or a video.
+  var isVisual: Bool {
+    switch kind {
+    case .image, .video: true
+    default: false
+    }
+  }
+
+  /// The picture itself, or a video's first frame.
+  func previewImage() async -> UIImage? {
+    switch kind {
+    case .image:
+      return UIImage(contentsOfFile: fileURL.path(percentEncoded: false))
+    case .video:
+      let generator = AVAssetImageGenerator(asset: AVURLAsset(url: fileURL))
+      generator.appliesPreferredTrackTransform = true
+      guard let frame = try? await generator.image(at: .zero).image else { return nil }
+      return UIImage(cgImage: frame)
+    default:
+      return nil
+    }
   }
 }
 
