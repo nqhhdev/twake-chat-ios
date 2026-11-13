@@ -43,6 +43,21 @@ public protocol TimelineRepository: Sendable {
   /// Sends a copy of the message `eventId` (text, picture, file…) to the room `roomId`, without its reply.
   func forward(eventId: String, to roomId: String) async throws(TimelineError)
 
+  /// The text the user left in the composer, kept by the SDK per room; `nil` when there is none.
+  func loadDraft() async -> String?
+
+  /// Keeps the composer's text for the next visit, or clears it when empty.
+  func saveDraft(_ text: String) async
+
+  /// Sends again the messages that failed to send (the SDK pauses a room's send queue after a failure).
+  func retryFailedSends() async
+
+  /// Reports the message `eventId` to the server's moderators, with an optional reason.
+  func report(eventId: String, reason: String?) async throws(TimelineError)
+
+  /// Hides everything from the user `userId` everywhere, as Matrix "ignore" does (the app calls it Block).
+  func ignore(userId: String) async throws(TimelineError)
+
   /// Marks the room as read up to its latest event.
   func markAsRead() async
 

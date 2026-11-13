@@ -21,6 +21,13 @@ struct RoomListRepositoryTests {
       return stream
     }
 
+    func accept(roomId: String) async throws(RoomListError) {}
+    func decline(roomId: String) async throws(RoomListError) {}
+    func setUnread(_ unread: Bool, roomId: String) async throws(RoomListError) {}
+    func setFavourite(_ favourite: Bool, roomId: String) async throws(RoomListError) {}
+    func leave(roomId: String) async throws(RoomListError) {}
+    func setMuted(_ muted: Bool, roomId: String) async throws(RoomListError) {}
+
     func stop() async {
       continuation?.finish()
       continuation = nil

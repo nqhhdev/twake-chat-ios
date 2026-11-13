@@ -8,6 +8,24 @@ public protocol RoomListRepository: Sendable {
   /// second `start()` finishes the stream of the first.
   func start() async throws(RoomListError) -> AsyncStream<[RoomSummary]>
 
+  /// Joins a room the user is invited to.
+  func accept(roomId: String) async throws(RoomListError)
+
+  /// Declines an invitation; the room leaves the list.
+  func decline(roomId: String) async throws(RoomListError)
+
+  /// Marks the room as unread (`true`), or as read up to its latest message (`false`).
+  func setUnread(_ unread: Bool, roomId: String) async throws(RoomListError)
+
+  /// Adds the room to the favourites, or takes it out.
+  func setFavourite(_ favourite: Bool, roomId: String) async throws(RoomListError)
+
+  /// Mutes the room, or goes back to the account's default notifications.
+  func setMuted(_ muted: Bool, roomId: String) async throws(RoomListError)
+
+  /// Leaves a joined room; it leaves the list.
+  func leave(roomId: String) async throws(RoomListError)
+
   /// Stops the updates and sync. Does nothing when not started.
   func stop() async
 }

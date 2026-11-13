@@ -6,4 +6,6 @@ public enum RoomListError: Error, Sendable, Equatable {
   case notSignedIn
   /// Sync or the room list service could not be started.
   case syncUnavailable
+  /// Joining or leaving the room failed.
+  case requestFailed
 }

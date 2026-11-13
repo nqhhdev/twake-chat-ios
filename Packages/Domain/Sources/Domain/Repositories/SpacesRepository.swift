@@ -1,0 +1,43 @@
+import Foundation
+
+/// A room or a sub-space listed in a space (Flutter `space_home`'s channels).
+public struct SpaceChild: Sendable, Equatable, Identifiable {
+  public let id: String
+  public let name: String
+  public let topic: String?
+  public let avatar: MediaReference?
+  public let memberCount: Int
+  /// The user is in it: it opens. Otherwise Join first.
+  public let isJoined: Bool
+  /// A space inside the space: it opens as a space.
+  public let isSpace: Bool
+  /// Servers that can find it, for joining.
+  public let via: [String]
+
+  public init(
+    id: String, name: String, topic: String?, avatar: MediaReference?, memberCount: Int,
+    isJoined: Bool, isSpace: Bool, via: [String]
+  ) {
+    self.id = id
+    self.name = name
+    self.topic = topic
+    self.avatar = avatar
+    self.memberCount = memberCount
+    self.isJoined = isJoined
+    self.isSpace = isSpace
+    self.via = via
+  }
+}
+
+public enum SpacesError: Error, Sendable, Equatable {
+  case notSignedIn
+  case requestFailed
+}
+
+/// What a space holds, and joining it. Implemented in MatrixData (ADR 0006).
+public protocol SpacesRepository: Sendable {
+  /// The rooms and sub-spaces of a space, as far as the server lists them.
+  func children(of spaceId: String) async throws(SpacesError) -> [SpaceChild]
+  /// Joins a room of the space and returns its id.
+  func join(_ child: SpaceChild) async throws(SpacesError) -> String
+}

@@ -17,11 +17,29 @@ public struct RoomSummary: Sendable, Equatable, Identifiable {
   public let unreadCount: Int
   /// Unread messages that mention the user.
   public let mentionCount: Int
+  /// The room's picture, or `nil` when it has none.
+  public let avatar: MediaReference?
+  /// The user is invited and has not joined yet.
+  public let isInvite: Bool
+  /// The user marked the room as a favourite; the list shows favourites first.
+  public let isFavourite: Bool
+  /// A direct chat with one person, rather than a group.
+  public let isDirect: Bool
+  /// The user muted the room: no notification.
+  public let isMuted: Bool
+  /// The user left the room: it is in the archive and opens read-only.
+  public let isArchived: Bool
+  /// A space: it holds rooms instead of messages, and opens as the list of its rooms.
+  public let isSpace: Bool
 
   public init(
     id: String, name: String, lastMessageText: String?, lastMessageSender: String?,
-    lastActivity: Date?, unreadCount: Int = 0, mentionCount: Int = 0
+    lastActivity: Date?, unreadCount: Int = 0, mentionCount: Int = 0, avatar: MediaReference? = nil,
+    isInvite: Bool = false, isFavourite: Bool = false, isDirect: Bool = false,
+    isMuted: Bool = false, isArchived: Bool = false, isSpace: Bool = false
   ) {
+    self.isArchived = isArchived
+    self.isSpace = isSpace
     self.id = id
     self.name = name
     self.lastMessageText = lastMessageText
@@ -29,6 +47,11 @@ public struct RoomSummary: Sendable, Equatable, Identifiable {
     self.lastActivity = lastActivity
     self.unreadCount = unreadCount
     self.mentionCount = mentionCount
+    self.avatar = avatar
+    self.isInvite = isInvite
+    self.isFavourite = isFavourite
+    self.isDirect = isDirect
+    self.isMuted = isMuted
   }
 }
 
