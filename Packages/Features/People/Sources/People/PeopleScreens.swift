@@ -8,7 +8,7 @@ struct PeopleSearchList: View {
 
   var body: some View {
     List {
-      if viewModel.mode == .group, !viewModel.selected.isEmpty {
+      if viewModel.mode != .direct, !viewModel.selected.isEmpty {
         Section("Selected users") {
           ScrollView(.horizontal) {
             HStack(spacing: 12) {
@@ -49,7 +49,7 @@ struct PeopleSearchList: View {
                 .lineLimit(1)
               }
               Spacer()
-              if viewModel.mode == .group {
+              if viewModel.mode != .direct {
                 Image(systemName: viewModel.isSelected(person) ? "checkmark.circle.fill" : "circle")
                   .foregroundStyle(
                     viewModel.isSelected(person) ? SysColors.primary : SysColors.outline
@@ -150,5 +150,34 @@ public struct ContactsScreen: View {
       .scrollContentBackground(.hidden)
       .background(SysColors.background)
       .twakeTitle("Contacts")
+  }
+}
+
+/// People to invite into a room, as the Flutter "Add members" page: search, pick, then Invite. It closes once they are
+/// invited.
+public struct InviteScreen: View {
+  @Bindable var viewModel: PeopleSearchViewModel
+  @Environment(\.dismiss) private var dismiss
+
+  public init(viewModel: PeopleSearchViewModel) {
+    self.viewModel = viewModel
+  }
+
+  public var body: some View {
+    NavigationStack {
+      PeopleSearchList(viewModel: viewModel)
+        .navigationTitle("Add people")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+          ToolbarItem(placement: .cancellationAction) {
+            Button("Cancel") { dismiss() }
+          }
+          ToolbarItem(placement: .confirmationAction) {
+            Button("Invite") { Task { await viewModel.inviteSelected() } }
+              .disabled(viewModel.selected.isEmpty || viewModel.isCreating)
+          }
+        }
+        .onChange(of: viewModel.didInvite) { _, invited in if invited { dismiss() } }
+    }
   }
 }

@@ -76,4 +76,31 @@ struct PeopleSearchViewModelTests {
     await viewModel.tap(alice)
     #expect(viewModel.errorMessage == "Could not start the chat. Please try again.")
   }
+
+  @Test func inviteModePicksPeopleAndInvitesThem() async {
+    var invited: [String] = []
+    let viewModel = PeopleSearchViewModel(
+      mode: .invite, repository: FakePeopleRepository(), debounce: .seconds(60),
+      onOpen: { _, _ in },
+      invite: { ids in
+        invited = ids
+        return true
+      })
+    await viewModel.tap(alice)
+    await viewModel.tap(bob)
+    await viewModel.inviteSelected()
+    #expect(invited == ["@alice:example.org", "@bob:example.org"])
+    #expect(viewModel.didInvite)
+  }
+
+  @Test func aFailedInviteKeepsThePickAndShowsAnError() async {
+    let viewModel = PeopleSearchViewModel(
+      mode: .invite, repository: FakePeopleRepository(), debounce: .seconds(60),
+      onOpen: { _, _ in }, invite: { _ in false })
+    await viewModel.tap(alice)
+    await viewModel.inviteSelected()
+    #expect(!viewModel.didInvite)
+    #expect(viewModel.selected == [alice])
+    #expect(viewModel.errorMessage == "Could not invite. Please try again.")
+  }
 }
