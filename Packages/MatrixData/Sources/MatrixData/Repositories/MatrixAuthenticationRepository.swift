@@ -178,3 +178,13 @@ public actor MatrixAuthenticationRepository: AuthenticationRepository {
     }
   }
 }
+
+extension MatrixAuthenticationRepository: SyncLifecycle {
+  public func pauseSync() async {
+    await proxy?.pauseSync()
+  }
+
+  public func resumeSync() async {
+    await proxy?.resumeSync()
+  }
+}

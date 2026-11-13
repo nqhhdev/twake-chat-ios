@@ -101,6 +101,17 @@ public final class ClientProxy: Sendable {
     await sync.release(objects.id)
   }
 
+  /// Stops the running sync service without releasing what it feeds, for the app in the background. Does nothing when
+  /// sync is not running.
+  func pauseSync() async {
+    await sync.pause()
+  }
+
+  /// Starts the paused sync service again. Does nothing when sync was never started or was stopped for good.
+  func resumeSync() async {
+    await sync.resume()
+  }
+
   /// Stops the sync service, after releasing what `keepWhileSyncing` kept. Does nothing when it is not running.
   func stopSync() async {
     await sync.stop()
@@ -190,6 +201,17 @@ private actor SyncServiceHolder {
       if running == task { running = nil }
       throw error
     }
+  }
+
+  /// Stops the SDK sync service but keeps it and what it feeds, so `resume` continues the same room lists and timelines.
+  func pause() async {
+    guard let task = running, let service = try? await task.value else { return }
+    await service.stop()
+  }
+
+  func resume() async {
+    guard !isClosed, let task = running, let service = try? await task.value else { return }
+    await service.start()
   }
 
   func stop() async {

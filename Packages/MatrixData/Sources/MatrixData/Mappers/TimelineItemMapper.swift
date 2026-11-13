@@ -14,6 +14,11 @@ enum TimelineItemMapper {
       event, content, sender: name(event.sender, event.senderProfile), ownUserId: ownUserId)
   }
 
+  private static func senderAvatar(_ profile: ProfileDetails) -> MediaReference? {
+    guard case .ready(_, _, let url) = profile else { return nil }
+    return RoomSummaryMapper.avatar(url)
+  }
+
   /// A short text made only of emojis (up to three), which the room shows large.
   private static func isEmojiOnly(_ body: TimelineMessage.Body, _ event: EventTimelineItem) -> Bool
   {
@@ -54,7 +59,11 @@ enum TimelineItemMapper {
       }
       return nil
     case .state(_, let content):
-      return state(content, sender: sender).map { .init(id: id, kind: .stateNotice($0)) }
+      return state(content, sender: sender).map {
+        .init(id: id, kind: .stateNotice($0.text), visibility: $0.visibility)
+      }
+    case .failedToParseMessageLike(let eventType, _), .failedToParseState(let eventType, _, _):
+      return .init(id: id, kind: .stateNotice(unknown(eventType)), visibility: .unknown)
     default:
       return nil
     }
@@ -67,12 +76,14 @@ enum TimelineItemMapper {
       if case .eventId(let value) = event.eventOrTransactionId { value } else { nil }
     var isEdited = false
     var media: MediaReference?
+    var formatted: AttributedString?
     let body: TimelineMessage.Body
     switch content.kind {
     case .message(let message):
       isEdited = message.isEdited
       body = Self.body(message.msgType)
       media = Self.media(message.msgType)
+      formatted = Self.formatted(message.msgType)
     case .sticker(let text, let info, let source):
       body = .sticker(text)
       media = reference(
@@ -85,13 +96,31 @@ enum TimelineItemMapper {
     let reactions = content.reactions.map { reaction in
       TimelineMessage.Reaction(
         key: reaction.key, count: reaction.senders.count,
-        includesOwn: reaction.senders.contains { $0.senderId == ownUserId })
+        includesOwn: reaction.senders.contains { $0.senderId == ownUserId },
+        senderIds: reaction.senders.sorted { $0.timestamp < $1.timestamp }.map(\.senderId))
     }
     return TimelineMessage(
       eventId: eventId, senderId: event.sender, senderName: sender, isOwn: event.isOwn,
       date: date(event.timestamp), body: body, isEdited: isEdited, reactions: reactions,
       reply: content.inReplyTo.map(reply), sendState: sendState(event.localSendState), media: media,
-      isEmojiOnly: isEmojiOnly(body, event))
+      isEmojiOnly: isEmojiOnly(body, event), senderAvatar: senderAvatar(event.senderProfile),
+      readCount: event.readReceipts.keys.filter { $0 != ownUserId }.count,
+      readerIds: event.readReceipts.keys.filter { $0 != ownUserId }.sorted(),
+      replyToEventId: content.inReplyTo?.eventId(), formatted: formatted)
+  }
+
+  /// The HTML body of a text, emote or notice as styled text, as the web client renders it; `nil` without one.
+  static func formatted(_ type: MessageType) -> AttributedString? {
+    let formatted: FormattedBody? =
+      switch type {
+      case .text(let content): content.formatted
+      case .emote(let content): content.formatted
+      case .notice(let content): content.formatted
+      default: nil
+      }
+    guard let formatted, case .html = formatted.format, !formatted.body.isEmpty else { return nil }
+    let rendered = MatrixHTML.attributedString(from: formatted.body)
+    return rendered.characters.isEmpty ? nil : rendered
   }
 
   static func body(_ type: MessageType) -> TimelineMessage.Body {
@@ -153,7 +182,7 @@ enum TimelineItemMapper {
         case .sticker(let body, _, _): text = body
         case .poll(let question, _, _, _, _, _, _): text = question
         case .redacted: text = "This message has been deleted"
-        case .unableToDecrypt: text = "This message has been encrypted"
+        case .unableToDecrypt: text = "Waiting for this message"
         default: text = nil
         }
       }
@@ -175,7 +204,7 @@ enum TimelineItemMapper {
     case .file(let name): "📁 \(name)"
     case .poll(let question): question
     case .redacted: "This message has been deleted"
-    case .unableToDecrypt: "This message has been encrypted"
+    case .unableToDecrypt: "Waiting for this message"
     case .unsupported: "Unknown event"
     }
   }
@@ -196,14 +225,60 @@ enum TimelineItemMapper {
     }
   }
 
-  private static func state(_ content: OtherState, sender: String) -> String? {
+  /// A room state event as a notice, and which chat setting can hide it (Flutter `EventTypeRules`): the room's name,
+  /// picture and creation always show; its settings are unimportant; pinned messages, aliases and server rules never
+  /// show; any other kind is unknown.
+  static func state(_ content: OtherState, sender: String) -> (
+    text: String, visibility: Domain.TimelineItem.Visibility
+  )? {
     switch content {
-    case .roomCreate: "💬 \(sender) created the chat"
-    case .roomEncryption: "🔐 \(sender) activated end to end encryption"
-    case .roomName(let name?): "\(sender) changed the chat name to: '\(name)'"
-    case .roomTopic(let topic?): "\(sender) changed the chat description to: '\(topic)'"
-    case .roomAvatar: "\(sender) changed the chat avatar"
-    default: nil
+    case .roomCreate: ("💬 \(sender) created the chat", .always)
+    case .roomName(let name?): ("\(sender) changed the chat name to: '\(name)'", .always)
+    case .roomAvatar: ("\(sender) changed the chat avatar", .always)
+    case .roomEncryption: ("🔐 \(sender) activated end to end encryption", .unimportant)
+    case .roomTopic(let topic?):
+      ("\(sender) changed the chat description to: '\(topic)'", .unimportant)
+    case .roomTopic(nil): ("\(sender) removed the chat description", .unimportant)
+    case .roomJoinRules(let rule):
+      (joinRuleText(rule, sender: sender), .unimportant)
+    case .roomHistoryVisibility(let visibility):
+      ("\(sender) changed the history visibility to: \(historyText(visibility))", .unimportant)
+    case .roomGuestAccess: ("\(sender) changed the guest access rules", .unimportant)
+    case .roomPowerLevels: ("\(sender) changed the chat permissions", .unimportant)
+    case .roomName(nil), .roomCanonicalAlias, .roomPinnedEvents, .roomServerAcl: nil
+    case .policyRuleRoom: (unknown("m.policy.rule.room"), .unknown)
+    case .policyRuleServer: (unknown("m.policy.rule.server"), .unknown)
+    case .policyRuleUser: (unknown("m.policy.rule.user"), .unknown)
+    case .roomAliases: (unknown("m.room.aliases"), .unknown)
+    case .roomThirdPartyInvite: (unknown("m.room.third_party_invite"), .unknown)
+    case .roomTombstone: ("This chat has been upgraded", .always)
+    case .spaceChild: (unknown("m.space.child"), .unknown)
+    case .spaceParent: (unknown("m.space.parent"), .unknown)
+    case .custom(let eventType): (unknown(eventType), .unknown)
+    }
+  }
+
+  /// The Flutter app's line for an event it cannot show (`unknownEvent`).
+  static func unknown(_ eventType: String) -> String { "Unknown event '\(eventType)'" }
+
+  private static func joinRuleText(_ rule: JoinRule?, sender: String) -> String {
+    let name: String? =
+      switch rule {
+      case .public: "Anyone can join"
+      case .invite: "Invited users only"
+      case .knock: "Anyone can ask to join"
+      default: nil
+      }
+    guard let name else { return "\(sender) changed the join rules" }
+    return "\(sender) changed the join rules to: \(name)"
+  }
+
+  private static func historyText(_ visibility: HistoryVisibility) -> String {
+    switch visibility {
+    case .invited: "From the invitation"
+    case .joined: "From joining"
+    case .shared: "Visible for all participants"
+    default: "Visible for everyone"
     }
   }
 

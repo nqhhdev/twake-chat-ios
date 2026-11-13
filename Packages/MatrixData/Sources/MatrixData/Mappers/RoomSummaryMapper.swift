@@ -14,7 +14,10 @@ enum RoomSummaryMapper {
       id: base.id, name: base.name, lastMessageText: base.lastMessageText,
       lastMessageSender: base.lastMessageSender, lastActivity: base.lastActivity,
       unreadCount: Int(clamping: max(info.numUnreadMessages, info.isMarkedUnread ? 1 : 0)),
-      mentionCount: Int(clamping: info.numUnreadMentions))
+      mentionCount: Int(clamping: info.numUnreadMentions), avatar: avatar(of: info),
+      isInvite: room.membership() == .invited, isFavourite: info.isFavourite,
+      isDirect: info.isDirect, isMuted: info.cachedUserDefinedNotificationMode == .mute,
+      isArchived: room.membership() == .left, isSpace: info.isSpace)
   }
 
   /// - Name: the display name, or the room id when the room has none.
@@ -51,6 +54,20 @@ enum RoomSummaryMapper {
   private static func senderName(_ sender: String, _ profile: ProfileDetails) -> String {
     if case .ready(let displayName?, _, _) = profile, !displayName.isEmpty { return displayName }
     return sender
+  }
+
+  /// The room's picture; a room without one that has a single other member (a direct chat) shows that person's, as
+  /// Element X and the Flutter app do.
+  static func avatar(of info: RoomInfo) -> MediaReference? {
+    if let room = avatar(info.avatarUrl) { return room }
+    guard info.heroes.count == 1 else { return nil }
+    return avatar(info.heroes[0].avatarUrl)
+  }
+
+  /// A picture's `mxc://` URL as a media reference the media repository loads.
+  static func avatar(_ url: String?) -> MediaReference? {
+    guard let url, !url.isEmpty, let source = try? MediaSource.fromUrl(url: url) else { return nil }
+    return MediaReference(source: source.toJson(), mimeType: "image/*")
   }
 
   private static func date(_ timestamp: Timestamp) -> Date {

@@ -10,7 +10,7 @@ public actor RoomListProxy: RoomListRepository {
   /// One page large enough for the first version's room list; paging further is not part of this card.
   static let pageSize: UInt32 = 200
 
-  private let clientProxy: @Sendable () async -> ClientProxy?
+  let clientProxy: @Sendable () async -> ClientProxy?
   private var subscription: Subscription?
 
   /// - Parameter authentication: Gives the signed-in client; the room list starts only after login or restore.
@@ -49,7 +49,8 @@ public actor RoomListProxy: RoomListRepository {
       pageSize: Self.pageSize, listener: EntriesListener(updatesContinuation))
     let controller = result.controller()
     // The dynamic adapters publish nothing until a filter is set.
-    _ = controller.setFilter(kind: .joined)
+    // Joined rooms and invitations, as the Flutter chat list shows them.
+    _ = controller.setFilter(kind: .nonLeft)
     let entries = result.entriesStream()
     // The client keeps the SDK list, controller and handle and releases them when sync stops, on logout before the
     // client signs out: freed after the client, they abort the process.
@@ -67,6 +68,67 @@ public actor RoomListProxy: RoomListRepository {
   }
 
   /// Stops following the room list and stops sync, which releases the SDK list. Safe after logout and when not started.
+  public func accept(roomId: String) async throws(Domain.RoomListError) {
+    guard let room = try? await clientProxy()?.client.getRoom(roomId: roomId) else {
+      throw .requestFailed
+    }
+    do { try await room.join() } catch { throw .requestFailed }
+  }
+
+  public func setUnread(_ unread: Bool, roomId: String) async throws(Domain.RoomListError) {
+    let room = try await room(roomId)
+    do {
+      if unread {
+        try await room.setUnreadFlag(newValue: true)
+      } else {
+        try await room.markAsRead(receiptType: .read)
+        try await room.setUnreadFlag(newValue: false)
+      }
+    } catch {
+      throw .requestFailed
+    }
+  }
+
+  public func setFavourite(_ favourite: Bool, roomId: String) async throws(Domain.RoomListError) {
+    let room = try await room(roomId)
+    do { try await room.setIsFavourite(isFavourite: favourite, tagOrder: nil) } catch {
+      throw .requestFailed
+    }
+  }
+
+  public func setMuted(_ muted: Bool, roomId: String) async throws(Domain.RoomListError) {
+    guard let client = await clientProxy()?.client else { throw .requestFailed }
+    let settings = await client.getNotificationSettings()
+    do {
+      if muted {
+        try await settings.setRoomNotificationMode(roomId: roomId, mode: .mute)
+      } else {
+        try await settings.restoreDefaultRoomNotificationMode(roomId: roomId)
+      }
+    } catch {
+      throw .requestFailed
+    }
+  }
+
+  public func leave(roomId: String) async throws(Domain.RoomListError) {
+    let room = try await room(roomId)
+    do { try await room.leave() } catch { throw .requestFailed }
+  }
+
+  private func room(_ roomId: String) async throws(Domain.RoomListError) -> Room {
+    guard let room = try? await clientProxy()?.client.getRoom(roomId: roomId) else {
+      throw .requestFailed
+    }
+    return room
+  }
+
+  public func decline(roomId: String) async throws(Domain.RoomListError) {
+    guard let room = try? await clientProxy()?.client.getRoom(roomId: roomId) else {
+      throw .requestFailed
+    }
+    do { try await room.leave() } catch { throw .requestFailed }
+  }
+
   public func stop() async {
     guard let subscription else { return }
     self.subscription = nil
