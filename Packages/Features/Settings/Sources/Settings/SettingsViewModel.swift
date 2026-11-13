@@ -1,6 +1,8 @@
+import DesignSystem
 import Domain
 import Foundation
 import Observation
+import SwiftUI
 
 /// The Settings tab, as the Flutter `settings` page lists it (`SettingEnum`): the profile, Privacy & Security (chat
 /// backup with the recovery key), Notifications (the defaults for direct and group chats), About, and Logout. Logging out
@@ -9,6 +11,13 @@ import Observation
 public final class SettingsViewModel {
   public let userId: String
   public private(set) var displayName: String
+  /// The user's picture, or `nil`.
+  public private(set) var avatar: MediaReference?
+  @ObservationIgnored private let media: (any MediaRepository)?
+  /// Emoji verification of this session; `nil` hides it.
+  @ObservationIgnored public let verification: VerificationViewModel?
+  /// The account's sessions; `nil` hides them.
+  @ObservationIgnored public let devices: DevicesViewModel?
   public private(set) var recoveryStatus: RecoveryStatus = .unknown
   public private(set) var directMode: NotificationMode = .allMessages
   public private(set) var groupMode: NotificationMode = .allMessages
@@ -18,25 +27,126 @@ public final class SettingsViewModel {
   public private(set) var newRecoveryKey: String?
   public private(set) var didRecover = false
   public private(set) var isLoggingOut = false
+  /// How chats show room events (Flutter Chat settings); every change is saved on this device at once.
+  public var chatDisplay: ChatDisplaySettings {
+    didSet { if chatDisplay != oldValue { chatDisplayStore?.save(chatDisplay) } }
+  }
+  /// Face ID, Touch ID or the passcode when the app opens; `nil` hides it.
+  @ObservationIgnored public let appLock: (any AppLockSettings)?
+  /// Where the chat display settings are kept; `nil` hides the Chat page.
+  @ObservationIgnored private let chatDisplayStore: (any ChatDisplaySettingsStore)?
 
   @ObservationIgnored private let repository: any AccountSettingsRepository
   @ObservationIgnored private let logOutAction: @MainActor () async -> Bool
 
   public init(
     userId: String, repository: any AccountSettingsRepository,
+    media: (any MediaRepository)? = nil,
+    verification: VerificationViewModel? = nil, devices: DevicesViewModel? = nil,
+    chatDisplay: (any ChatDisplaySettingsStore)? = nil,
+    appLock: (any AppLockSettings)? = nil,
     logOut: @escaping @MainActor () async -> Bool
   ) {
+    self.appLock = appLock
+    self.chatDisplayStore = chatDisplay
+    self.chatDisplay = chatDisplay?.load() ?? ChatDisplaySettings()
+    self.verification = verification
+    self.devices = devices
     self.userId = userId
     self.displayName = Self.localpart(of: userId)
     self.repository = repository
+    self.media = media
     self.logOutAction = logOut
+  }
+
+  /// Whether Settings lists the Chat page.
+  public var hasChatPage: Bool { chatDisplayStore != nil }
+
+  /// Loads the user's picture as data, for the avatar.
+  public func picture(_ reference: MediaReference) async -> Data? {
+    try? await media?.thumbnail(reference, width: 192, height: 192)
   }
 
   public func load() async {
     if let name = await repository.displayName() { displayName = name }
+    avatar = await repository.avatar()
     directMode = await repository.defaultNotificationMode(isDirect: true)
     groupMode = await repository.defaultNotificationMode(isDirect: false)
     recoveryStatus = await repository.recoveryStatus()
+  }
+
+  /// The people the user blocked; `nil` until loaded.
+  public private(set) var blockedUsers: [BlockedUser]?
+
+  public func loadBlockedUsers() async {
+    do {
+      blockedUsers = try await repository.blockedUsers()
+    } catch {
+      blockedUsers = []
+      errorMessage = "Could not load the blocked people."
+    }
+  }
+
+  /// Unblocks someone and takes them off the list.
+  public func unblock(_ user: BlockedUser) async {
+    errorMessage = nil
+    do {
+      try await repository.unblock(userId: user.id)
+      withAnimation { blockedUsers?.removeAll { $0.id == user.id } }
+    } catch {
+      errorMessage = "Could not unblock \(user.name). Please try again."
+    }
+  }
+
+  /// A new picture is uploading.
+  public private(set) var isUpdatingPicture = false
+
+  /// Makes a prepared picture the user's avatar (Flutter `settings_profile`), then shows the new one.
+  public func setPicture(_ picture: PreparedPicture) async {
+    guard !isUpdatingPicture else { return }
+    isUpdatingPicture = true
+    defer { isUpdatingPicture = false }
+    errorMessage = nil
+    do {
+      try await repository.setAvatar(
+        PictureUpload(
+          data: picture.jpeg, mimeType: "image/jpeg", width: picture.side, height: picture.side))
+      avatar = await repository.avatar()
+    } catch {
+      errorMessage = "Could not change your picture. Please try again."
+    }
+  }
+
+  /// Removes the user's avatar; others see the initial.
+  public func removePicture() async {
+    guard !isUpdatingPicture else { return }
+    isUpdatingPicture = true
+    defer { isUpdatingPicture = false }
+    errorMessage = nil
+    do {
+      try await repository.removeAvatar()
+      avatar = nil
+    } catch {
+      errorMessage = "Could not remove your picture. Please try again."
+    }
+  }
+
+  /// Changes the display name others see; an empty name is refused. Returns whether it worked.
+  @discardableResult
+  public func rename(to name: String) async -> Bool {
+    let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !name.isEmpty, !isWorking else { return false }
+    isWorking = true
+    defer { isWorking = false }
+    errorMessage = nil
+    do {
+      try await repository.setDisplayName(name)
+      displayName = name
+      return true
+    } catch {
+      errorMessage = "Could not change your name. Please try again."
+      return false
+    }
   }
 
   public func setNotificationMode(_ mode: NotificationMode, isDirect: Bool) async {
