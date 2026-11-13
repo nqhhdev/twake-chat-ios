@@ -1,0 +1,41 @@
+import SwiftUI
+
+/// The system colours of `LinagoraSysColors.material()` in linagora-design-flutter v0.4.2, light and dark.
+/// Values are copied by hand from `lib/colors/linagora_sys_colors.dart`.
+public enum SysColors {
+  public static let primary = ColorToken(0xFF0A_84FF, dark: 0xFF0A_84FF)
+  public static let onPrimary = ColorToken(0xFFFF_FFFF, dark: 0xFFFF_FFFF)
+  public static let primaryContainer = ColorToken(0xFFD2_E9FF, dark: 0xFF2D_2D2E)
+  public static let onPrimaryContainer = ColorToken(0xFF01_57AD, dark: 0xFFC9_CACC)
+  public static let inversePrimary = ColorToken(0xFF9B_C8FF, dark: 0xFF0A_84FF)
+  public static let secondary = ColorToken(0xFF5C_9CE6, dark: 0xFFCC_C2DC)
+  public static let onSecondary = ColorToken(0xFFFF_FFFF, dark: 0xFF33_2D41)
+  public static let secondaryContainer = ColorToken(0xFFE8_F0FA, dark: 0xFF3F_3F3F)
+  public static let onSecondaryContainer = ColorToken(0xFF24_3B55, dark: 0xFFFF_FFFF)
+  public static let tertiary = ColorToken(0xFF8C_9CAF, dark: 0xFFEF_B8C8)
+  public static let onTertiary = ColorToken(0xFFFF_FFFF, dark: 0xFF49_2532)
+  public static let tertiaryContainer = ColorToken(0xFFF9_FAFF, dark: 0xFFD7_E2F5)
+  public static let onTertiaryContainer = ColorToken(0xFF00_0000, dark: 0xFF0A_84FF)
+  public static let error = ColorToken(0xFFFF_3347, dark: 0xFFE6_4646)
+  public static let onError = ColorToken(0xFFFF_FFFF, dark: 0xFFFF_FFFF)
+  public static let errorContainer = ColorToken(0xFFF9_DEDC, dark: 0xFF8C_1D18)
+  public static let onErrorContainer = ColorToken(0xFF41_0E0B, dark: 0xFFF9_DEDC)
+  public static let background = ColorToken(0xFFFF_FBFE, dark: 0xFF1C_1B1F)
+  public static let onBackground = ColorToken(0xFF1C_1B1F, dark: 0xFFE6_E1E5)
+  public static let surface = ColorToken(0xFFF4_F4F4, dark: 0xFF1C_1B1F)
+  public static let onSurface = ColorToken(0xFF1C_1B1F, dark: 0xFFE6_E1E5)
+  public static let surfaceVariant = ColorToken(0xFFF7_F7F8, dark: 0xFF3F_3F3F)
+  public static let onSurfaceVariant = ColorToken(0xFF1C_1B1F, dark: 0xFFCA_C4D0)
+  public static let inverseSurface = ColorToken(0xFF31_3033, dark: 0xFFFF_FFFF)
+  public static let onInverseSurface = ColorToken(0xFFF4_EFF4, dark: 0xFF31_3033)
+  public static let shadow = ColorToken(0xFF00_0000, dark: 0xFF00_0000)
+  public static let surfaceTint = ColorToken(0xFF67_50A4, dark: 0xFFD0_BCFF)
+  public static let outline = ColorToken(0xFFAE_AEC0, dark: 0xFF52_5256)
+  public static let outlineVariant = ColorToken(0xFFCA_C4D0, dark: 0xFF49_454F)
+  // No dark value in the Flutter source: these fall back to the light one.
+  public static let warning = ColorToken(0xFFFF_B300)
+  public static let onWarning = ColorToken(0xFFFF_6F00)
+  public static let success = ColorToken(0xFF00_AD48)
+  public static let onSuccess = ColorToken(0xFFFF_FFFF)
+  public static let textSecondary = ColorToken(0xFF5C_6268)
+}
