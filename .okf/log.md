@@ -35,3 +35,5 @@
 ## 2026-11-13
 * **Decision**: ADR 0021 (decided under the owner's delegation, for review) supersedes ADR 0019 and amends ADR 0008: sign-in follows the Flutter app (TwakeWelcome, Twake ID through the registration site, company server discovery, SSO with the `loginToken`, password only without SSO, in every build). The Data and UI pages, Add a Feature and ADR 0020 point to it.
 * **Change**: The room (timeline and composer) and the adaptive signed-in shell are built; ADR 0022 (decided under the owner's delegation, for review) follows the Flutter width breakpoints for phones, the Duo and iPads. The UI and Data pages describe them. The app has the Twake app icon.
+* **Change**: Messages show their media: thumbnails, a full-screen picture viewer, and file downloads through `MediaRepository` (`MediaProxy`). The UI page describes them.
+* **Change**: The chat details page (members, search, leave) is built; the UI page describes it.

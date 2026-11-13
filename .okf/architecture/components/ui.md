@@ -73,8 +73,14 @@ Info.plist keys, which the `TWAKE_*` build settings fill: staging in Debug, Twak
 DesignSystem only) is the chat: `RoomViewModel` follows the room's `TimelineRepository`, loads older messages, and
 sends, replies to, edits, deletes and reacts to messages; `RoomScreen` shows Twake bubbles (own on the right in
 `primaryContainer`, others white with the sender's avatar and name), day dividers, room events as one-line notices,
-reply quotes and reactions, with the Flutter message menu as a context menu, then `ComposerView`. Media show a label
-and an icon; pictures, files and voice are not downloaded yet. `RoomTestSupport` holds `FakeTimelineRepository`.
+reply quotes and reactions, with the Flutter message menu as a context menu, then `ComposerView`. Pictures, videos and
+stickers show a thumbnail at their aspect ratio (at most the bubble width and 300 pt tall); a tap on a picture opens
+it full screen with pinch to zoom and Share. Voice messages and files show their name and size; a tap downloads them
+(`MediaRepository`, `MediaProxy` in MatrixData) and offers to share or open them. Video and voice do not play in the
+app yet. The room's header opens `RoomDetailsScreen` (the Flutter `chat_details` page): avatar, name, description, address,
+encryption, visibility, the members with search, and Leave chat after a confirmation, which closes the chat
+(`RoomDetailsRepository`, `RoomDetailsProxy` in MatrixData). `RoomTestSupport` holds `FakeTimelineRepository`,
+`FakeMediaRepository` and `FakeRoomDetailsRepository`.
 
 ## Chat list (built, TWAK-66)
 `Packages/Features/ChatList/` (Domain and DesignSystem only) shows the joined rooms after sign-in, in the order the
