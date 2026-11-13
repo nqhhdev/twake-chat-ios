@@ -196,3 +196,29 @@ struct ChatListViewModelTests {
     #expect(ChatListViewModel.preview(of: Self.room("!a:b", "A", text: nil)) == nil)
   }
 }
+
+@MainActor
+struct ChatListSearchTests {
+  @Test func searchFiltersRoomsByName() async {
+    let repository = FakeRoomListRepository()
+    let viewModel = ChatListViewModel(repository: repository) { true }
+    let task = Task { await viewModel.start() }
+    let rooms = [
+      RoomSummary(
+        id: "!a", name: "Design team", lastMessageText: nil, lastMessageSender: nil,
+        lastActivity: nil),
+      RoomSummary(
+        id: "!b", name: "Alice", lastMessageText: nil, lastMessageSender: nil, lastActivity: nil),
+    ]
+    while repository.startCallCount == 0 { await Task.yield() }
+    repository.send(rooms)
+    while viewModel.state != .loaded(rooms) { await Task.yield() }
+    #expect(viewModel.visibleRooms.map(\.id) == ["!a", "!b"])
+    viewModel.query = "design"
+    #expect(viewModel.visibleRooms.map(\.id) == ["!a"])
+    viewModel.query = "  "
+    #expect(viewModel.visibleRooms.count == 2)
+    task.cancel()
+    repository.finish()
+  }
+}

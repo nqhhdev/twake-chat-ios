@@ -7,6 +7,13 @@ import Observation
 @MainActor @Observable
 public final class SignedInViewModel {
   public let userId: String
+
+  /// The name the Settings tab shows: the Matrix id's localpart until the profile is loaded (`@alice:example.org`
+  /// shows "alice").
+  public var displayName: String {
+    let localpart = userId.dropFirst(userId.hasPrefix("@") ? 1 : 0).split(separator: ":").first
+    return localpart.map(String.init) ?? userId
+  }
   public private(set) var isLoggingOut = false
   /// Shown when logout failed and the session is still saved on this device.
   public private(set) var errorMessage: String?

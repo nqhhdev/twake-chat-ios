@@ -154,7 +154,7 @@ struct RootView: View {
     } else if let authentication = coordinator.authentication {
       AuthenticationCoordinatorView(coordinator: authentication) { signedIn in
         if let chatList = coordinator.chatList(for: signedIn) {
-          ChatShell(chatList: chatList, makeRoom: coordinator.room(for:onLeft:))
+          ChatShell(chatList: chatList, signedIn: signedIn, makeRoom: coordinator.room(for:onLeft:))
         }
       }
     } else {

@@ -2,11 +2,11 @@ import DesignSystem
 import Domain
 import SwiftUI
 
-/// The joined rooms, as the Flutter chat list shows them: avatar, name, time of the last message and its preview, and
-/// a Log out button. A tap opens the room through `onSelect`; the open room is highlighted when the list sits beside
+/// The joined rooms, as the Flutter chat list shows them: the centred "Chats" title, the search field (it filters the
+/// rooms by name), then each room's avatar, name, time of the last message and its preview. A tap opens the room through `onSelect`; the open room is highlighted when the list sits beside
 /// it. The app puts it in a navigation stack. It holds no logic.
 public struct ChatListScreen: View {
-  let viewModel: ChatListViewModel
+  @Bindable var viewModel: ChatListViewModel
   let selectedRoomId: String?
   let onSelect: (RoomSummary) -> Void
 
@@ -20,24 +20,53 @@ public struct ChatListScreen: View {
   }
 
   public var body: some View {
-    content
-      .background(SysColors.background)
-      .navigationTitle("Chats")
-      .toolbar {
-        ToolbarItem(placement: .topBarTrailing) {
-          Button("Log out", role: .destructive) {
-            Task { await viewModel.logOut() }
-          }
-          .disabled(viewModel.isLoggingOut)
-        }
+    VStack(spacing: 0) {
+      searchField
+      Rectangle().fill(SysColors.surfaceTint.opacity(0.16)).frame(height: 1)
+      content
+    }
+    .background(SysColors.background)
+    .twakeTitle("Chats")
+    .safeAreaInset(edge: .bottom) {
+      if let message = viewModel.logOutErrorMessage {
+        Text(message).foregroundStyle(SysColors.error).padding()
       }
-      .safeAreaInset(edge: .bottom) {
-        if let message = viewModel.logOutErrorMessage {
-          Text(message).foregroundStyle(SysColors.error).padding()
-        }
-      }
-      .task { await viewModel.start() }
+    }
+    .task { await viewModel.start() }
   }
+
+  /// `ChatListHeaderStyle`: a 57 pt row, padded 16 on the sides and 8 below, holding a field in `surface` with a 24 pt
+  /// radius, a search icon and the hint in titleMedium `neutral[60]`.
+  private var searchField: some View {
+    HStack(spacing: 8) {
+      Image(systemName: "magnifyingglass")
+        .font(.system(size: 20))
+        .foregroundStyle(Self.hintColor)
+      TextField(text: $viewModel.query) {
+        Text("Search").foregroundStyle(Self.hintColor)
+      }
+      .textStyle(TextStyles.titleMedium)
+      .textInputAutocapitalization(.never)
+      .autocorrectionDisabled()
+      .submitLabel(.search)
+      if !viewModel.query.isEmpty {
+        Button {
+          viewModel.query = ""
+        } label: {
+          Image(systemName: "xmark.circle.fill").foregroundStyle(Self.hintColor)
+        }
+        .accessibilityLabel("Clear search")
+      }
+    }
+    .padding(.horizontal, 12)
+    .frame(height: 48)
+    .background(SysColors.surface, in: .rect(cornerRadius: 24))
+    .padding(.horizontal, 16)
+    .padding(.bottom, 8)
+    .frame(height: 57, alignment: .bottom)
+  }
+
+  static let hintColor = RefColors.neutral[tone: 60] ?? SysColors.textSecondary
 
   @ViewBuilder private var content: some View {
     switch viewModel.state {
@@ -47,10 +76,10 @@ public struct ChatListScreen: View {
       ContentUnavailableView("No rooms yet", systemImage: "bubble.left.and.bubble.right")
     case .failed(let message):
       ContentUnavailableView(message, systemImage: "exclamationmark.triangle")
-    case .loaded(let rooms):
+    case .loaded:
       ScrollView {
         LazyVStack(spacing: 0) {
-          ForEach(rooms) { room in
+          ForEach(viewModel.visibleRooms) { room in
             Button {
               onSelect(room)
             } label: {

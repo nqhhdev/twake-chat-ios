@@ -17,6 +17,8 @@ public final class ChatListViewModel {
   }
 
   public private(set) var state: State = .loading
+  /// The search field's text; it filters the rooms by name.
+  public var query = ""
   public private(set) var isLoggingOut = false
   /// Shown when logout failed and the session is still saved on this device.
   public private(set) var logOutErrorMessage: String?
@@ -61,6 +63,14 @@ public final class ChatListViewModel {
     if await !logOutAction() {
       logOutErrorMessage = "Could not log out. Please try again."
     }
+  }
+
+  /// The loaded rooms whose name contains the search text, all of them when it is empty.
+  public var visibleRooms: [RoomSummary] {
+    guard case .loaded(let rooms) = state else { return [] }
+    let text = query.trimmingCharacters(in: .whitespaces)
+    guard !text.isEmpty else { return rooms }
+    return rooms.filter { $0.name.localizedCaseInsensitiveContains(text) }
   }
 
   /// The row's preview: "sender: text", or the text alone when the sender is unknown; `nil` without a text message.
