@@ -20,6 +20,7 @@
 		A1000000000000000000B004 /* MatrixData in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D004 /* MatrixData */; };
 		A1000000000000000000B005 /* Authentication in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D005 /* Authentication */; };
 		A1000000000000000000B006 /* ChatList in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D006 /* ChatList */; };
+		A1000000000000000000B007 /* Room in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D007 /* Room */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -42,6 +43,7 @@
 		A1000000000000000000E004 /* MatrixData */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = MatrixData; path = Packages/MatrixData; sourceTree = "<group>"; };
 		A1000000000000000000E005 /* Authentication */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = Authentication; path = Packages/Features/Authentication; sourceTree = "<group>"; };
 		A1000000000000000000E006 /* ChatList */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = ChatList; path = Packages/Features/ChatList; sourceTree = "<group>"; };
+		A1000000000000000000E007 /* Room */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = Room; path = Packages/Features/Room; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -88,6 +90,7 @@
 				A1000000000000000000B004 /* MatrixData in Frameworks */,
 				A1000000000000000000B005 /* Authentication in Frameworks */,
 				A1000000000000000000B006 /* ChatList in Frameworks */,
+				A1000000000000000000B007 /* Room in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -145,6 +148,7 @@
 				A1000000000000000000E004 /* MatrixData */,
 				A1000000000000000000E005 /* Authentication */,
 				A1000000000000000000E006 /* ChatList */,
+				A1000000000000000000E007 /* Room */,
 			);
 			name = Packages;
 			sourceTree = "<group>";
@@ -175,6 +179,7 @@
 				A1000000000000000000D004 /* MatrixData */,
 				A1000000000000000000D005 /* Authentication */,
 				A1000000000000000000D006 /* ChatList */,
+				A1000000000000000000D007 /* Room */,
 			);
 			productName = TwakeChat;
 			productReference = A10000000000000000000002 /* TwakeChat.app */;
@@ -270,6 +275,7 @@
 				A1000000000000000000C004 /* XCLocalSwiftPackageReference "Packages/MatrixData" */,
 				A1000000000000000000C005 /* XCLocalSwiftPackageReference "Packages/Features/Authentication" */,
 				A1000000000000000000C006 /* XCLocalSwiftPackageReference "Packages/Features/ChatList" */,
+				A1000000000000000000C007 /* XCLocalSwiftPackageReference "Packages/Features/Room" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000005 /* Products */;
@@ -405,6 +411,7 @@
 				CURRENT_PROJECT_VERSION = 2331;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TwakeChat/Info.plist;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -435,6 +442,7 @@
 				CURRENT_PROJECT_VERSION = 2331;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TwakeChat/Info.plist;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -579,6 +587,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/Features/ChatList;
 		};
+		A1000000000000000000C007 /* XCLocalSwiftPackageReference "Packages/Features/Room" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Features/Room;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -633,6 +645,10 @@
 		A1000000000000000000D006 /* ChatList */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ChatList;
+		};
+		A1000000000000000000D007 /* Room */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Room;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

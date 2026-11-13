@@ -78,3 +78,22 @@ extension ListDiff where Element == Room {
     }
   }
 }
+
+extension ListDiff where Element == MatrixRustSDK.TimelineItem {
+  /// The SDK timeline update as a `ListDiff`.
+  init(_ diff: TimelineDiff) {
+    switch diff {
+    case .append(let values): self = .append(values)
+    case .clear: self = .clear
+    case .pushFront(let value): self = .pushFront(value)
+    case .pushBack(let value): self = .pushBack(value)
+    case .popFront: self = .popFront
+    case .popBack: self = .popBack
+    case .insert(let index, let value): self = .insert(index: Int(index), value)
+    case .set(let index, let value): self = .set(index: Int(index), value)
+    case .remove(let index): self = .remove(index: Int(index))
+    case .truncate(let length): self = .truncate(length: Int(length))
+    case .reset(let values): self = .reset(values)
+    }
+  }
+}

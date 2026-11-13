@@ -69,4 +69,15 @@ public final class ChatListViewModel {
     guard let sender = room.lastMessageSender else { return text }
     return "\(sender): \(text)"
   }
+
+  /// The time beside a room: the hour today, the weekday this week, the date before, as the Flutter chat list writes it.
+  public static func timeText(_ date: Date, now: Date = .now, calendar: Calendar = .current)
+    -> String
+  {
+    if calendar.isDate(date, inSameDayAs: now) { return date.formatted(.dateTime.hour().minute()) }
+    if let days = calendar.dateComponents([.day], from: date, to: now).day, days < 7 {
+      return date.formatted(.dateTime.weekday(.abbreviated))
+    }
+    return date.formatted(.dateTime.day().month(.twoDigits).year(.twoDigits))
+  }
 }

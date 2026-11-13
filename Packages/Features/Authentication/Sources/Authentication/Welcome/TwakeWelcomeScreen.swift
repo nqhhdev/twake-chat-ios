@@ -33,6 +33,8 @@ public struct TwakeWelcomeScreen: View {
       buttons
       footer
     }
+    // On a wide screen (an unfolded Duo, an iPad) the buttons keep a phone's width instead of spanning the screen.
+    .frame(maxWidth: TwakeLayout.formMaxWidth)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(Self.gradient.ignoresSafeArea())
     .disabled(viewModel.isLoading)

@@ -56,6 +56,8 @@ public struct ConnectScreen: View {
       .padding(.horizontal, 16)
       Spacer()
     }
+    .frame(maxWidth: TwakeLayout.formMaxWidth)
+    .frame(maxWidth: .infinity)
     .background(SysColors.background)
     .disabled(viewModel.isLoading)
     .overlay {

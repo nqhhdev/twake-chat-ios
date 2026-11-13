@@ -65,6 +65,8 @@ public struct HomeserverPickerScreen: View {
       .padding(16)
       Spacer()
     }
+    .frame(maxWidth: TwakeLayout.formMaxWidth)
+    .frame(maxWidth: .infinity)
     .background(SysColors.background)
     .disabled(viewModel.isLoading)
     .onAppear { isFieldFocused = true }

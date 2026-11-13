@@ -95,6 +95,12 @@ public final class ClientProxy: Sendable {
     await sync.keep(objects)
   }
 
+  /// Cancels and releases objects kept with `keepWhileSyncing` before sync stops, while the client is alive (a room's
+  /// timeline when its screen closes). Does nothing when they are no longer kept.
+  func release(_ objects: SyncBoundObjects) async {
+    await sync.release(objects.id)
+  }
+
   /// Stops the sync service, after releasing what `keepWhileSyncing` kept. Does nothing when it is not running.
   func stopSync() async {
     await sync.stop()
@@ -144,6 +150,8 @@ struct PendingSSOLogin: Sendable {
 struct SyncBoundObjects: Sendable {
   let entries: TaskHandle
   let objects: [any Sendable]
+  /// Names these objects for `ClientProxy.release(_:)`.
+  let id = UUID()
 }
 
 /// Builds and starts at most one `SyncService` per client, also when two callers start it together, and stops it.
@@ -159,6 +167,11 @@ private actor SyncServiceHolder {
     guard running != nil else { return false }
     kept.append(objects)
     return true
+  }
+
+  func release(_ id: UUID) {
+    guard let index = kept.firstIndex(where: { $0.id == id }) else { return }
+    kept.remove(at: index).entries.cancel()
   }
 
   func start(client: Client) async throws -> SyncService {

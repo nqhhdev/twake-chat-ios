@@ -1,8 +1,10 @@
 import Authentication
 import ChatList
+import DesignSystem
 import Domain
 import Foundation
 import Observation
+import Room
 import SwiftUI
 
 /// The root coordinator. At launch it restores the saved session, then hands over to the authentication flow, which
@@ -29,6 +31,7 @@ final class RootCoordinator {
 
   @ObservationIgnored private let repository: any AuthenticationRepository
   @ObservationIgnored private let roomList: (any RoomListRepository)?
+  @ObservationIgnored private let makeTimeline: (String) -> any TimelineRepository
   @ObservationIgnored private let signInConfiguration: SignInConfiguration
   @ObservationIgnored private let webAuthenticator: any WebAuthenticator
 
@@ -39,10 +42,12 @@ final class RootCoordinator {
   ///   - webAuthenticator: Opens the SSO pages.
   init(
     repository: any AuthenticationRepository, roomList: (any RoomListRepository)? = nil,
+    makeTimeline: @escaping (String) -> any TimelineRepository = { _ in UnavailableTimeline() },
     signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator
   ) {
     self.repository = repository
     self.roomList = roomList
+    self.makeTimeline = makeTimeline
     self.signInConfiguration = signInConfiguration
     self.webAuthenticator = webAuthenticator
   }
@@ -63,6 +68,11 @@ final class RootCoordinator {
     }
     chatList = (signedIn, viewModel)
     return viewModel
+  }
+
+  /// A room's screen model on its own timeline; the shell keeps the open one.
+  func room(for summary: RoomSummary) -> RoomViewModel {
+    RoomViewModel(roomId: summary.id, roomName: summary.name, repository: makeTimeline(summary.id))
   }
 
   @ObservationIgnored private var started = false
@@ -135,11 +145,29 @@ struct RootView: View {
     } else if let authentication = coordinator.authentication {
       AuthenticationCoordinatorView(coordinator: authentication) { signedIn in
         if let chatList = coordinator.chatList(for: signedIn) {
-          ChatListScreen(viewModel: chatList)
+          ChatShell(chatList: chatList, makeRoom: coordinator.room(for:))
         }
       }
     } else {
-      Color.clear
+      // Restoring the saved session at launch: the Twake logo, as the Flutter app's splash shows it.
+      TwakeLogo(TwakeLogo.welcomeResource)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(SysColors.background)
     }
   }
+}
+
+/// The timeline of a root built without one (tests that never open a room): it cannot open.
+struct UnavailableTimeline: TimelineRepository {
+  func open() async throws(TimelineError) -> AsyncStream<[TimelineItem]> { throw .unavailable }
+  func loadOlder() async throws(TimelineError) -> Bool { throw .unavailable }
+  func send(text: String) async throws(TimelineError) { throw .unavailable }
+  func reply(text: String, to eventId: String) async throws(TimelineError) { throw .unavailable }
+  func edit(eventId: String, text: String) async throws(TimelineError) { throw .unavailable }
+  func redact(eventId: String) async throws(TimelineError) { throw .unavailable }
+  func toggleReaction(_ key: String, on eventId: String) async throws(TimelineError) {
+    throw .unavailable
+  }
+  func markAsRead() async {}
+  func close() async {}
 }

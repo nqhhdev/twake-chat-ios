@@ -42,6 +42,13 @@
     },
     {
       "target" : {
+        "containerPath" : "container:Packages\/Features\/Room",
+        "identifier" : "RoomTests",
+        "name" : "RoomTests"
+      }
+    },
+    {
+      "target" : {
         "containerPath" : "container:TwakeChat.xcodeproj",
         "identifier" : "A10000000000000000000077",
         "name" : "MatrixDataTests"
