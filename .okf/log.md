@@ -44,3 +44,4 @@
 * **Change**: New People feature package: the Contacts tab and the new chat sheet (direct message or new group) on the user directory; the UI page describes them.
 * **Change**: Pin and forward messages, big emoji messages, unread and mention badges; the UI page describes them.
 * **Change**: Voice messages (hold-to-record, in-bubble player) and in-app video playback; the UI page describes them.
+* **Change**: CI checks format only (owner decision 2026-11-13): `.github/workflows/ci.yml` runs one `format (<module>)` job per module in parallel, each `scripts/lint.sh <path>`; the knowledge-base check, tests and builds left CI and run locally before a pull request. `scripts/lint.sh` takes optional paths. Build and Constraints describe it.

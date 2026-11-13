@@ -1,22 +1,33 @@
 #!/bin/bash
 # Lints every Swift file with swift-format against .swift-format; exits non-zero on any finding.
-# Usage: scripts/lint.sh          check only
-#        scripts/lint.sh --fix    rewrite the same files in place with `swift-format format`
+# Usage: scripts/lint.sh                 check only
+#        scripts/lint.sh --fix           rewrite the same files in place with `swift-format format`
+#        scripts/lint.sh [--fix] PATH... only these folders or files, relative to the repository root
+#                                        (CI checks one module per job)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-mode=lint
-case "${1:-}" in
-  "") ;;
-  --fix) mode=format ;;
-  *) echo "usage: $0 [--fix]" >&2; exit 2 ;;
-esac
+usage() { echo "usage: $0 [--fix] [path ...]" >&2; exit 2; }
 
+mode=lint
 roots=()
-for dir in TwakeChat Packages scripts; do
-  [ -d "$dir" ] && roots+=("$dir")
+for arg in "$@"; do
+  case "$arg" in
+    --fix) mode=format ;;
+    -*) usage ;;
+    *)
+      [ -e "$arg" ] || { echo "$0: no such path: $arg" >&2; exit 2; }
+      roots+=("$arg")
+      ;;
+  esac
 done
+
+if [ ${#roots[@]} -eq 0 ]; then
+  for dir in TwakeChat Packages scripts; do
+    [ -d "$dir" ] && roots+=("$dir")
+  done
+fi
 [ ${#roots[@]} -eq 0 ] && exit 0
 
 # swift-format has no exclude option, so the file list is built here.
