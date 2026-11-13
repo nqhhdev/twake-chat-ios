@@ -25,10 +25,10 @@ is the whole screen (`MediaQuery`), safe areas included.
   with no chat open the right column shows the Twake logo.
 - Sign-in screens keep at most 472 pt of width on a wide screen, centred, so their buttons do not span it.
 - Bubbles hug their content up to `TwakeLayout.bubbleWidth(in:)`.
-- Navigation: the Contacts, Chats and Settings tabs are the Twake bottom bar on a phone held upright and on a folded
-  Duo, and the Twake navigation rail (80 pt, `AdaptiveScaffoldPrimaryNavigation`) on an unfolded Duo, an iPad or any
-  screen on its side. Flutter keeps the bottom bar up to 1239 pt; the owner asked on 2026-11-13 that the navigation
-  adapt to the Duo instead of sitting at the bottom of its wide screen, so the rail starts with two columns here.
+- Navigation: the Contacts, Chats and Settings tabs are Apple's system tab view (SwiftUI `TabView` with `Tab`s,
+  `.sidebarAdaptable`) on every screen, folded or unfolded (owner decision 2026-11-13, replacing the Twake bottom bar
+  and navigation rail). iOS draws the tab bar, or a sidebar where the system offers one; on iOS 26 it shrinks while
+  the content scrolls down. A chat pushed over the list on one column hides the tab bar, as Messages does.
 
 ## Consequences
 **Good.** One rule, the Flutter one, for every device; nothing Duo-specific. **Costly.** SwiftUI gives the width

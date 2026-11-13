@@ -7,7 +7,10 @@ status: draft
 ---
 # Notification Service Extension
 
-> Planned. Nothing here exists in the repository yet.
+> Built: the `TwakeChatNSE` target (`TwakeChatNSE/NotificationService.swift`), bundle id `app.twake.ios.chat.nse` as
+> the Flutter app's extension (ADR 0012), embedded in the app. Its content comes from MatrixData's
+> `NotificationContentProxy`. Not yet seen running on a device: `simctl push` does not start notification service
+> extensions, and a real APNs push needs a team-signed build.
 
 | | |
 |---|---|

@@ -36,6 +36,7 @@ status: stable
 | [architecture/containers/app.md](architecture/containers/app.md) | Container | C4 level 2 - the main iOS application: targets, modules, entry point and what it talks to. | [c4, container, ios] |
 | [architecture/containers/backend.md](architecture/containers/backend.md) | Container | C4 level 2 - the servers the app depends on, as seen from the app. | [c4, container, backend, matrix] |
 | [architecture/containers/notification-service-extension.md](architecture/containers/notification-service-extension.md) | Container | C4 level 2 - the separate process that fetches and decrypts a pushed event and rewrites the notification. | [c4, container, push, e2ee] |
+| [architecture/containers/share-extension.md](architecture/containers/share-extension.md) | Container | C4 level 2 - the system share sheet entry that hands what another app shares to the app. | [c4, container, share] |
 | [architecture/context.md](architecture/context.md) | System Context | C4 level 1 - what this app is, who uses it, and which external systems it depends on. | [c4, context, ios] |
 | [backlog/deferred-features.md](backlog/deferred-features.md) | Task | Flutter features left out of v1, to be ordered after v1 is tested. | [roadmap, scope] |
 | [backlog/open-verifications.md](backlog/open-verifications.md) | Task | Assumptions in this knowledge base that nobody has confirmed yet. | [verification] |

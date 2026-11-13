@@ -20,7 +20,7 @@ Taken from the Flutter app's `lib/pages` and `lib/domain` at the baseline commit
 | Search (rooms and in-room) | `search`, `chat_search` | |
 | Spaces, folders | `space_home`, `domain/spaces`, `data/datasource_impl/folders` | |
 | Calls | `dialer`, `domain/video_call` | Needs VoIP push |
-| Forward and share extension | `forward`, `share` | A third target; existing users lose it on update until it is rebuilt ([ADR 0012](../adr/0012-reuse-flutter-bundle-identifier.md)) |
+| Forward and share extension | `forward`, `share` | Built 2026-11-13: forward in the message actions, the `TwakeChatShare` target ([Share Extension](../architecture/containers/share-extension.md)) |
 | Drive picker | `drive_picker`, `domain/drive` | Only on the unmerged branch `feat/tom-3-drive-sso-foundation`, not in the baseline |
 | Multiple accounts | `multiple_accounts` | Affects the session store layout |
 | Chat details, profile, roles | `chat_details`, `chat_profile_info`, `profile_info` | |
