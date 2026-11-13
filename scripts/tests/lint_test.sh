@@ -287,5 +287,16 @@ expect "--fix with a broken .swift-format left the file alone" 0 \
 sed 's/"lineLength" : 100/"lineLength" : "100"/' "$repo/.swift-format" > "$r/.swift-format"
 expect "a .swift-format with a wrongly typed value fails" nonzero "$r/scripts/lint.sh"
 
+# 22. Paths limit the run to those folders, as each CI job checks one module; a missing path is a usage
+# error, and an option other than --fix is still rejected.
+r=$(new_repo paths)
+put "$r" Packages/Core/Sources/Core/Bad.swift "$bad"
+put "$r" TwakeChat/App/Good.swift "$good"
+expect "a clean path passes although another folder has findings" 0 "$r/scripts/lint.sh" TwakeChat
+expect "the path with findings fails" nonzero "$r/scripts/lint.sh" Packages/Core
+expect "several paths are all checked" nonzero "$r/scripts/lint.sh" TwakeChat Packages/Core
+expect "a missing path exits 2" 2 "$r/scripts/lint.sh" Nope
+expect "an unknown option after a path exits 2" 2 "$r/scripts/lint.sh" TwakeChat --frobnicate
+
 echo "$((cases - failures))/$cases passed"
 [ "$failures" -eq 0 ]
