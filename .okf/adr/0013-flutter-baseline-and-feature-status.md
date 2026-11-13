@@ -7,7 +7,7 @@ status: draft
 ---
 # ADR 0013: Port behaviour from one pinned Flutter commit
 
-**Status:** Proposed (2026-11-11), waiting for the project owner.
+**Status:** Proposed (2026-11-11), waiting for the project owner. To be superseded by [ADR 0023](0023-features-from-web-client-ux-from-best-messengers.md) (proposed 2026-11-14).
 
 ## Context
 The native app reproduces behaviour from the Flutter app `twake-on-matrix`. On 2026-11-11 that repository had

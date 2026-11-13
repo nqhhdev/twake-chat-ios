@@ -68,8 +68,8 @@ Info.plist keys, which the `TWAKE_*` build settings fill: staging in Debug, Twak
 
 ## Signed-in shell and room (built)
 `TwakeChat/ChatShell.swift` joins the ChatList, Room and Authentication (Settings) features after sign-in. Its
-Contacts, Chats and Settings tabs are the Twake bottom bar on a phone held upright or a folded Duo and the Twake
-navigation rail on an unfolded Duo, an iPad or a landscape screen; Contacts and the chat list's pencil button are
+Contacts, Chats and Settings tabs are Apple's system tab view (`TabView`, `.sidebarAdaptable`, ADR 0022) on every
+screen, and a chat pushed over the list hides the tab bar; Contacts and the chat list's pencil button are
 `Packages/Features/People/` (`PeopleRepository`, `PeopleProxy` in MatrixData): search Twake's address book on the ToM server
 (`t.server` in `.well-known`, `POST /_twake/identity/v1/lookup/match` with the access token, as the Flutter
 `TomContactAPI` does), then the Matrix user directory, or type a full Matrix id, open the direct chat with someone (the existing one or a new encrypted one), or pick people
