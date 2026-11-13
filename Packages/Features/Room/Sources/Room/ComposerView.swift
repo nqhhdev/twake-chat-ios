@@ -1,0 +1,206 @@
+import DesignSystem
+import Domain
+import SwiftUI
+
+/// The Flutter chat input: a banner while replying or editing, a rounded text field that grows to a few lines, and the
+/// send button, shown when there is text. The banner slides up, the send button pops in, bounces and taps the haptic
+/// engine on each send, as in Telegram and iMessage.
+struct ComposerView: View {
+  @Bindable var viewModel: RoomViewModel
+  @FocusState private var isFocused: Bool
+  @State private var recorder = VoiceRecorder()
+  /// How far the mic is dragged to the leading side; past `cancelDistance` the recording is dropped.
+  @State private var dragOffset: CGFloat = 0
+  private static let cancelDistance: CGFloat = 100
+
+  var body: some View {
+    VStack(spacing: 0) {
+      banner
+      if let typing = viewModel.typingText {
+        TypingIndicator(text: typing)
+          .transition(.move(edge: .bottom).combined(with: .opacity))
+      }
+      if viewModel.uploadCount > 0 {
+        ProgressView("Sending…")
+          .textStyle(TextStyles.bodySmall)
+          .padding(.vertical, 4)
+          .transition(.opacity)
+      }
+      HStack(alignment: .bottom, spacing: 8) {
+        if recorder.isRecording {
+          recordingBar
+        } else {
+          AttachmentButton(viewModel: viewModel)
+            .transition(.scale.combined(with: .opacity))
+          field
+        }
+        if viewModel.canSend {
+          sendButton
+        } else {
+          micButton
+        }
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 8)
+    }
+    .background(SysColors.background)
+    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: viewModel.canSend)
+    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: recorder.isRecording)
+    .animation(.spring(response: 0.35, dampingFraction: 0.85), value: viewModel.composerMode)
+    .sensoryFeedback(.impact(weight: .light), trigger: viewModel.sendCount)
+    .sensoryFeedback(.impact(weight: .medium), trigger: recorder.isRecording)
+    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: viewModel.typingText)
+    .animation(.easeInOut(duration: 0.2), value: viewModel.uploadCount)
+    .onChange(of: viewModel.draft) { old, new in
+      Task { await viewModel.draftDidChange(from: old, to: new) }
+    }
+    .onChange(of: viewModel.composerMode) { _, mode in
+      if mode != .new { isFocused = true }
+    }
+    .alert(
+      "Microphone access is off",
+      isPresented: Binding(get: { recorder.permissionDenied }, set: { _ in })
+    ) {
+      Button("OK", role: .cancel) {}
+    } message: {
+      Text("Allow Twake Chat to use the microphone in Settings to record voice messages.")
+    }
+  }
+
+  private var field: some View {
+    TextField("Type a message", text: $viewModel.draft, axis: .vertical)
+      .textStyle(TextStyles.bodyLarge)
+      .lineLimit(1...6)
+      .focused($isFocused)
+      .padding(.horizontal, 16)
+      .padding(.vertical, 10)
+      .background(SysColors.surface, in: .rect(cornerRadius: 24))
+  }
+
+  private var sendButton: some View {
+    Button {
+      Task { await viewModel.send() }
+    } label: {
+      Image(systemName: isEditing ? "checkmark" : "paperplane.fill")
+        .font(.system(size: 18, weight: .semibold))
+        .foregroundStyle(SysColors.onPrimary)
+        .symbolEffect(.bounce, value: viewModel.sendCount)
+        .contentTransition(.symbolEffect(.replace))
+        .frame(width: 44, height: 44)
+        .background(SysColors.primary, in: Circle())
+    }
+    .buttonStyle(PressScaleButtonStyle())
+    .accessibilityLabel(isEditing ? "Save the edit" : "Send message")
+    .transition(.scale(scale: 0.4).combined(with: .opacity))
+  }
+
+  /// Hold to record; slide left to cancel; release to send. The button grows while recording.
+  private var micButton: some View {
+    Image(systemName: "mic.fill")
+      .font(.system(size: 18, weight: .semibold))
+      .foregroundStyle(recorder.isRecording ? SysColors.onPrimary : SysColors.primary)
+      .frame(width: 44, height: 44)
+      .background(recorder.isRecording ? SysColors.primary : SysColors.surface, in: Circle())
+      .scaleEffect(recorder.isRecording ? 1.35 + CGFloat(recorder.level) * 0.25 : 1)
+      .offset(x: dragOffset)
+      .animation(.easeOut(duration: 0.1), value: recorder.level)
+      .gesture(
+        DragGesture(minimumDistance: 0)
+          .onChanged { value in
+            if !recorder.isRecording, dragOffset == 0, value.translation == .zero {
+              Task { await recorder.start() }
+            }
+            dragOffset = min(0, value.translation.width)
+          }
+          .onEnded { _ in
+            let cancelled = -dragOffset >= Self.cancelDistance
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { dragOffset = 0 }
+            guard let recording = recorder.stop(keep: !cancelled) else { return }
+            Task {
+              await viewModel.send(
+                attachment: .voice(duration: recording.duration, waveform: recording.waveform),
+                fileURL: recording.url, mimeType: "audio/mp4", size: nil)
+              try? FileManager.default.removeItem(at: recording.url.deletingLastPathComponent())
+            }
+          }
+      )
+      .accessibilityLabel("Hold to record a voice message")
+      .transition(.scale(scale: 0.4).combined(with: .opacity))
+  }
+
+  /// While recording: a pulsing red dot, the time, and "Slide to cancel", which fades as the mic slides left.
+  private var recordingBar: some View {
+    HStack(spacing: 8) {
+      Circle()
+        .fill(SysColors.error)
+        .frame(width: 10, height: 10)
+        .phaseAnimator([1.0, 0.3]) { dot, opacity in
+          dot.opacity(opacity)
+        } animation: { _ in
+          .easeInOut(duration: 0.6)
+        }
+      Text(AudioMessageRow.time(recorder.elapsed))
+        .textStyle(TextStyles.bodyLarge)
+        .monospacedDigit()
+        .contentTransition(.numericText())
+      Spacer()
+      Label("Slide to cancel", systemImage: "chevron.left")
+        .textStyle(TextStyles.bodyMedium)
+        .foregroundStyle(SysColors.textSecondary)
+        .opacity(1 - Double(min(1, -dragOffset / Self.cancelDistance)))
+        .offset(x: dragOffset / 3)
+    }
+    .padding(.horizontal, 16)
+    .frame(height: 44)
+    .background(SysColors.surface, in: .rect(cornerRadius: 24))
+    .transition(.move(edge: .trailing).combined(with: .opacity))
+  }
+
+  private var isEditing: Bool {
+    if case .edit = viewModel.composerMode { true } else { false }
+  }
+
+  @ViewBuilder private var banner: some View {
+    switch viewModel.composerMode {
+    case .new:
+      EmptyView()
+    case .reply(_, let reply):
+      ComposerBanner(
+        icon: "arrowshape.turn.up.left", title: "Reply to \(reply.senderName)", text: reply.text,
+        cancel: viewModel.cancelComposerMode
+      )
+      .transition(.move(edge: .bottom).combined(with: .opacity))
+    case .edit:
+      ComposerBanner(icon: "pencil", title: "Edit", text: nil, cancel: viewModel.cancelComposerMode)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+  }
+}
+
+private struct ComposerBanner: View {
+  let icon: String
+  let title: String
+  let text: String?
+  let cancel: () -> Void
+
+  var body: some View {
+    HStack(spacing: 8) {
+      Image(systemName: icon).foregroundStyle(SysColors.primary)
+      VStack(alignment: .leading, spacing: 0) {
+        Text(title).textStyle(TextStyles.labelLarge).foregroundStyle(SysColors.primary)
+        if let text {
+          Text(text).textStyle(TextStyles.bodySmall).foregroundStyle(SysColors.textSecondary)
+            .lineLimit(1)
+        }
+      }
+      Spacer()
+      Button(action: cancel) {
+        Image(systemName: "xmark").foregroundStyle(SysColors.textSecondary)
+      }
+      .accessibilityLabel("Cancel")
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 8)
+    .background(SysColors.surface)
+  }
+}

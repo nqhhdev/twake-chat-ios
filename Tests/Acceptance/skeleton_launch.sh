@@ -2,8 +2,9 @@
 # Runtime acceptance checks for TWAK-34, added by the tester next to skeleton.sh and skeleton_manifests.sh.
 # Those scripts prove the project builds; this one proves the built app runs:
 #   - the Release configuration builds with no warning (VALIDATE_PRODUCT, whole-module), not only Debug;
-#   - on an iOS 26 simulator the app installs, launches, stays running, and shows a blank screen
-#     (no screen content, card "Out of scope"). Owner decision 2026-11-12: iOS 26 only, no iOS 18 launch check.
+#   - on an iOS 26 simulator the app installs, launches, stays running, and shows content: on a new simulator with
+#     no saved session, the Debug build opens on the sign-in form (TWAK-65, ADR 0019). TWAK-34 expected a blank screen
+#     here, before any feature existed. Owner decision 2026-11-12: iOS 26 only, no iOS 18 launch check.
 #
 # Usage, from the repository root:
 #   Tests/Acceptance/skeleton_launch.sh
@@ -128,7 +129,8 @@ launch_on() { # $1 label, $2 iOS major
   local shot="$WORK/$label.png"
   if xcrun simctl io "$udid" screenshot --type=png "$shot" >/dev/null 2>&1; then
     local msg; msg="$(blank_screen "$shot" 2>&1)"
-    if [ $? -eq 0 ]; then pass "$label: blank screen, $msg"; else fail "$label: screen is not blank: $msg"; fi
+    # TWAK-65: the Debug launch shows the sign-in form, so the content area must not be one colour.
+    if [ $? -ne 0 ] && [[ "$msg" == "more than one colour"* ]]; then pass "$label: screen shows content (the sign-in form): $msg"; else fail "$label: screen is blank: $msg"; fi
   else
     fail "$label: could not take a screenshot"
   fi

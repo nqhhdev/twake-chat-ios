@@ -41,7 +41,8 @@ allowed_imports() {
     Domain) echo "Foundation" ;;
     AppShared) echo "Foundation Security OSLog" ;;
     DesignSystem) echo "SwiftUI" ;;
-    MatrixData) echo "Domain AppShared" ;; # the Matrix SDK is added by card e
+    MatrixData) echo "Foundation Domain AppShared MatrixRustSDK" ;; # the Matrix SDK, added by TWAK-48; Foundation for
+    # the URL and FileManager the client proxy needs (TWAK-64), as Domain and AppShared already use it
   esac
 }
 platforms_of() { grep -oE '\.(iOS|macOS|tvOS|watchOS|visionOS)\(\.v[0-9_]+\)' "Packages/$1/Package.swift" | sort | tr '\n' ' ' | sed 's/ $//'; }
@@ -52,7 +53,13 @@ for p in "${PACKAGES[@]}"; do
   check "$p: swift-tools-version 6.2 (Swift 6 mode, complete concurrency)" grep -qE '^// swift-tools-version: ?6\.2' "$m"
   check "$p: warnings are errors" grep -q '\.treatAllWarnings(as: \.error)' "$m"
   check "$p: no unsafeFlags" bash -c "! grep -q unsafeFlags '$m'"
-  check "$p: no remote package dependency" bash -c "! grep -q '\.package(url:' '$m'"
+  if [ "$p" = MatrixData ]; then
+    # TWAK-48: the Matrix SDK is the only remote dependency, pinned exactly (ADR 0003, ADR 0015).
+    check "$p: the only remote package dependency is the Matrix SDK, exact 26.04.01" bash -c \
+      "[ \"\$(grep -o '\.package(url:[^)]*)' '$m')\" = '.package(url: \"https://github.com/matrix-org/matrix-rust-components-swift\", exact: \"26.04.01\")' ]"
+  else
+    check "$p: no remote package dependency" bash -c "! grep -q '\.package(url:' '$m'"
+  fi
   actual="$(grep -oE '\.package\(path: "\.\./[A-Za-z]+"\)' "$m" | sed -E 's/.*\.\.\/([A-Za-z]+).*/\1/' | sort | tr '\n' ' ' | sed 's/ $//')"
   if [ "$actual" = "$(expected_deps "$p")" ]; then pass "$p: package dependencies match ADR 0005 ('$actual')"
   else fail "$p: package dependencies '$actual', ADR 0005 expects '$(expected_deps "$p")'"; fi
@@ -65,28 +72,39 @@ for p in "${PACKAGES[@]}"; do
   if [ -z "$bad" ]; then pass "$p: imports only what ADR 0005 allows"; else fail "$p: imports not allowed by ADR 0005:$bad"; fi
 done
 
-check "MatrixData target depends on the Domain and AppShared products only" bash -c '
-  [ "$(grep -oE "\.product\(name: \"[A-Za-z]+\"" Packages/MatrixData/Package.swift | sort | tr "\n" " ")" = ".product(name: \"AppShared\" .product(name: \"Domain\" " ]'
+check "MatrixData target depends on the Domain, AppShared and MatrixRustSDK products only" bash -c '
+  [ "$(grep -oE "\.product\(name: \"[A-Za-z]+\"" Packages/MatrixData/Package.swift | sort | tr "\n" " ")" = ".product(name: \"AppShared\" .product(name: \"Domain\" .product(name: \"MatrixRustSDK\" " ]'
 
 [ "$(platforms_of Domain)" = ".iOS(.v18) .macOS(.v15)" ] && pass "Domain: iOS 18 and macOS 15" || fail "Domain platforms: $(platforms_of Domain)"
 [ "$(platforms_of AppShared)" = ".iOS(.v18) .macOS(.v15)" ] && pass "AppShared: iOS 18 and macOS 15" || fail "AppShared platforms: $(platforms_of AppShared)"
 [ "$(platforms_of DesignSystem)" = ".iOS(.v18)" ] && pass "DesignSystem: iOS 18 only" || fail "DesignSystem platforms: $(platforms_of DesignSystem)"
 [ "$(platforms_of MatrixData)" = ".iOS(.v18)" ] && pass "MatrixData: iOS 18 only" || fail "MatrixData platforms: $(platforms_of MatrixData)"
 
-check "no Matrix SDK import anywhere" bash -c "! grep -rnE --include='*.swift' 'import[[:space:]]+(MatrixRustSDK|MatrixRustComponents|MatrixSDK|MatrixSDKCrypto)' TwakeChat Packages"
-check "no #available or @available anywhere" bash -c "! grep -rnE --include='*.swift' '#available|#unavailable|@available' TwakeChat Packages"
-check "no Features package (ADR 0011: created with its first feature)" test ! -e Packages/Features
+# TWAK-48: MatrixData imports the SDK; nothing else may (ADR 0006). .build holds the SDK checkout itself.
+check "no Matrix SDK import outside Packages/MatrixData" bash -c "! grep -rnE --include='*.swift' --exclude-dir=.build --exclude-dir=MatrixData 'import[[:space:]]+(MatrixRustSDK|MatrixRustComponents|MatrixSDK|MatrixSDKCrypto)' TwakeChat Packages"
+check "MatrixData imports MatrixRustSDK" grep -qE '^import MatrixRustSDK$' Packages/MatrixData/Sources/MatrixData/MatrixData.swift
+# .build is excluded: `swift test` (TWAK-35) generates a test entry point there that uses @available.
+check "no #available or @available anywhere" bash -c "! grep -rnE --include='*.swift' --exclude-dir=.build '#available|#unavailable|@available' TwakeChat Packages"
+# ADR 0011: the Features folder is created with its first feature. TWAK-65 adds it with Authentication, so the lock now
+# checks that the folder holds only the index manifest and the feature packages. TWAK-66 adds ChatList.
+check "Features holds only the index, Authentication and ChatList (TWAK-65, TWAK-66)" bash -c \
+  "[ \"\$(cd Packages/Features && ls | sort | tr '\\n' ' ')\" = 'Authentication ChatList Package.swift Sources ' ]"
 
 # App target
 check "entry point TwakeChat/TwakeChatApp.swift is @main and shows RootView" bash -c \
-  "grep -q '^@main' TwakeChat/TwakeChatApp.swift && grep -q 'RootView()' TwakeChat/TwakeChatApp.swift"
+  "grep -q '^@main' TwakeChat/TwakeChatApp.swift && grep -qE 'RootView\(coordinator: root\)' TwakeChat/TwakeChatApp.swift"
+# TWAK-65: RootView takes the root coordinator, which the composition root builds.
 check "root view has no screen content" bash -c "! grep -qE '\b(Text|Image|Button|Label|List|NavigationStack)\(' TwakeChat/RootView.swift"
 check "project file exists" test -f "$PBX"
 only_value() { # every occurrence of setting $1 has value $2, and there is at least one
   local values; values="$(grep -E "^[[:space:]]*$1 = " "$PBX" | sed -E "s/^[[:space:]]*$1 = \"?([^\";]*)\"?;.*/\1/" | sort -u)"
   [ "$values" = "$2" ]
 }
-check "PRODUCT_BUNDLE_IDENTIFIER is app.twake.ios.chat (ADR 0012)" only_value PRODUCT_BUNDLE_IDENTIFIER app.twake.ios.chat
+# The test bundles (TWAK-35) use app.twake.ios.chat.tests and app.twake.ios.chat.tests.<module>; every other value
+# must be the app's.
+check "PRODUCT_BUNDLE_IDENTIFIER is app.twake.ios.chat (ADR 0012)" bash -c \
+  "[ \"\$(grep -E '^[[:space:]]*PRODUCT_BUNDLE_IDENTIFIER = ' '$PBX' | grep -vE 'app\.twake\.ios\.chat\.tests(\.[a-z]+)?;' \
+     | sed -E 's/.*= \"?([^\";]*)\"?;.*/\1/' | sort -u)\" = app.twake.ios.chat ]"
 # ADR 0012: version and build numbers above the Flutter app's last release, 2.26.1 (2330) in its pubspec.yaml.
 above_flutter_release() {
   local mv bn; mv="$(grep -E '^[[:space:]]*MARKETING_VERSION = ' "$PBX" | sed -E 's/.*= "?([^";]*)"?;.*/\1/' | sort -u)"
@@ -104,9 +122,20 @@ check "SWIFT_TREAT_WARNINGS_AS_ERRORS is YES" only_value SWIFT_TREAT_WARNINGS_AS
 check "GCC_TREAT_WARNINGS_AS_ERRORS is YES" only_value GCC_TREAT_WARNINGS_AS_ERRORS YES
 check "settings are in both Debug and Release project configurations" bash -c \
   "[ \$(grep -c 'SWIFT_TREAT_WARNINGS_AS_ERRORS = YES' '$PBX') -ge 2 ] && [ \$(grep -c 'IPHONEOS_DEPLOYMENT_TARGET = 18.0' '$PBX') -ge 2 ] && [ \$(grep -c 'SWIFT_VERSION = 6.0' '$PBX') -ge 2 ]"
-check "no development team, entitlements or extension target (out of scope)" bash -c \
-  "! grep -qE 'DEVELOPMENT_TEAM|CODE_SIGN_ENTITLEMENTS|app-extension' '$PBX'"
-check "exactly one native target" bash -c "[ \$(grep -c 'isa = PBXNativeTarget' '$PBX') -eq 1 ]"
+check "no development team or extension target (out of scope)" bash -c \
+  "! grep -qE 'DEVELOPMENT_TEAM|app-extension' '$PBX'"
+# TWAK-63 adds the app's App Group and Keychain access group (ADR 0007, ADR 0012): one entitlements file, nothing else.
+check "the app target's only entitlements file is TwakeChat/TwakeChat.entitlements (ADR 0007)" bash -c \
+  "[ \$(grep -c 'CODE_SIGN_ENTITLEMENTS = TwakeChat/TwakeChat.entitlements;' '$PBX') -eq 2 ] \
+   && [ \$(grep -c 'CODE_SIGN_ENTITLEMENTS' '$PBX') -eq 2 ]"
+check "the entitlements are exactly the App Group and Keychain group of ADR 0007" bash -c \
+  "[ \"\$(plutil -convert json -o - TwakeChat/TwakeChat.entitlements)\" = \
+     '{\"com.apple.security.application-groups\":[\"group.app.twake.ios.chat\"],\"keychain-access-groups\":[\"\$(AppIdentifierPrefix)app.twake.ios.chat\"]}' ]"
+# TWAK-35 adds the TwakeChatTests and MatrixDataTests unit-test bundles; the app stays the only application target.
+check "exactly one application target, and the two test bundles are the only other native targets" bash -c \
+  "[ \$(grep -c 'productType = \"com.apple.product-type.application\"' '$PBX') -eq 1 ] \
+   && [ \$(grep -c 'isa = PBXNativeTarget' '$PBX') -eq 3 ] \
+   && [ \$(grep -c 'productType = \"com.apple.product-type.bundle.unit-test\"' '$PBX') -eq 2 ]"
 for p in "${PACKAGES[@]}"; do
   check "project references local package Packages/$p" grep -q "relativePath = Packages/$p;" "$PBX"
   check "TwakeChat target links $p" bash -c "awk '/packageProductDependencies = \(/,/\);/' '$PBX' | grep -q '/\* $p \*/'"

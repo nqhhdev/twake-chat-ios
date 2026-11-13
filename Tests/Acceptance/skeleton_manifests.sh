@@ -36,7 +36,8 @@ import json, sys
 name, path = sys.argv[1], sys.argv[2]
 m = json.load(open(path))
 # ADR 0005 dependency table, plus the platforms the card asks for.
-deps = {"Domain": [], "AppShared": [], "DesignSystem": [], "MatrixData": ["appshared", "domain"]}
+deps = {"Domain": [], "AppShared": [], "DesignSystem": [],
+        "MatrixData": ["appshared", "domain", "matrix-rust-components-swift"]}
 platforms = {"Domain": [("ios", "18.0"), ("macos", "15.0")], "AppShared": [("ios", "18.0"), ("macos", "15.0")],
              "DesignSystem": [("ios", "18.0")], "MatrixData": [("ios", "18.0")]}
 def report(ok, text):
@@ -49,13 +50,25 @@ modes = m.get("swiftLanguageVersions") or m.get("swiftLanguageModes")
 bad += report(modes in (None, ["6"]), f"package language modes are Swift 6 only (got {modes})")
 got_deps = sorted(next(iter(d.values()))[0]["identity"] for d in m["dependencies"])
 bad += report(got_deps == deps[name], f"package dependencies {got_deps} match ADR 0005 {deps[name]}")
+# TWAK-48: the only remote dependency is the Matrix SDK, in MatrixData alone, pinned exactly (ADR 0003, ADR 0015).
+# SwiftPM evaluates the tag 26.04.01 as the version 26.4.1.
 remote = [d for d in m["dependencies"] if "fileSystem" not in d]
-bad += report(not remote, "every package dependency is a local path (no Matrix SDK yet)")
+want_remote = ([{"identity": "matrix-rust-components-swift",
+                 "url": "https://github.com/matrix-org/matrix-rust-components-swift",
+                 "requirement": {"exact": ["26.4.1"]}}] if name == "MatrixData" else [])
+got_remote = [{"identity": d["sourceControl"][0]["identity"],
+               "url": d["sourceControl"][0]["location"]["remote"][0]["urlString"],
+               "requirement": d["sourceControl"][0]["requirement"]} if "sourceControl" in d else d for d in remote]
+bad += report(got_remote == want_remote, f"remote dependencies {got_remote} (want {want_remote})")
 got_platforms = sorted((x["platformName"], x["version"]) for x in m["platforms"])
 bad += report(got_platforms == platforms[name], f"platforms {got_platforms}")
 targets = m["targets"]
-bad += report([(t["name"], t["type"]) for t in targets] == [(name, "regular")],
-              f"one regular target named {name}, no test target (got {[(t['name'], t['type']) for t in targets]})")
+# TWAK-35 adds exactly one Swift Testing target, <Name>Tests, that depends on <Name> alone (ADR 0010: no mocking
+# library or other test dependency), to every package but MatrixData. MatrixData is iOS-only, so its tests are the
+# MatrixDataTests bundle of the Xcode project (Tests/MatrixDataTests), run on the simulator.
+want_targets = [(name, "regular")] + ([] if name == "MatrixData" else [(name + "Tests", "test")])
+bad += report([(t["name"], t["type"]) for t in targets] == want_targets,
+              f"targets {want_targets} (got {[(t['name'], t['type']) for t in targets]})")
 products = m["products"]
 bad += report([(x["name"], x["targets"], list(x["type"])) for x in products] == [(name, [name], ["library"])],
               f"one library product {name}")
@@ -67,29 +80,57 @@ for t in targets:
     for d in t["dependencies"]:
         kind, val = next(iter(d.items()))
         tdeps.append((kind, val[0], val[1] if kind == "product" else None))
-    want = [("product", "Domain", "Domain"), ("product", "AppShared", "AppShared")] if name == "MatrixData" else []
-    bad += report(sorted(tdeps) == sorted(want), f"target dependencies {tdeps}")
+    if t["type"] == "test":
+        want = [("byName", name, None)]
+    else:
+        want = [("product", "Domain", "Domain"), ("product", "AppShared", "AppShared"),
+                ("product", "MatrixRustSDK", "matrix-rust-components-swift")] if name == "MatrixData" else []
+    bad += report(sorted(tdeps) == sorted(want), f"{t['name']} target dependencies {tdeps}")
 sys.exit(1 if bad else 0)
 PY
   [ $? -eq 0 ] || FAILURES=$((FAILURES + 1))
 done
 
 # The card: "Each has one source file so the package compiles". Exactly one Swift file, at Sources/<Name>/<Name>.swift,
-# and no other file under Sources (no resource, no second placeholder, no Tests folder: test targets are card b).
+# and no other file under Sources (no resource, no second placeholder). Tests live in Tests/<Name>Tests (TWAK-35).
+# TWAK-63 adds the session types to Domain and the Keychain store and App Group paths to AppShared: those two packages
+# now hold exactly the files listed below, still all Swift.
 for p in "${PACKAGES[@]}"; do
   files="$(cd "Packages/$p" && find Sources -type f ! -name .DS_Store | sort | tr '\n' ' ' | sed 's/ $//')"
-  [ "$files" = "Sources/$p/$p.swift" ] && pass "$p: exactly one source file, Sources/$p/$p.swift" \
-    || fail "$p: source files are '$files', the card asks for one (Sources/$p/$p.swift)"
-  check "$p: no Tests folder (test targets are card b)" test ! -e "Packages/$p/Tests"
+  case "$p" in
+    # TWAK-66 adds the room summary and the room list repository with its error.
+    Domain) want="Sources/Domain/Domain.swift Sources/Domain/Models/RoomSummary.swift Sources/Domain/Models/UserSession.swift Sources/Domain/Repositories/AuthenticationError.swift Sources/Domain/Repositories/AuthenticationRepository.swift Sources/Domain/Repositories/RoomListError.swift Sources/Domain/Repositories/RoomListRepository.swift" ;;
+    AppShared) want="Sources/AppShared/AppGroupContainer.swift Sources/AppShared/AppShared.swift Sources/AppShared/KeychainSessionStore.swift" ;;
+    # TWAK-64 adds the client proxy, the authentication repository and their mapper.
+    # TWAK-66 adds the room list proxy, its diff applier and the room summary mapper.
+    MatrixData) want="Sources/MatrixData/Mappers/RoomSummaryMapper.swift Sources/MatrixData/Mappers/UserSessionMapper.swift Sources/MatrixData/MatrixData.swift Sources/MatrixData/Proxies/ClientProxy.swift Sources/MatrixData/Proxies/ListDiff.swift Sources/MatrixData/Proxies/RoomListProxy.swift Sources/MatrixData/Repositories/MatrixAuthenticationRepository.swift" ;;
+    *) want="Sources/$p/$p.swift" ;;
+  esac
+  [ "$files" = "$want" ] && pass "$p: source files are exactly '$want'" \
+    || fail "$p: source files are '$files', expected '$want'"
+  # TWAK-35 (card b): the only test folder is Tests/<Name>Tests, holding Swift files only. MatrixData has none: an
+  # iOS-only package with a Tests folder would be run by host `swift test`, which cannot build it.
+  if [ "$p" = MatrixData ]; then
+    check "MatrixData: no Tests folder (its tests are Tests/MatrixDataTests in the project)" test ! -e Packages/MatrixData/Tests
+    continue
+  fi
+  tests="$(cd "Packages/$p" && find Tests -mindepth 1 -maxdepth 1 ! -name .DS_Store | sort | tr '\n' ' ' | sed 's/ $//')"
+  [ "$tests" = "Tests/${p}Tests" ] && pass "$p: the only test folder is Tests/${p}Tests" \
+    || fail "$p: test folders are '$tests', expected Tests/${p}Tests"
+  check "$p: Tests/${p}Tests holds only Swift files" bash -c \
+    "[ -z \"\$(find 'Packages/$p/Tests/${p}Tests' -type f ! -name '*.swift' ! -name .DS_Store)\" ]"
 done
 
-# Matrix SDK: no reference in any form (import kinds, @_exported, package reference, product name).
-check "no Matrix SDK name in Swift sources, manifests or the project file" bash -c \
-  "! grep -rnE 'MatrixRust|matrix-rust|MatrixSDK' --include='*.swift' --include='*.pbxproj' --include='*.xcscheme' TwakeChat Packages TwakeChat.xcodeproj"
+# Matrix SDK (TWAK-48): named only in Packages/MatrixData, in its Package.swift and its sources (ADR 0006).
+# .build is excluded: it holds the SDK checkout itself.
+check "no Matrix SDK name in Swift sources, manifests or the project file outside Packages/MatrixData" bash -c \
+  "! grep -rnE 'MatrixRust|matrix-rust|MatrixSDK' --include='*.swift' --include='*.pbxproj' --include='*.xcscheme' --exclude-dir=.build --exclude-dir=MatrixData TwakeChat Packages TwakeChat.xcodeproj"
 check "project has no remote package reference" bash -c "! grep -q XCRemoteSwiftPackageReference '$PBX'"
 check "project has no .xcconfig base configuration (out of scope)" bash -c "! grep -q baseConfigurationReference '$PBX'"
+# scripts/tests/architecture-fixtures holds the architecture check's own test trees: some break the rules on purpose.
+# Only that folder is skipped, not any folder with the same name.
 check "no version check anywhere in the repository's Swift code" bash -c \
-  "! grep -rnE --include='*.swift' '#(un)?available|@available' --exclude-dir=.build --exclude-dir=DerivedData ."
+  "! { grep -rnE --include='*.swift' '#(un)?available|@available' --exclude-dir=.build --exclude-dir=DerivedData . | grep -v '^\./scripts/tests/architecture-fixtures/'; }"
 
 # The project graph, followed by object id: the app's sources come in through the synchronized TwakeChat folder
 # (the Sources phase is empty), and every package product is really in the target's Frameworks phase.
@@ -121,13 +162,17 @@ linked = set()
 for f in (field(fw[0], 'files') if fw else []):
     ref = field(objs[f], 'productRef')
     if ref and ref in objs: linked.add(field(objs[ref], 'productName'))
-want = {"Domain", "AppShared", "DesignSystem", "MatrixData"}
+# TWAK-65: the app also links its first feature package, Packages/Features/Authentication (ADR 0005).
+# TWAK-66: and the second, Packages/Features/ChatList.
+features = {"Authentication", "ChatList"}
+want = {"Domain", "AppShared", "DesignSystem", "MatrixData"} | features
 report(linked == want, f"Frameworks phase links exactly {sorted(want)} (got {sorted(linked)})")
 deps = {field(objs[i], 'productName') for i in field(t, 'packageProductDependencies') or []}
 report(deps == want, f"packageProductDependencies are exactly {sorted(want)} (got {sorted(deps)})")
 proj = [b for b in objs.values() if 'isa = PBXProject' in b][0]
 refs = {field(objs[i], 'relativePath') for i in field(proj, 'packageReferences') or []}
-report(refs == {f"Packages/{n}" for n in want}, f"project package references are the four local packages (got {sorted(refs)})")
+want_refs = {f"Packages/{n}" for n in want - features} | {f"Packages/Features/{n}" for n in features}
+report(refs == want_refs, f"project package references are the four layer packages and the feature packages (got {sorted(refs)})")
 sys.exit(1 if bad else 0)
 PY
 [ $? -eq 0 ] || FAILURES=$((FAILURES + 1))
@@ -144,12 +189,15 @@ if [ "$MODE" = full ]; then
       for kv in SWIFT_VERSION=6.0 SWIFT_STRICT_CONCURRENCY=complete SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
                 GCC_TREAT_WARNINGS_AS_ERRORS=YES IPHONEOS_DEPLOYMENT_TARGET=18.0 \
                 PRODUCT_BUNDLE_IDENTIFIER=app.twake.ios.chat GENERATE_INFOPLIST_FILE=YES SDKROOT=iphoneos \
-                DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS= SWIFT_SUPPRESS_WARNINGS=NO; do
+                DEVELOPMENT_TEAM= CODE_SIGN_ENTITLEMENTS=TwakeChat/TwakeChat.entitlements SWIFT_SUPPRESS_WARNINGS=NO; do
         key="${kv%%=*}"; want="${kv#*=}"; got="$(setting "$key")"
+        # Newer Xcode prints SDKROOT as the SDK's path and leaves SWIFT_SUPPRESS_WARNINGS empty when it is not set (NO).
+        case "$key=$got" in SDKROOT=*/iPhoneOS*.sdk) got=iphoneos ;; SWIFT_SUPPRESS_WARNINGS=) got=NO ;; esac
         [ "$got" = "$want" ] && pass "$config: resolved $key = '$want'" || fail "$config: resolved $key = '$got', expected '$want'"
       done
+      # The iOS 26 SDK or a newer one: the deployment target, not the SDK, is what ADR 0002 keeps at 18.0.
       sdkver="$(setting SDK_VERSION)"
-      case "$sdkver" in 26*) pass "$config: built with the iOS 26 SDK ($sdkver)" ;; *) fail "$config: SDK_VERSION '$sdkver', ADR 0002 needs iOS 26" ;; esac
+      [ "${sdkver%%.*}" -ge 26 ] 2>/dev/null && pass "$config: built with an iOS 26 or newer SDK ($sdkver)" || fail "$config: SDK_VERSION '$sdkver', ADR 0002 needs iOS 26 or newer"
     else
       fail "$config: xcodebuild -showBuildSettings ($(grep -m1 -i error "$WORK/settings-$config.err"))"
     fi
@@ -193,17 +241,27 @@ if [ "$MODE" = full ]; then
        -derivedDataPath "$WORK/dd-product" >"$WORK/product.log" 2>&1 \
      && grep -q '\*\* BUILD SUCCEEDED \*\*' "$WORK/product.log" && ! grep -q 'warning:' "$WORK/product.log"; then
     pass "generic iOS Simulator build: BUILD SUCCEEDED, no warning"
-    check "no module of the app build is compiled with -suppress-warnings" bash -c "! grep -q -- '-suppress-warnings' '$WORK/product.log'"
+    # Our own modules only: Xcode always compiles a remote package (the Matrix SDK, ADR 0015) with -suppress-warnings.
+    check "no module of the app build is compiled with -suppress-warnings" bash -c \
+      "! grep -- '-suppress-warnings' '$WORK/product.log' | grep -qE -- '-module-name (TwakeChat|TwakeChatTests|Domain|AppShared|DesignSystem|MatrixData)( |$)'"
     APP="$(find "$WORK/dd-product/Build/Products" -maxdepth 2 -name TwakeChat.app -type d | head -1)"
     plist() { /usr/libexec/PlistBuddy -c "Print :$1" "$APP/Info.plist" 2>/dev/null; }
     [ "$(plist CFBundleIdentifier)" = app.twake.ios.chat ] && pass "built app: CFBundleIdentifier app.twake.ios.chat" \
       || fail "built app: CFBundleIdentifier '$(plist CFBundleIdentifier)'"
     [ "$(plist MinimumOSVersion)" = 18.0 ] && pass "built app: MinimumOSVersion 18.0" \
       || fail "built app: MinimumOSVersion '$(plist MinimumOSVersion)'"
-    case "$(plist DTSDKName)" in iphonesimulator26*) pass "built app: built with the iOS 26 SDK ($(plist DTSDKName))" ;;
-      *) fail "built app: DTSDKName '$(plist DTSDKName)', ADR 0002 needs iOS 26" ;; esac
-    check "built app: no app extension or entitlements (out of scope)" bash -c \
-      "[ ! -d '$APP/PlugIns' ] && ! codesign -d --entitlements - '$APP' 2>/dev/null | grep -q 'application-groups\|keychain-access-groups'"
+    sdkname="$(plist DTSDKName)"; sdkmajor="${sdkname#iphonesimulator}"; sdkmajor="${sdkmajor%%.*}"
+    case "$sdkname" in iphonesimulator*) [ "$sdkmajor" -ge 26 ] 2>/dev/null ;; *) false ;; esac \
+      && pass "built app: built with an iOS 26 or newer SDK ($sdkname)" || fail "built app: DTSDKName '$sdkname', ADR 0002 needs iOS 26 or newer"
+    check "built app: no app extension (out of scope)" bash -c "[ ! -d '$APP/PlugIns' ]"
+    # TWAK-63: the signed app carries the App Group and the Keychain access group of ADR 0007, and no other group.
+    codesign -d --entitlements - --xml "$APP" 2>/dev/null >"$WORK/entitlements.plist" || true
+    groups="$(plutil -extract com.apple.security.application-groups json -o - "$WORK/entitlements.plist" 2>/dev/null)"
+    [ "$groups" = '["group.app.twake.ios.chat"]' ] && pass "built app: App Group group.app.twake.ios.chat only" \
+      || fail "built app: application-groups '$groups'"
+    keychain="$(plutil -extract keychain-access-groups json -o - "$WORK/entitlements.plist" 2>/dev/null)"
+    case "$keychain" in '["'*'app.twake.ios.chat"]') pass "built app: one Keychain access group ending in app.twake.ios.chat" ;;
+      *) fail "built app: keychain-access-groups '$keychain'" ;; esac
   else
     grep -E 'warning:|error:' "$WORK/product.log" | sort -u | head -20 >&2
     fail "generic iOS Simulator build: failed or warned (log lines above)"

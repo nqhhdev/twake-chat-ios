@@ -1,0 +1,63 @@
+# CI for every pull request and every push to main (ADR 0014). Uses no secret and no signing.
+# What it runs and why: .okf/workflows/build.md, section CI.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  XCODE_VERSION: "26.2"
+  SIMULATOR_NAME: "iPhone 17"
+
+jobs:
+  ci:
+    name: ci
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode ${{ env.XCODE_VERSION }}
+        run: |
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+          xcodebuild -version
+
+      - name: Cache SwiftPM downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/org.swift.swiftpm
+          key: swiftpm-${{ runner.os }}-xcode-${{ env.XCODE_VERSION }}-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: |
+            swiftpm-${{ runner.os }}-xcode-${{ env.XCODE_VERSION }}-
+
+      - name: Knowledge base check
+        run: python3 .okf/tools/okf.py --check
+
+      - name: Lint
+        run: scripts/lint.sh
+
+      - name: Tests (host and iOS 26 simulator)
+        run: |
+          xcrun simctl list runtimes | grep '^iOS 26\.'
+          scripts/test.sh
+
+      # No iOS 18 runtime is installed or needed (owner decision 2026-11-12): this compiles the app and
+      # every test target against the iOS 18.0 deployment target without running them again (ADR 0010).
+      # The log shows each compile with the target triple arm64-apple-ios18.0-simulator.
+      - name: Build app and tests (iOS 18.0 deployment target, no simulator)
+        run: |
+          xcodebuild build-for-testing \
+            -project TwakeChat.xcodeproj \
+            -scheme TwakeChat \
+            -testPlan TwakeChat \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO

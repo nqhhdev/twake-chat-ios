@@ -8,6 +8,7 @@ status: draft
 # ADR 0008: Sign in with SSO after server discovery
 
 **Status:** Accepted by the project owner, 2026-11-11.
+**Amended by [ADR 0021](0021-sign-in-as-the-flutter-app.md), 2026-11-13: the Flutter flow, with password sign-in for servers without SSO in every build. (ADR 0019, now superseded, had amended it for Debug builds.)**
 
 ## Context
 Observed on `matrix.linagora.com` (2026-11-11): the homeserver offers `m.login.sso` with identity provider

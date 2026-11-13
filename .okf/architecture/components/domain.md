@@ -9,10 +9,24 @@ status: draft
 
 | | |
 |---|---|
-| Folder | `Packages/Domain/` (planned) |
+| Folder | `Packages/Domain/` |
 | Holds | Value-type models (`RoomSummary`, `TimelineItem`, `UserSession`), repository protocols, use cases, typed errors |
 | May import | Foundation only |
 | Must not import | SwiftUI, UIKit, the Matrix SDK, any other package of this repository |
+
+## Files
+- `Sources/Domain/Models/UserSession.swift`: `UserSession`, the signed-in session (user id, device id, homeserver URL,
+  access token, optional refresh token). Its `description` and `debugDescription` leave the tokens out (TWAK-63).
+- `Sources/Domain/Repositories/AuthenticationRepository.swift`: password login, restoring the saved session and logout,
+  each `async throws(AuthenticationError)`. Password login is for Debug builds ([ADR 0019](../../adr/0019-password-login-debug-builds.md)).
+- `Sources/Domain/Repositories/AuthenticationError.swift`: `invalidCredentials`, `serverUnreachable`,
+  `invalidHomeserverURL`, `unknown`. No case carries a token or server text.
+- `Sources/Domain/Models/RoomSummary.swift`: `RoomSummary`, one joined room (id, name, last message text and sender,
+  last activity date). Its `description` and `debugDescription` leave the message text out (TWAK-66, ADR 0009).
+- `Sources/Domain/Repositories/RoomListRepository.swift`: `start() async throws(RoomListError)` returns an
+  `AsyncStream<[RoomSummary]>` that yields the whole list on each change, in the server's order; `stop()` ends it and
+  stops sync (TWAK-66).
+- `Sources/Domain/Repositories/RoomListError.swift`: `notSignedIn`, `syncUnavailable`. No case carries SDK text.
 
 ## Rules
 - Models are `struct` or `enum`, `Sendable`, and carry no SDK type. Anything from the SDK is mapped in [Data](data.md).
