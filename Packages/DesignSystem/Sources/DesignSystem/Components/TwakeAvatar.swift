@@ -6,19 +6,50 @@ import SwiftUI
 public struct TwakeAvatar: View {
   private let name: String
   private let size: CGFloat
+  private let pictureID: String?
+  private let load: (@Sendable () async -> Data?)?
 
-  public init(name: String, size: CGFloat = 48) {
+  @State private var picture: UIImage?
+
+  /// - Parameters:
+  ///   - pictureID: Names the picture, so the avatar reloads when it changes; `nil` shows the initial only.
+  ///   - load: Loads the picture; until it arrives, and when it fails, the initial shows.
+  public init(
+    name: String, size: CGFloat = 48, pictureID: String? = nil,
+    load: (@Sendable () async -> Data?)? = nil
+  ) {
     self.name = name
     self.size = size
+    self.pictureID = pictureID
+    self.load = load
   }
 
   public var body: some View {
-    Text(Self.initial(of: name))
-      .font(.custom(TextStyleToken.Weight.semibold.face, size: size * 0.42))
-      .foregroundStyle(.white)
-      .frame(width: size, height: size)
-      .background(Self.color(for: name), in: Circle())
-      .accessibilityHidden(true)
+    ZStack {
+      Text(Self.initial(of: name))
+        .font(.custom(TextStyleToken.Weight.semibold.face, size: size * 0.42))
+        .foregroundStyle(.white)
+        .frame(width: size, height: size)
+        .background(Self.color(for: name), in: Circle())
+      if let picture {
+        Image(uiImage: picture)
+          .resizable()
+          .scaledToFill()
+          .frame(width: size, height: size)
+          .clipShape(Circle())
+          .transition(.opacity)
+      }
+    }
+    .accessibilityHidden(true)
+    .task(id: pictureID) {
+      guard pictureID != nil, let load else {
+        picture = nil
+        return
+      }
+      if let data = await load(), let image = UIImage(data: data) {
+        withAnimation(.easeIn(duration: 0.2)) { picture = image }
+      }
+    }
   }
 
   /// The first letter or digit of the name, upper-cased; a Matrix id's sigil is skipped.
