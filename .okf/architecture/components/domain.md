@@ -18,7 +18,7 @@ status: draft
 - `Sources/Domain/Models/UserSession.swift`: `UserSession`, the signed-in session (user id, device id, homeserver URL,
   access token, optional refresh token). Its `description` and `debugDescription` leave the tokens out (TWAK-63).
 - `Sources/Domain/Repositories/AuthenticationRepository.swift`: password login, restoring the saved session and logout,
-  each `async throws(AuthenticationError)`. Password login is for Debug builds ([ADR 0019](../../adr/0019-password-login-debug-builds.md)).
+  each `async throws(AuthenticationError)`. Password login is for Debug builds ([ADR 0019](../../../docs/adr/0019-password-login-debug-builds.md)).
 - `Sources/Domain/Repositories/AuthenticationError.swift`: `invalidCredentials`, `serverUnreachable`,
   `invalidHomeserverURL`, `unknown`. No case carries a token or server text.
 - `Sources/Domain/Models/RoomSummary.swift`: `RoomSummary`, one joined room (id, name, last message text and sender,

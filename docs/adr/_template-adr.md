@@ -7,8 +7,8 @@ status: draft
 ---
 # ADR Template
 
-> Copy to `.okf/adr/NNNN-<slug>.md` using the next free number (or the repo's own number when mirroring),
-> replace everything, add it to [Architecture Decision Records](index.md) and a line to [Knowledge Base Update Log](../log.md).
+> Copy to `docs/adr/NNNN-<slug>.md` using the next free number (or the repo's own number when mirroring),
+> replace everything, add it to [Architecture Decision Records](index.md) and a line to [Knowledge Base Update Log](../../.okf/log.md).
 > Delete this quote block.
 
 ```yaml
@@ -37,4 +37,4 @@ The condition that would reopen this.
 
 ---
 Write an ADR when the decision is expensive to reverse or a reasonable engineer would choose otherwise.
-A choice with no real alternative is a [convention](../engineering/conventions/index.md). Supersede rather than edit an accepted ADR.
+A choice with no real alternative is a [convention](../../.okf/engineering/conventions/index.md). Supersede rather than edit an accepted ADR.

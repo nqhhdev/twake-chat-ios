@@ -90,7 +90,7 @@ The new SDK store ([ADR 0007](0007-shared-session-store-app-group.md)) uses a di
 new one. The proposed name is in open point 4.
 
 These rows are the expected inputs of the first-launch cleanup test named in
-[Constraints](../engineering/constraints.md).
+[Constraints](../../.okf/engineering/constraints.md).
 
 ### Open points the owner must still rule on
 1. **The cleanup signs out the wrong device.** The only session the Flutter app writes to the shared Keychain is the
@@ -118,7 +118,7 @@ These rows are the expected inputs of the first-launch cleanup test named in
    container, which shares no path prefix with the old `Library/Application Support/app.twake.ios.chat/` tree, so
    deleting the old tree cannot reach it. The owner confirms or picks another name.
 
-Each open point is tracked in [Open Verifications](../backlog/open-verifications.md) until the owner rules.
+Each open point is tracked in [Open Verifications](../../.okf/backlog/open-verifications.md) until the owner rules.
 
 ## Consequences
 **Good.** One list to implement and test the cleanup from; push keeps working with no server change; the ToM server is

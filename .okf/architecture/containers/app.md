@@ -18,7 +18,7 @@ status: draft
 |---|---|
 | Kind | Native iOS app, Swift, SwiftUI |
 | Bundle id | `app.twake.ios.chat` |
-| Deployment target | iOS 18.0 ([ADR 0002](../../adr/0002-ios-18-minimum-ios-26-styling.md)) |
+| Deployment target | iOS 18.0 ([ADR 0002](../../../docs/adr/0002-ios-18-minimum-ios-26-styling.md)) |
 | Entry point | `TwakeChat/TwakeChatApp.swift`: builds the composition root and the root coordinator |
 | Talks to | [Backend](backend.md) through the Matrix SDK only |
 | Shares with | The [Notification Service Extension](notification-service-extension.md), through one App Group container and one Keychain access group |
@@ -39,7 +39,7 @@ Packages/
     Encryption/
     Settings/
 ```
-Module rules are in [Components](../components/index.md); the reasoning is [ADR 0005](../../adr/0005-layered-local-swift-packages.md).
+Module rules are in [Components](../components/index.md); the reasoning is [ADR 0005](../../../docs/adr/0005-layered-local-swift-packages.md).
 
 ## Configuration
 The Flutter app reads a bundled `config.json` (default homeserver, registration URL, privacy URL, support links). This
@@ -48,7 +48,7 @@ from the homeserver's discovery document at run time, not from the build.
 
 ## Identifiers
 The app reuses the Flutter app's identifiers and therefore installs over it
-([ADR 0012](../../adr/0012-reuse-flutter-bundle-identifier.md)).
+([ADR 0012](../../../docs/adr/0012-reuse-flutter-bundle-identifier.md)).
 
 | What | Value |
 |---|---|
@@ -60,4 +60,4 @@ The app reuses the Flutter app's identifiers and therefore installs over it
 
 ## First launch after replacing the Flutter app
 The app signs the Flutter app's old session out, then deletes its leftover files and Keychain items. The user signs in
-again. Details in [ADR 0012](../../adr/0012-reuse-flutter-bundle-identifier.md).
+again. Details in [ADR 0012](../../../docs/adr/0012-reuse-flutter-bundle-identifier.md).

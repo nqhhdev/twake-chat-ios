@@ -17,7 +17,7 @@ status: draft
 
 ## Proxies
 Each long-lived SDK object is wrapped once, behind a protocol, so the rest of the app never sees an SDK type
-([ADR 0006](../../adr/0006-sdk-behind-proxy-protocols.md)).
+([ADR 0006](../../../docs/adr/0006-sdk-behind-proxy-protocols.md)).
 
 | Proxy | Wraps | Responsibility |
 |---|---|---|
@@ -34,7 +34,7 @@ Each long-lived SDK object is wrapped once, behind a protocol, so the rest of th
 `KeychainClientSessionDelegate` gives the SDK the saved session and saves refreshed tokens with
 `KeychainSessionStore.saveRefreshedTokens`, which only updates the item of the same user and device and never adds
 one: a refresh after sign-out cannot bring the session back. `MatrixAuthenticationRepository` (an actor) implements
-the Domain `AuthenticationRepository` with the Flutter sign-in of [ADR 0021](../../adr/0021-sign-in-as-the-flutter-app.md):
+the Domain `AuthenticationRepository` with the Flutter sign-in of [ADR 0021](../../../docs/adr/0021-sign-in-as-the-flutter-app.md):
 `HomeserverDiscovery` reads `.well-known`, the login flows with their identity providers and a registration probe over
 plain HTTP (the pinned SDK lists no providers); `startSSOLogin` builds a client and keeps the SDK `SsoHandler` until
 `finishSSOLogin` hands it the web session's callback (`loginToken`); password login is the same in every build. The
@@ -60,7 +60,7 @@ is freed after its client, so they must never outlive it, and the applying task 
 fails, so no sync service is built while the store is removed), and so releases the room list, before the server
 sign-out, so nothing writes to the store while `MatrixAuthenticationRepository` deletes it, also
 when the chat list calls `stop()` only after logout. Nothing here logs: the summaries hold
-message content ([ADR 0009](../../adr/0009-push-gateway-and-nse-decryption.md)). `ListDiff` and the mapper are tested
+message content ([ADR 0009](../../../docs/adr/0009-push-gateway-and-nse-decryption.md)). `ListDiff` and the mapper are tested
 in `MatrixDataTests`; the mapper fixtures are enum cases only, because the SDK's struct initializers are in a binary
 that bundle does not link. The message-text path (a message's body and sender) has no automated test: the opt-in
 staging test `RoomListIntegrationTests` checks only that a non-empty list of rooms with ids and names arrives, and the
@@ -86,7 +86,7 @@ pinned version when the code is written. For the pinned version they are in
 
 ## Storage
 The SDK's own store (state, event cache, crypto) is the only database in v1. It lives in the App Group container
-([ADR 0007](../../adr/0007-shared-session-store-app-group.md)). Tokens live in the Keychain, through `AppShared`.
+([ADR 0007](../../../docs/adr/0007-shared-session-store-app-group.md)). Tokens live in the Keychain, through `AppShared`.
 
 `AppShared` holds the storage pieces that need no SDK (TWAK-63):
 - `KeychainSessionStore` (`Sources/AppShared/KeychainSessionStore.swift`) saves, loads and deletes one `StoredSession`
@@ -97,11 +97,11 @@ The SDK's own store (state, event cache, crypto) is the only database in v1. It 
 - `AppGroupContainer` (`Sources/AppShared/AppGroupContainer.swift`) names the SDK store directory in the App Group
   container: one fixed directory, `Library/Application Support/TwakeChat/SDK`, that no caller can change, so the app
   and the extension open the same store. It is the name
-  [ADR 0017](../../adr/0017-flutter-upgrade-keep-and-drop-lists.md) open point 4 proposes, pending the owner's
+  [ADR 0017](../../../docs/adr/0017-flutter-upgrade-keep-and-drop-lists.md) open point 4 proposes, pending the owner's
   confirmation. A test checks it is apart from the Flutter app's trees that the cleanup deletes. It creates and deletes
   nothing.
 
-`AppShared` does not import Domain ([ADR 0005](../../adr/0005-layered-local-swift-packages.md)), so MatrixData will map
+`AppShared` does not import Domain ([ADR 0005](../../../docs/adr/0005-layered-local-swift-packages.md)), so MatrixData will map
 `StoredSession` to Domain `UserSession` when it implements `AuthenticationRepository` (a later card). The app reads its
 expanded Keychain group from the `KeychainAccessGroup` key of `TwakeChat/Info.plist`.
 

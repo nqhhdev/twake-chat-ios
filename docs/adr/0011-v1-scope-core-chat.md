@@ -25,7 +25,7 @@ Version 1 contains:
 | Encryption | Encrypted rooms, recovery with the recovery key, verifying this session from another one |
 | Push | Notifications with decrypted text |
 
-Everything else is deferred and tracked in [Deferred Features](../backlog/deferred-features.md). A deferred feature
+Everything else is deferred and tracked in [Deferred Features](../../.okf/backlog/deferred-features.md). A deferred feature
 needs no code, flag or placeholder in v1.
 
 ## Consequences

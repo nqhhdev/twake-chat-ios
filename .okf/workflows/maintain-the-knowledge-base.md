@@ -27,7 +27,7 @@ status: draft
 ## Which directory
 | You learned | Put it in |
 |---|---|
-| Why a choice was made | [adr/](../adr/index.md) |
+| Why a choice was made | [adr/](../../docs/adr/index.md) |
 | A naming or style rule | [conventions/](../engineering/conventions/index.md) |
 | A rule a tool enforces | a row in [Constraints](../engineering/constraints.md) |
 | How to write one more of something | [patterns/](../engineering/patterns/index.md) |

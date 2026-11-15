@@ -13,13 +13,12 @@ The app is at design stage: no code exists yet, and every page is `status: draft
 * [Know the rules](engineering/constraints.md) - Every rule, what enforces it, and the page that owns it.
 * [Name and place a file](engineering/conventions/naming.md) - Where each kind of file lives and what it is called.
 * [Add a feature](workflows/add-a-feature.md) - The skeleton procedure across every layer.
-* [Know why it is like this](adr/index.md) - Architecture Decision Records.
+* [Know why it is like this](../docs/adr/index.md) - Architecture Decision Records.
 * [Something is wrong](troubleshooting.md) - Symptoms mapped to causes.
 * [What is still undecided](backlog/index.md) - Open decisions, unverified assumptions and deferred features.
 
 # Subdirectories
 
-* [adr](adr/) - Architecture Decision Records - why the codebase is the way it is.
 * [architecture](architecture/) - C4 levels 1-3: context, containers and components. Level 4 is the code.
 * [backlog](backlog/) - Known gaps and planned work.
 * [domains](domains/) - The business model - one folder per domain slice.

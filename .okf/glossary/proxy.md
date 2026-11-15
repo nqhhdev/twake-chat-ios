@@ -8,4 +8,4 @@ status: draft
 # Proxy
 
 A `MatrixData` type that wraps one Matrix SDK object and exposes it through a Domain protocol, mapping types and errors.
-See [ADR 0006](../adr/0006-sdk-behind-proxy-protocols.md).
+See [ADR 0006](../../docs/adr/0006-sdk-behind-proxy-protocols.md).

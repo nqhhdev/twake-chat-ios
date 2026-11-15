@@ -25,7 +25,7 @@ reference for using the package, follows newer releases.
 **Costly.** The pin is older than current Element X. SDK API names and signatures must be read from the pinned
 package, not from Element X `main`, whose code may call APIs this version lacks or names differently. Whether this
 version supports the SSO login-token flow and cross-process store locking is still unconfirmed, and stays open in
-[Open Verifications](../backlog/open-verifications.md).
+[Open Verifications](../../.okf/backlog/open-verifications.md).
 **Alternatives rejected.** The latest release: newer APIs and Element X code that matches, but untried against Twake
 servers and different from the extension's version. Leaving the version open: ADR 0003 requires an exact pin.
 

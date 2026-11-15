@@ -7,10 +7,10 @@ status: draft
 ---
 # Deferred Features
 
-**State:** open - order not decided ([ADR 0011](../adr/0011-v1-scope-core-chat.md)).
+**State:** open - order not decided ([ADR 0011](../../docs/adr/0011-v1-scope-core-chat.md)).
 
 Taken from the Flutter app's `lib/pages` and `lib/domain` at the baseline commit of
-[ADR 0013](../adr/0013-flutter-baseline-and-feature-status.md). The list may be incomplete.
+[ADR 0013](../../docs/adr/0013-flutter-baseline-and-feature-status.md). The list may be incomplete.
 
 | Feature | Flutter location | Note |
 |---|---|---|

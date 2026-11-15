@@ -15,7 +15,7 @@ records decisions as ADRs. Without a record, each contributor or agent re-derive
 
 ## Decision
 Every decision that is expensive to reverse, or that a reasonable engineer would make differently, is one file in
-`.okf/adr/`, numbered in order, using the [ADR Template](_template-adr.md). An accepted ADR is superseded by a new one,
+`docs/adr/`, numbered in order, using the [ADR Template](_template-adr.md). An accepted ADR is superseded by a new one,
 not edited. The project owner accepts or rejects each ADR; an agent may only propose.
 
 ## Consequences
