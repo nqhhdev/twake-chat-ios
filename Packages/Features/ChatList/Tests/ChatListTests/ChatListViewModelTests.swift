@@ -216,6 +216,80 @@ struct ChatListViewModelTests {
     repository.finish()
   }
 
+  @Test func lowPriorityChatsGoLastUnlessFavourite() async {
+    let repository = FakeRoomListRepository()
+    let viewModel = ChatListViewModel(repository: repository, logOut: { true })
+    let low = RoomSummary(
+      id: "!low:example.org", name: "Low", lastMessageText: nil, lastMessageSender: nil,
+      lastActivity: nil, isLowPriority: true)
+    let both = RoomSummary(
+      id: "!both:example.org", name: "Both", lastMessageText: nil, lastMessageSender: nil,
+      lastActivity: nil, isFavourite: true, isLowPriority: true)
+    let task = Task { await viewModel.start() }
+    await waitUntil { repository.isStarted }
+    repository.send([low, team, both])
+    await waitUntil { viewModel.state != .loading }
+    #expect(viewModel.favouriteRooms.map(\.id) == [both.id])
+    #expect(viewModel.otherRooms.map(\.id) == [team.id])
+    #expect(viewModel.lowPriorityRooms.map(\.id) == [low.id])
+    await viewModel.setLowPriority(false, room: low)
+    viewModel.selection = [team.id, low.id]
+    await viewModel.leaveSelection()
+    #expect(
+      repository.decisions == [
+        "normal !low:example.org", "leave !low:example.org", "leave !team:example.org",
+      ])
+    #expect(viewModel.selection.isEmpty)
+    task.cancel()
+    repository.finish()
+  }
+
+  @Test func doNotDisturbShowsUntilTurnedOff() async {
+    let viewModel = ChatListViewModel(
+      repository: FakeRoomListRepository(),
+      doNotDisturb: .init(isOn: { true }, turnOff: { true }), logOut: { true })
+    await viewModel.refreshDoNotDisturb()
+    #expect(viewModel.isDoNotDisturbOn)
+    await viewModel.turnOffDoNotDisturb()
+    #expect(!viewModel.isDoNotDisturbOn)
+    #expect(viewModel.actionErrorMessage == nil)
+  }
+
+  @Test func activityListsUnreadAndMentionedRooms() async {
+    let repository = FakeRoomListRepository()
+    let viewModel = ChatListViewModel(repository: repository, logOut: { true })
+    let mention = RoomSummary(
+      id: "!m:example.org", name: "M", lastMessageText: nil, lastMessageSender: nil,
+      lastActivity: nil, unreadCount: 3, mentionCount: 2)
+    let unread = RoomSummary(
+      id: "!u:example.org", name: "U", lastMessageText: nil, lastMessageSender: nil,
+      lastActivity: nil, unreadCount: 1)
+    let task = Task { await viewModel.start() }
+    await waitUntil { repository.isStarted }
+    repository.send([mention, unread, team])
+    await waitUntil { viewModel.state != .loading }
+    #expect(viewModel.mentioned.map(\.id) == [mention.id])
+    #expect(viewModel.inbox.map(\.id).contains(unread.id))
+    #expect(viewModel.mentionTotal == 2)
+    task.cancel()
+    repository.finish()
+  }
+
+  @Test func theSearchFindsPeopleAndOpensTheirChat() async {
+    let opened = OpenedPeople()
+    let viewModel = ChatListViewModel(
+      repository: FakeRoomListRepository(), people: FoundPeople(),
+      openPerson: {
+        opened.ids.append($0)
+        return true
+      }, logOut: { true })
+    viewModel.query = "ali"
+    await viewModel.searchMessages()
+    #expect(viewModel.peopleResults.map(\.id) == ["@alice:example.org"])
+    await viewModel.open(viewModel.peopleResults[0])
+    #expect(opened.ids == ["@alice:example.org"])
+  }
+
   @Test func swipeActionsAskTheRepository() async {
     let repository = FakeRoomListRepository()
     let viewModel = ChatListViewModel(repository: repository, logOut: { true })
@@ -229,6 +303,25 @@ struct ChatListViewModelTests {
         "leave !family:example.org",
       ])
     #expect(viewModel.actionErrorMessage == nil)
+  }
+
+  @Test func theBroadcastsFilterKeepsTheRoomsWhereOnlyModeratorsPost() async {
+    let repository = FakeRoomListRepository()
+    let viewModel = ChatListViewModel(repository: repository, logOut: { true })
+    let news = RoomSummary(
+      id: "!news:example.org", name: "News", lastMessageText: nil, lastMessageSender: nil,
+      lastActivity: nil, isBroadcast: true)
+    let team = RoomSummary(
+      id: "!team:example.org", name: "Team", lastMessageText: nil, lastMessageSender: nil,
+      lastActivity: nil)
+    let task = Task { await viewModel.start() }
+    await waitUntil { repository.isStarted }
+    repository.send([news, team])
+    await waitUntil { viewModel.state != .loading }
+    viewModel.filter = .broadcasts
+    #expect(viewModel.joinedRooms.map(\.id) == [news.id])
+    task.cancel()
+    repository.finish()
   }
 
   @Test func filtersPickUnreadFavouritesPeopleAndGroups() async {
@@ -252,6 +345,8 @@ struct ChatListViewModelTests {
     #expect(viewModel.joinedRooms.map(\.id) == [group.id])
     viewModel.filter = .favourites
     #expect(viewModel.joinedRooms.map(\.id) == [group.id])
+    // The app icon badge counts every room, whatever the filter.
+    #expect(viewModel.allJoinedRooms.map(\.id) == [unreadDM.id, group.id])
     viewModel.selection = [unreadDM.id, group.id]
     viewModel.filter = .all
     await viewModel.toggleSelectionMuted()
@@ -275,7 +370,9 @@ struct ChatListSearchTests {
       RoomSummary(
         id: "!b", name: "Alice", lastMessageText: nil, lastMessageSender: nil, lastActivity: nil),
     ]
-    while repository.startCallCount == 0 { await Task.yield() }
+    // The stream exists only once `start()` has stored its continuation; `startCallCount` grows before that, so
+    // waiting on it let `send` reach no stream now and then (the flaky run).
+    while !repository.isStarted { await Task.yield() }
     repository.send(rooms)
     while viewModel.state != .loaded(rooms) { await Task.yield() }
     #expect(viewModel.visibleRooms.map(\.id) == ["!a", "!b"])
@@ -299,4 +396,19 @@ struct ChatListSearchTests {
     #expect(viewModel.answering.isEmpty)
     #expect(viewModel.inviteErrorMessage == nil)
   }
+}
+
+private struct FoundPeople: PeopleRepository {
+  func search(_ text: String) async throws(PeopleError) -> [Person] {
+    [Person(id: "@alice:example.org", displayName: "Alice")]
+  }
+  func directChat(with userId: String) async throws(PeopleError) -> String { "!dm" }
+  func createGroup(name: String, inviting userIds: [String]) async throws(PeopleError) -> String {
+    "!g"
+  }
+}
+
+@MainActor
+private final class OpenedPeople {
+  var ids: [String] = []
 }

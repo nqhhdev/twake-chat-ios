@@ -89,6 +89,20 @@ public enum MatrixHTML {
     types: NSTextCheckingResult.CheckingType.link.rawValue)
 }
 
+/// Marks text the sender hid as a spoiler (`<span data-mx-spoiler>`, spec "Spoiler messages"): the room shows it
+/// covered until the reader taps it.
+public enum SpoilerAttribute: AttributedStringKey {
+  public typealias Value = Bool
+  public static let name = "org.linagora.twake.spoiler"
+}
+
+extension AttributedString {
+  /// The text holds a part hidden as a spoiler.
+  public var hasSpoiler: Bool {
+    runs.contains { $0[SpoilerAttribute.self] == true }
+  }
+}
+
 /// Writes the text with the styles of the tags open around it.
 private struct Builder {
   private var output = AttributedString()
@@ -102,6 +116,8 @@ private struct Builder {
   private var links: [URL?] = []
   private var lists: [(ordered: Bool, next: Int)] = []
   private var quoteDepth = 0
+  /// For each open `span`, whether it hides a spoiler.
+  private var spans: [Bool] = []
   /// Nothing has been written on the current line yet.
   private var atLineStart = true
 
@@ -154,6 +170,12 @@ private struct Builder {
         marker += "• "
       }
       append(marker, styled: false)
+    case "span":
+      if isClosing {
+        _ = spans.popLast()
+      } else {
+        spans.append(body.lowercased().contains("data-mx-spoiler"))
+      }
     case "img":
       if let alt = Self.attribute("alt", in: body) { write(text: alt) }
     case "td", "th":
@@ -218,6 +240,7 @@ private struct Builder {
     if strike > 0 { intent.insert(.strikethrough) }
     if code > 0 || pre > 0 { intent.insert(.code) }
     if !intent.isEmpty { piece.inlinePresentationIntent = intent }
+    if spans.contains(true) { piece[SpoilerAttribute.self] = true }
     if let link = links.last {
       if let link { piece.link = link }
     } else if code == 0, pre == 0 {

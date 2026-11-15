@@ -16,6 +16,17 @@ import Testing
       .inlinePresentationIntent
   }
 
+  @Test func aSpoilerIsMarkedAndOnlyItsText() {
+    let rendered = render(
+      "see <span data-mx-spoiler=\"plot\">he <b>dies</b></span> <span>ok</span>")
+    #expect(String(rendered.characters) == "see he dies ok")
+    let hidden = rendered.runs.filter { $0[SpoilerAttribute.self] == true }
+      .map { String(rendered[$0.range].characters) }.joined()
+    #expect(hidden == "he dies")
+    #expect(rendered.hasSpoiler)
+    #expect(!render("<span>plain</span>").hasSpoiler)
+  }
+
   @Test func inlineStylesBecomeIntents() {
     let html = "a <b>bold</b> <em>it</em> <del>gone</del> <code>x</code>"
     #expect(text(html) == "a bold it gone x")

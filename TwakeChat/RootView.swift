@@ -43,9 +43,12 @@ final class RootCoordinator {
   @ObservationIgnored private let linkPreviews: (any LinkPreviewRepository)?
   /// A room's timeline, or with a kind, only that kind of message, for a chat details tab.
   @ObservationIgnored private let makeTimeline: (String, RoomContentKind?) -> any TimelineRepository
+  /// One thread's timeline: room id, then the thread's root event id.
+  @ObservationIgnored private let makeThreadTimeline: (String, String) -> any TimelineRepository
   @ObservationIgnored private let media: any MediaRepository
   @ObservationIgnored private let roomDetails: (any RoomDetailsRepository)?
   @ObservationIgnored private let roomSearch: (any RoomSearchRepository)?
+  @ObservationIgnored private let savedMessages: (any SavedMessagesRepository)?
   @ObservationIgnored private let accountSettings: (any AccountSettingsRepository)?
   @ObservationIgnored private let people: (any PeopleRepository)?
   /// Push notifications of the signed-in account.
@@ -79,9 +82,13 @@ final class RootCoordinator {
     makeTimeline: @escaping (String, RoomContentKind?) -> any TimelineRepository = { _, _ in
       UnavailableTimeline()
     },
+    makeThreadTimeline: @escaping (String, String) -> any TimelineRepository = { _, _ in
+      UnavailableTimeline()
+    },
     media: any MediaRepository = UnavailableMedia(),
     roomDetails: (any RoomDetailsRepository)? = nil,
     roomSearch: (any RoomSearchRepository)? = nil,
+    savedMessages: (any SavedMessagesRepository)? = nil,
     roomLinks: (any RoomLinkRepository)? = nil,
     accountSettings: (any AccountSettingsRepository)? = nil,
     people: (any PeopleRepository)? = nil, push: (any PushRepository)? = nil,
@@ -104,9 +111,11 @@ final class RootCoordinator {
     self.spaces = spaces
     self.linkPreviews = linkPreviews
     self.makeTimeline = makeTimeline
+    self.makeThreadTimeline = makeThreadTimeline
     self.media = media
     self.roomDetails = roomDetails
     self.roomSearch = roomSearch
+    self.savedMessages = savedMessages
     self.accountSettings = accountSettings
     self.people = people
     self.signInConfiguration = signInConfiguration
@@ -125,7 +134,8 @@ final class RootCoordinator {
     guard let roomList else { return nil }
     let viewModel = ChatListViewModel(
       repository: roomList, media: media, archive: archive, publicRooms: publicRooms,
-      spaces: spaces
+      spaces: spaces, messageSearch: roomSearch, doNotDisturb: doNotDisturb(),
+      saved: savedMessages, people: people, openPerson: openDirectChat()
     ) {
       [weak signedIn, push] in
       guard let signedIn else { return false }
@@ -135,7 +145,7 @@ final class RootCoordinator {
     }
     chatList = (signedIn, viewModel)
     lifecycle.unreadCount = { [weak viewModel] in
-      viewModel?.joinedRooms.reduce(0) { $0 + $1.unreadCount } ?? 0
+      viewModel.map { RoomSummary.appBadge(for: $0.allJoinedRooms) } ?? 0
     }
     return viewModel
   }
@@ -151,7 +161,41 @@ final class RootCoordinator {
       contentTimeline: { [makeTimeline] kind in makeTimeline(summary.id, kind) },
       openDirectChat: openDirectChat(), search: roomSearch,
       isArchived: summary.isArchived, rejoin: rejoin(summary.id), linkPreviews: linkPreviews,
-      checkSession: sessionCheck(), display: displaySettings())
+      checkSession: sessionCheck(), display: displaySettings(), blocking: blocking(),
+      saved: savedMessages,
+      threadTimeline: { [makeThreadTimeline] root in makeThreadTimeline(summary.id, root) })
+  }
+
+  /// The account's do not disturb, for the chat list's banner.
+  private func doNotDisturb() -> ChatListViewModel.DoNotDisturb? {
+    guard let accountSettings else { return nil }
+    return ChatListViewModel.DoNotDisturb(
+      isOn: { await accountSettings.isDoNotDisturbOn() },
+      turnOff: {
+        do {
+          try await accountSettings.setDoNotDisturb(false)
+          return true
+        } catch {
+          return false
+        }
+      })
+  }
+
+  /// The account's block list, for the "You blocked this person" bar of a direct chat.
+  private func blocking() -> RoomViewModel.Blocking? {
+    guard let accountSettings else { return nil }
+    return RoomViewModel.Blocking(
+      isBlocked: { userId in
+        ((try? await accountSettings.blockedUsers()) ?? []).contains { $0.id == userId }
+      },
+      unblock: { userId in
+        do {
+          try await accountSettings.unblock(userId: userId)
+          return true
+        } catch {
+          return false
+        }
+      })
   }
 
   /// Which room events a chat shows: the Settings tab's choice, so a change there redraws the open chat.
@@ -345,6 +389,11 @@ struct UnavailableTimeline: TimelineRepository {
     throw .unavailable
   }
   func setTyping(_ isTyping: Bool) async {}
+  func createPoll(_ draft: PollDraft) async throws(TimelineError) { throw .unavailable }
+  func vote(_ answerIds: [String], in pollEventId: String) async throws(TimelineError) {
+    throw .unavailable
+  }
+  func endPoll(_ pollEventId: String) async throws(TimelineError) { throw .unavailable }
   func setPinned(_ pinned: Bool, eventId: String) async throws(TimelineError) { throw .unavailable }
   func pinnedMessages() async -> [TimelineMessage] { [] }
   func loadDraft() async -> String? { nil }

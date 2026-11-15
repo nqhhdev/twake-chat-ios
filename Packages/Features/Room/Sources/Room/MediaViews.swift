@@ -1,5 +1,6 @@
 import DesignSystem
 import Domain
+import QuickLook
 import SwiftUI
 
 /// The media of a message inside its bubble, as the Flutter chat shows it: pictures, videos and stickers as a
@@ -15,6 +16,8 @@ struct MessageMediaView: View {
   @State private var downloaded: DownloadedFile?
   @State private var isDownloading = false
   @State private var video: DownloadedFile?
+  /// A downloaded file shown in Quick Look (PDF, documents, pictures), which also offers Share and Save to Files.
+  @State private var previewURL: URL?
 
   var body: some View {
     switch message.body {
@@ -50,7 +53,9 @@ struct MessageMediaView: View {
         .frame(width: size.width, height: size.height)
         .clipShape(.rect(cornerRadius: 12))
         .overlay {
-          if case .video = message.body {
+          if message.sendState == .sending {
+            UploadProgressRing(progress: message.uploadProgress)
+          } else if case .video = message.body {
             if isDownloading {
               ProgressView().tint(.white).controlSize(.large)
             } else {
@@ -83,7 +88,9 @@ struct MessageMediaView: View {
       HStack(spacing: 12) {
         ZStack {
           Circle().fill(SysColors.primary).frame(width: 40, height: 40)
-          if isDownloading {
+          if message.sendState == .sending {
+            UploadProgressRing(progress: message.uploadProgress, diameter: 30, lineWidth: 3)
+          } else if isDownloading {
             ProgressView().tint(.white)
           } else {
             Image(systemName: isAudio ? "waveform" : "doc.fill")
@@ -103,6 +110,7 @@ struct MessageMediaView: View {
     }
     .buttonStyle(.plain)
     .disabled(isDownloading)
+    .quickLookPreview($previewURL)
     .sheet(item: $downloaded) { file in ShareSheetLink(url: file.url) }
   }
 
@@ -113,11 +121,50 @@ struct MessageMediaView: View {
     video = await viewModel.file(of: message).map(DownloadedFile.init(url:))
   }
 
+  /// Downloads the file, then shows it in Quick Look when it can, or offers to share it otherwise.
   private func download() async {
     guard !isDownloading else { return }
     isDownloading = true
     defer { isDownloading = false }
-    downloaded = await viewModel.file(of: message).map(DownloadedFile.init(url:))
+    guard let url = await viewModel.file(of: message) else { return }
+    if QLPreviewController.canPreview(url as NSURL) {
+      previewURL = url
+    } else {
+      downloaded = DownloadedFile(url: url)
+    }
+  }
+}
+
+/// How much of a sending picture, video or file is uploaded: a ring that fills smoothly over a dimmed disc, or a
+/// spinning arc before the first progress arrives.
+struct UploadProgressRing: View {
+  let progress: Double?
+  var diameter: CGFloat = 48
+  var lineWidth: CGFloat = 4
+
+  @State private var spins = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  var body: some View {
+    ZStack {
+      Circle().fill(.black.opacity(0.35))
+      Circle().stroke(.white.opacity(0.3), lineWidth: lineWidth).padding(lineWidth)
+      Circle()
+        .trim(from: 0, to: progress.map { max(0.03, $0) } ?? 0.25)
+        .stroke(.white, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+        .rotationEffect(.degrees(progress == nil && spins ? 270 : -90))
+        .padding(lineWidth)
+        .animation(.easeOut(duration: 0.25), value: progress)
+        .animation(
+          progress == nil ? .linear(duration: 1).repeatForever(autoreverses: false) : .default,
+          value: spins)
+    }
+    .frame(width: diameter, height: diameter)
+    .onAppear { spins = !reduceMotion }
+    .transition(.scale.combined(with: .opacity))
+    .accessibilityElement()
+    .accessibilityLabel("Uploading")
+    .accessibilityValue(progress.map { "\(Int($0 * 100)) percent" } ?? "")
   }
 }
 

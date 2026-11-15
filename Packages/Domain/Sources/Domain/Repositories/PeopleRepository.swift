@@ -30,4 +30,17 @@ public protocol PeopleRepository: Sendable {
 
   /// A new private, encrypted group named `name` that invites `userIds`. Returns the room id.
   func createGroup(name: String, inviting userIds: [String]) async throws(PeopleError) -> String
+
+  /// A new Broadcast (`app.twake.chat.page`) that invites `userIds`. Returns the room id.
+  func createBroadcast(_ draft: BroadcastDraft, inviting userIds: [String])
+    async throws(PeopleError)
+    -> String
+}
+
+extension PeopleRepository {
+  public func createBroadcast(_ draft: BroadcastDraft, inviting userIds: [String])
+    async throws(PeopleError) -> String
+  {
+    throw .requestFailed
+  }
 }

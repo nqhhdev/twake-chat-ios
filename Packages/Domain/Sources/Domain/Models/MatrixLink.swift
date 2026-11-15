@@ -30,6 +30,35 @@ public enum MatrixLink: Sendable, Equatable {
     self = link
   }
 
+  /// The `https://matrix.to/#/…` link to share this room, message or person (spec, "matrix.to navigation"): each
+  /// identifier is percent-encoded, and a room link names the servers that can find it.
+  public var url: URL? {
+    let path: String
+    var via: [String] = []
+    switch self {
+    case .user(let id):
+      path = Self.encode(id)
+    case .room(let idOrAlias, let eventId, let servers):
+      path = Self.encode(idOrAlias) + (eventId.map { "/" + Self.encode($0) } ?? "")
+      via = idOrAlias.hasPrefix("!") ? servers : []
+    }
+    let query = via.isEmpty ? "" : "?" + via.map { "via=" + Self.encode($0) }.joined(separator: "&")
+    return URL(string: "https://matrix.to/#/" + path + query)
+  }
+
+  /// The server name of a Matrix id (`@user:server`), or `nil` when it has none.
+  public static func server(of id: String) -> String? {
+    guard let colon = id.firstIndex(of: ":") else { return nil }
+    let server = id[id.index(after: colon)...]
+    return server.isEmpty ? nil : String(server)
+  }
+
+  private static func encode(_ text: String) -> String {
+    var allowed = CharacterSet.alphanumerics
+    allowed.insert(charactersIn: "-._~!$@:+=")
+    return text.addingPercentEncoding(withAllowedCharacters: allowed) ?? text
+  }
+
   /// `<id>[/<event>][?via=…]` after `matrix.to/#/`; the parts may be percent-encoded.
   static func parseIdentifiers(_ text: String) -> MatrixLink? {
     let (path, query) = split(text)

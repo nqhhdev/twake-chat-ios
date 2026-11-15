@@ -7,8 +7,14 @@ public struct RoomSearchResult: Sendable, Equatable, Identifiable {
   public let senderName: String
   public let date: Date
   public let text: String
+  /// The room of the message, for a search across every room.
+  public let roomId: String?
 
-  public init(eventId: String, senderId: String, senderName: String, date: Date, text: String) {
+  public init(
+    eventId: String, senderId: String, senderName: String, date: Date, text: String,
+    roomId: String? = nil
+  ) {
+    self.roomId = roomId
     self.eventId = eventId
     self.senderId = senderId
     self.senderName = senderName
@@ -43,4 +49,15 @@ public protocol RoomSearchRepository: Sendable {
   /// The messages of `roomId` that match `term`, newest first, from `nextBatch` (`nil` for the first page).
   func search(_ term: String, roomId: String, from nextBatch: String?) async throws(RoomSearchError)
     -> RoomSearchPage
+  /// The messages of every room the user is in that match `term`, newest first.
+  func searchEverywhere(_ term: String, from nextBatch: String?) async throws(RoomSearchError)
+    -> RoomSearchPage
+}
+
+extension RoomSearchRepository {
+  public func searchEverywhere(_ term: String, from nextBatch: String?)
+    async throws(RoomSearchError) -> RoomSearchPage
+  {
+    throw .requestFailed
+  }
 }

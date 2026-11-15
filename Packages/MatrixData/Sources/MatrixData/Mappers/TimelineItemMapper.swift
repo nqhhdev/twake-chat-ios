@@ -77,6 +77,7 @@ enum TimelineItemMapper {
     var isEdited = false
     var media: MediaReference?
     var formatted: AttributedString?
+    var poll: Domain.Poll?
     let body: TimelineMessage.Body
     switch content.kind {
     case .message(let message):
@@ -88,7 +89,14 @@ enum TimelineItemMapper {
       body = .sticker(text)
       media = reference(
         source, info.thumbnailSource, info.mimetype, info.size, info.width, info.height)
-    case .poll(let question, _, _, _, _, _, _): body = .poll(question: question)
+    case .poll(
+      let question, let kind, let maxSelections, let answers, let votes, let endTime, let edited):
+      body = .poll(question: question)
+      isEdited = edited
+      poll = Self.poll(
+        question: question, isDisclosed: kind == .disclosed, maxSelections: maxSelections,
+        answers: answers.map { ($0.id, $0.text) }, votes: votes, isEnded: endTime != nil,
+        ownUserId: ownUserId)
     case .redacted: body = .redacted
     case .unableToDecrypt: body = .unableToDecrypt
     default: body = .unsupported
@@ -106,7 +114,36 @@ enum TimelineItemMapper {
       isEmojiOnly: isEmojiOnly(body, event), senderAvatar: senderAvatar(event.senderProfile),
       readCount: event.readReceipts.keys.filter { $0 != ownUserId }.count,
       readerIds: event.readReceipts.keys.filter { $0 != ownUserId }.sorted(),
-      replyToEventId: content.inReplyTo?.eventId(), formatted: formatted)
+      replyToEventId: content.inReplyTo?.eventId(), formatted: formatted,
+      uploadProgress: uploadProgress(event.localSendState), poll: poll,
+      thread: content.threadSummary.map(thread), threadRootId: content.threadRoot)
+  }
+
+  private static func thread(_ summary: ThreadSummary) -> TimelineMessage.ThreadPreview {
+    let latest = embedded(summary.latestEvent())
+    return .init(
+      replyCount: Int(clamping: summary.numReplies()), latestSenderName: latest?.senderName,
+      latestText: latest?.text)
+  }
+
+  /// A poll's answers with their voters, as the SDK counts the votes (answer id → voters).
+  static func poll(
+    question: String, isDisclosed: Bool, maxSelections: UInt64,
+    answers: [(id: String, text: String)],
+    votes: [String: [String]], isEnded: Bool, ownUserId: String?
+  ) -> Domain.Poll {
+    let own = Set(votes.filter { $0.value.contains { $0 == ownUserId } }.map(\.key))
+    return Domain.Poll(
+      question: question,
+      answers: answers.map { .init(id: $0.id, text: $0.text, voterIds: votes[$0.id] ?? []) },
+      maxSelections: Int(clamping: maxSelections), isDisclosed: isDisclosed, isEnded: isEnded,
+      ownAnswerIds: own)
+  }
+
+  /// The share of a media upload done, from the send queue's local echo; `nil` when nothing is uploading.
+  static func uploadProgress(_ state: EventSendState?) -> Double? {
+    guard case .notSentYet(let progress?) = state, progress.progress.total > 0 else { return nil }
+    return min(1, Double(progress.progress.current) / Double(progress.progress.total))
   }
 
   /// The HTML body of a text, emote or notice as styled text, as the web client renders it; `nil` without one.
@@ -173,23 +210,35 @@ enum TimelineItemMapper {
   }
 
   private static func reply(_ details: InReplyToDetails) -> TimelineMessage.Reply {
-    switch details.event() {
+    embedded(details.event()) ?? .init(senderName: "", text: nil)
+  }
+
+  /// The sender and one line of an event another one points at (a reply's original, a thread's latest reply), or
+  /// `nil` while it is not loaded.
+  private static func embedded(_ details: EmbeddedEventDetails) -> TimelineMessage.Reply? {
+    switch details {
     case .ready(let content, let sender, let profile, _, _):
-      var text: String?
-      if case .msgLike(let msgLike) = content {
-        switch msgLike.kind {
-        case .message(let message): text = preview(body(message.msgType))
-        case .sticker(let body, _, _): text = body
-        case .poll(let question, _, _, _, _, _, _): text = question
-        case .redacted: text = "This message has been deleted"
-        case .unableToDecrypt: text = "Waiting for this message"
-        default: text = nil
-        }
-      }
+      let text = line(of: content)
       return .init(senderName: name(sender, profile), text: text)
     default:
-      return .init(senderName: "", text: nil)
+      return nil
     }
+  }
+
+  /// One line for an event's content, as a reply preview or a thread list shows it; `nil` for content that has none.
+  static func line(of content: TimelineItemContent) -> String? {
+    var text: String?
+    if case .msgLike(let msgLike) = content {
+      switch msgLike.kind {
+      case .message(let message): text = preview(body(message.msgType))
+      case .sticker(let body, _, _): text = body
+      case .poll(let question, _, _, _, _, _, _): text = question
+      case .redacted: text = "This message has been deleted"
+      case .unableToDecrypt: text = "Waiting for this message"
+      default: text = nil
+      }
+    }
+    return text
   }
 
   /// One line for a message body, as reply previews show it.
@@ -296,7 +345,21 @@ enum TimelineItemMapper {
     }
   }
 
-  private static func date(_ timestamp: Timestamp) -> Date {
+  static func date(_ timestamp: Timestamp) -> Date {
     Date(timeIntervalSince1970: TimeInterval(timestamp) / 1000)
+  }
+}
+
+extension TimelineItemMapper {
+  /// A thread of the room's thread list (`ThreadListService`).
+  static func threadEntry(_ item: ThreadListItem) -> ThreadListEntry {
+    let root = item.rootEvent
+    let latest = item.latestEvent
+    return ThreadListEntry(
+      rootEventId: root.eventId, rootSenderName: name(root.sender, root.senderProfile),
+      rootText: root.content.flatMap(line(of:)), date: date(root.timestamp),
+      replyCount: Int(item.numReplies),
+      latestSenderName: latest.map { name($0.sender, $0.senderProfile) },
+      latestText: latest?.content.flatMap(line(of:)), latestDate: latest.map { date($0.timestamp) })
   }
 }

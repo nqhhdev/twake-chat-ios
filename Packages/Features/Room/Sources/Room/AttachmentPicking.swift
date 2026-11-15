@@ -61,6 +61,33 @@ enum AttachmentLoader {
     return Loaded(kind: kind, fileURL: copy, mimeType: type?.preferredMIMEType, size: size)
   }
 
+  /// A picture from the clipboard, written to a temporary JPEG file like a picked one.
+  static func load(image: UIImage) -> Loaded? {
+    guard let data = image.jpegData(compressionQuality: 0.9) else { return nil }
+    let url = temporaryFile(named: "\(UUID().uuidString).jpg")
+    guard (try? data.write(to: url)) != nil else { return nil }
+    return Loaded(
+      kind: .image(
+        width: Int(image.size.width * image.scale), height: Int(image.size.height * image.scale)),
+      fileURL: url, mimeType: "image/jpeg", size: data.count)
+  }
+
+  /// A picture or a video the camera took, written to a temporary file like a picked one.
+  static func load(camera info: [UIImagePickerController.InfoKey: Any]) -> Loaded? {
+    if let movie = info[.mediaURL] as? URL {
+      return load(document: movie)
+    }
+    guard let image = (info[.editedImage] ?? info[.originalImage]) as? UIImage,
+      let data = image.jpegData(compressionQuality: 0.85)
+    else { return nil }
+    let url = temporaryFile(named: "\(UUID().uuidString).jpg")
+    guard (try? data.write(to: url)) != nil else { return nil }
+    return Loaded(
+      kind: .image(
+        width: Int(image.size.width * image.scale), height: Int(image.size.height * image.scale)),
+      fileURL: url, mimeType: "image/jpeg", size: data.count)
+  }
+
   /// Removes a copied file once it is uploaded.
   static func remove(_ loaded: Loaded) {
     try? FileManager.default.removeItem(at: loaded.fileURL.deletingLastPathComponent())
@@ -84,11 +111,23 @@ struct AttachmentButton: View {
   @State private var pickedPhotos: [PhotosPickerItem] = []
   /// What was picked, shown before sending.
   @State private var preview: PickedBatch?
+  @State private var isPollShown = false
+  @State private var isCameraShown = false
 
   var body: some View {
     Menu {
+      if CameraPicker.isAvailable {
+        Button("Camera", systemImage: "camera") { isCameraShown = true }
+      }
       Button("Gallery", systemImage: "photo.on.rectangle") { isGalleryShown = true }
       Button("Documents", systemImage: "paperclip") { isDocumentPickerShown = true }
+      Button("Poll", systemImage: "chart.bar.xaxis") { isPollShown = true }
+      if UIPasteboard.general.hasImages {
+        Button("Paste Picture", systemImage: "doc.on.clipboard") {
+          let loaded = UIPasteboard.general.images?.compactMap(AttachmentLoader.load(image:)) ?? []
+          if !loaded.isEmpty { preview = PickedBatch(items: loaded) }
+        }
+      }
     } label: {
       Image(systemName: "plus")
         .font(.system(size: 20, weight: .semibold))
@@ -124,6 +163,52 @@ struct AttachmentButton: View {
     .sheet(item: $preview) { batch in
       SendPreviewSheet(items: batch.items, viewModel: viewModel)
     }
+    .sheet(isPresented: $isPollShown) {
+      CreatePollSheet(viewModel: viewModel)
+    }
+    .fullScreenCover(isPresented: $isCameraShown) {
+      CameraPicker { loaded in
+        isCameraShown = false
+        if let loaded { preview = PickedBatch(items: [loaded]) }
+      }
+      .ignoresSafeArea()
+    }
+  }
+}
+
+/// The system camera, for a picture or a video; it hands back the taken file, or `nil` when cancelled.
+struct CameraPicker: UIViewControllerRepresentable {
+  let onFinish: (AttachmentLoader.Loaded?) -> Void
+
+  static var isAvailable: Bool { UIImagePickerController.isSourceTypeAvailable(.camera) }
+
+  func makeUIViewController(context: Context) -> UIImagePickerController {
+    let picker = UIImagePickerController()
+    picker.sourceType = .camera
+    picker.mediaTypes =
+      UIImagePickerController.availableMediaTypes(for: .camera) ?? ["public.image"]
+    picker.videoQuality = .typeHigh
+    picker.delegate = context.coordinator
+    return picker
+  }
+
+  func updateUIViewController(_ controller: UIImagePickerController, context: Context) {}
+
+  func makeCoordinator() -> Coordinator { Coordinator(onFinish: onFinish) }
+
+  final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate
+  {
+    let onFinish: (AttachmentLoader.Loaded?) -> Void
+    init(onFinish: @escaping (AttachmentLoader.Loaded?) -> Void) { self.onFinish = onFinish }
+
+    func imagePickerController(
+      _ picker: UIImagePickerController,
+      didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+    ) {
+      onFinish(AttachmentLoader.load(camera: info))
+    }
+
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { onFinish(nil) }
   }
 }
 

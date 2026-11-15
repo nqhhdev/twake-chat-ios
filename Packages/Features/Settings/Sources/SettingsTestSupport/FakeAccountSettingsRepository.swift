@@ -13,6 +13,47 @@ public final class FakeAccountSettingsRepository: AccountSettingsRepository, @un
 
   public init() {}
 
+  private var _statusMessage: String?
+  /// The status message, as `setStatusMessage` leaves it.
+  public var statusText: String? {
+    get { lock.withLock { _statusMessage } }
+    set { lock.withLock { _statusMessage = newValue } }
+  }
+
+  public func statusMessage() async -> String? { statusText }
+
+  /// What `contactsVisibility` answers; `setContactsVisibility` changes it unless `visibilityFails`.
+  public var visibility: ContactsVisibility? = .contacts
+  public var visibilityFails = false
+
+  public func contactsVisibility() async -> ContactsVisibility? { visibility }
+
+  public func setContactsVisibility(_ visibility: ContactsVisibility) async throws(SettingsError) {
+    if visibilityFails { throw .requestFailed }
+    self.visibility = visibility
+  }
+
+  /// What `cacheSize` answers; clearing sets it to 0.
+  public var cacheBytes: Int? = 2_048
+
+  public func cacheSize() async -> Int? { cacheBytes }
+
+  public func clearCache() async throws(SettingsError) { cacheBytes = 0 }
+
+  /// What `startIdentityReset` answers; the password `finishIdentityReset` got.
+  public var resetStep: IdentityResetStep = .password
+  public private(set) var resetPassword: String?
+
+  public func startIdentityReset() async throws(SettingsError) -> IdentityResetStep { resetStep }
+
+  public func finishIdentityReset(password: String?) async throws(SettingsError) {
+    resetPassword = password
+  }
+
+  public func setStatusMessage(_ message: String) async throws(SettingsError) {
+    statusText = message.isEmpty ? nil : message
+  }
+
   public var name: String? {
     get { lock.withLock { _displayName } }
     set { lock.withLock { _displayName = newValue } }

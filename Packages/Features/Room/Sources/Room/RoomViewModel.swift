@@ -23,6 +23,11 @@ public final class RoomViewModel {
 
   public let roomId: String
   public let roomName: String
+  /// The root of the thread this screen shows, or `nil` for the room's main timeline.
+  public let threadRootId: String?
+  /// The thread pushed from this room, while it shows.
+  public var openedThread: RoomViewModel?
+  @ObservationIgnored private let threadTimeline: ThreadTimeline?
   /// The room's picture, or `nil` when it has none.
   public let roomAvatar: MediaReference?
   public private(set) var state: State = .loading
@@ -43,6 +48,96 @@ public final class RoomViewModel {
   /// The room's pinned messages, oldest pin first, and the one the banner shows.
   public private(set) var pinned: [TimelineMessage] = []
   public private(set) var pinnedIndex = 0
+  /// The user may delete other people's messages, as a moderator; loaded with the timeline.
+  public private(set) var canRedactOthers = false
+  @ObservationIgnored private let saved: (any SavedMessagesRepository)?
+  /// The commands of the room's bots, loaded with the timeline.
+  public private(set) var botCommands: [BotCommand] = []
+
+  /// The message whose edit history the sheet shows.
+  public var historyMessage: TimelineMessage?
+
+  /// The versions of an edited message, the original first; `nil` in an encrypted chat.
+  func editHistory(of message: TimelineMessage) async -> [MessageVersion]? {
+    guard let eventId = message.eventId else { return [] }
+    return await repository.editHistory(of: eventId)
+  }
+
+  /// The commands the draft's "/" word may become.
+  public var commandSuggestions: [BotCommand] {
+    Array(BotCommand.matching(draft, in: botCommands).prefix(6))
+  }
+
+  /// Writes the command's name in the composer, ready for its arguments.
+  public func pick(_ command: BotCommand) {
+    draft = "/" + command.name + (command.argumentNames.isEmpty ? "" : " ")
+  }
+  /// The event ids of this room's messages the user saved.
+  public private(set) var savedEventIds: Set<String> = []
+  public var canSave: Bool { saved != nil }
+
+  func loadSaved() async {
+    guard let saved else { return }
+    savedEventIds = Set(await saved.savedRefs().filter { $0.roomId == roomId }.map(\.eventId))
+  }
+
+  public func isSaved(_ message: TimelineMessage) -> Bool {
+    message.eventId.map(savedEventIds.contains) ?? false
+  }
+
+  /// Saves the message to Saved messages, or forgets it.
+  public func toggleSaved(_ message: TimelineMessage) async {
+    guard let saved, let eventId = message.eventId else { return }
+    let save = !savedEventIds.contains(eventId)
+    do {
+      try await saved.setSaved(save, roomId: roomId, eventId: eventId)
+      if save { savedEventIds.insert(eventId) } else { savedEventIds.remove(eventId) }
+      showToast(save ? "Saved" : "Removed from saved messages")
+    } catch {
+      errorMessage = "Could not update your saved messages."
+    }
+  }
+
+  /// Members whose identity changed, for the banner above the timeline.
+  public private(set) var identityWarnings: [IdentityWarning] = []
+
+  /// Accepts a member's new identity; the banner goes away.
+  public func accept(_ warning: IdentityWarning) async {
+    do {
+      try await repository.accept(warning)
+      withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+        identityWarnings.removeAll { $0.userId == warning.userId }
+      }
+    } catch {
+      errorMessage = "Could not update \(warning.name)'s identity."
+    }
+  }
+
+  /// The room that replaced this one; the composer gives way to a banner that opens it.
+  public private(set) var successorRoomId: String?
+  /// The other person of this direct chat, when the user blocked them; the composer gives way to Unblock.
+  public private(set) var blockedUserId: String?
+  /// The user may post in this room; in a Broadcast only moderators do, and the composer gives way to a note.
+  public private(set) var canSendMessages = true
+
+  /// The other person of this direct chat, when it has one.
+  @ObservationIgnored private var directUserId: String?
+  /// Whether the user blocked someone, and unblocking them; given by the app from the account settings.
+  @ObservationIgnored private let blocking: Blocking?
+
+  /// The account's block list, as the room needs it.
+  public struct Blocking: Sendable {
+    public let isBlocked: @Sendable (String) async -> Bool
+    public let unblock: @Sendable (String) async -> Bool
+
+    public init(
+      isBlocked: @escaping @Sendable (String) async -> Bool,
+      unblock: @escaping @Sendable (String) async -> Bool
+    ) {
+      self.isBlocked = isBlocked
+      self.unblock = unblock
+    }
+  }
   /// A short confirmation shown after an action ("Forwarded").
   public private(set) var toast: String?
   /// The message a long press lifted into the actions layer; while it is set, taps on pictures do nothing, so the
@@ -53,7 +148,7 @@ public final class RoomViewModel {
   /// What another app shared into this room, applied once the timeline shows.
   @ObservationIgnored private var pendingShare: IncomingShare?
 
-  @ObservationIgnored private let repository: any TimelineRepository
+  @ObservationIgnored let repository: any TimelineRepository
   /// Loads the pictures and files of messages.
   @ObservationIgnored public let media: any MediaRepository
   @ObservationIgnored private let detailsRepository: (any RoomDetailsRepository)?
@@ -83,6 +178,22 @@ public final class RoomViewModel {
   /// The quick reactions of the Flutter message menu.
   public static let quickReactions = ["👍", "❤️", "😂", "😮", "😢", "🙏"]
 
+  /// The tapback bar: the user's recent reactions first, then the defaults, six in all.
+  public private(set) var reactionBar: [String] = RoomViewModel.quickReactions
+
+  static func reactionBar(recents: [String]) -> [String] {
+    var bar: [String] = []
+    for key in recents + quickReactions where !bar.contains(key) && !key.isEmpty {
+      bar.append(key)
+      if bar.count == quickReactions.count { break }
+    }
+    return bar
+  }
+
+  func loadRecentReactions() async {
+    reactionBar = Self.reactionBar(recents: await repository.recentReactions())
+  }
+
   public init(
     roomId: String, roomName: String, roomAvatar: MediaReference? = nil,
     repository: any TimelineRepository, media: any MediaRepository,
@@ -95,8 +206,15 @@ public final class RoomViewModel {
     isArchived: Bool = false, rejoin: (@MainActor () async -> Bool)? = nil,
     linkPreviews: (any LinkPreviewRepository)? = nil,
     checkSession: (@Sendable () async -> SessionWarning?)? = nil,
-    display: @escaping @MainActor () -> ChatDisplaySettings = { ChatDisplaySettings() }
+    display: @escaping @MainActor () -> ChatDisplaySettings = { ChatDisplaySettings() },
+    blocking: Blocking? = nil,
+    saved: (any SavedMessagesRepository)? = nil,
+    threadTimeline: ThreadTimeline? = nil, threadRootId: String? = nil
   ) {
+    self.threadTimeline = threadTimeline
+    self.threadRootId = threadRootId
+    self.saved = saved
+    self.blocking = blocking
     self.display = display
     self.checkSession = checkSession
     self.linkPreviews = linkPreviews
@@ -114,6 +232,21 @@ public final class RoomViewModel {
     self.media = media
     self.detailsRepository = details
     self.onLeft = onLeft
+  }
+
+  var hasThreadTimelines: Bool { threadTimeline != nil }
+
+  /// The screen of one thread of this room: the same room, on that thread's timeline, where what is sent goes into
+  /// the thread. It has no thread of its own and no room search.
+  func makeThread(root eventId: String) -> RoomViewModel? {
+    guard let threadTimeline else { return nil }
+    return RoomViewModel(
+      roomId: roomId, roomName: roomName, roomAvatar: roomAvatar,
+      repository: threadTimeline(eventId), media: media, details: detailsRepository, onLeft: onLeft,
+      forwardTargets: forwardTargets, invitePeople: invitePeople, contentTimeline: nil,
+      openDirectChat: openDirectChat, search: nil, isArchived: isArchived, rejoin: nil,
+      linkPreviews: linkPreviews, checkSession: nil, display: display, blocking: blocking,
+      saved: saved, threadTimeline: nil, threadRootId: eventId)
   }
 
   /// The details page of this room, or `nil` when the app gave no details repository.
@@ -189,7 +322,7 @@ public final class RoomViewModel {
 
   /// The card of a link, from the homeserver.
   func linkPreview(of url: URL) async -> LinkPreview? {
-    await linkPreviews?.preview(of: url)
+    await linkPreviews?.preview(of: url, inRoom: roomId)
   }
 
   /// Whether the app gave a way to search inside the room.
@@ -225,10 +358,32 @@ public final class RoomViewModel {
       }
     }
     defer { typing.cancel() }
+    let identities = Task { [repository] in
+      for await warnings in await repository.identityWarnings() {
+        await MainActor.run {
+          withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+            self.identityWarnings = warnings
+          }
+        }
+      }
+    }
+    defer { identities.cancel() }
     // The draft left in this room, here or on another device, comes back in the composer.
     if draft.isEmpty, let saved = await repository.loadDraft() { draft = saved }
     await repository.markAsRead()
-    await loadPinned()
+    // What decorates the room loads beside the timeline, so the messages show without waiting for it (one of these
+    // asks the server).
+    let extras = Task { [weak self] in
+      guard let self else { return }
+      async let pinned: Void = loadPinned()
+      async let roomState: Void = loadRoomState()
+      async let reactions: Void = loadRecentReactions()
+      async let saved: Void = loadSaved()
+      let commands = await repository.botCommands()
+      _ = await (pinned, roomState, reactions, saved)
+      botCommands = commands
+    }
+    defer { extras.cancel() }
     for await list in items where thisStart == startCount {
       state = .loaded(list)
       if list.contains(where: { $0.kind == .timelineStart }) { reachedStart = true }
@@ -349,6 +504,42 @@ public final class RoomViewModel {
     }
   }
 
+  /// Scrolls to the first message sent on `date`'s day or later, loading older pages until the timeline reaches that
+  /// day (at most `maxPages`). Works in encrypted chats, since it reads the decrypted timeline.
+  public func jump(toDate date: Date, calendar: Calendar = .current, maxPages: Int = 200) async {
+    let day = calendar.startOfDay(for: date)
+    var pages = 0
+    while !reachedStart, pages < maxPages, oldestMessageDate.map({ $0 >= day }) ?? true {
+      guard await loadOlder() else { break }
+      pages += 1
+      try? await Task.sleep(for: .milliseconds(120))
+    }
+    guard let target = firstMessage(onOrAfter: day), let eventId = target.eventId else {
+      showToast("No messages from that day")
+      return
+    }
+    await jump(toEvent: eventId, maxPages: 0)
+  }
+
+  /// The date of the oldest loaded message.
+  var oldestMessageDate: Date? {
+    guard case .loaded(let items) = state else { return nil }
+    return items.lazy.compactMap { item -> Date? in
+      if case .message(let message) = item.kind { message.date } else { nil }
+    }.first
+  }
+
+  /// The first loaded message sent at or after `day`.
+  func firstMessage(onOrAfter day: Date) -> TimelineMessage? {
+    guard case .loaded(let items) = state else { return nil }
+    for item in items {
+      if case .message(let message) = item.kind, message.date >= day, message.eventId != nil {
+        return message
+      }
+    }
+    return nil
+  }
+
   /// The row that shows `eventId`: its own, or the album it belongs to.
   private func rowId(containingEvent eventId: String) -> String? {
     for row in rows {
@@ -405,6 +596,81 @@ public final class RoomViewModel {
       showToast(pin ? "Pinned" : "Unpinned")
     } catch {
       errorMessage = "Could not pin the message."
+    }
+  }
+
+  /// Picking messages to copy, forward or delete together (Flutter selection mode).
+  public private(set) var isSelectingMessages = false
+  /// The picked messages, by event id.
+  public private(set) var selectedMessages: [String: TimelineMessage] = [:]
+
+  public func startSelecting(_ message: TimelineMessage) {
+    guard let eventId = message.eventId else { return }
+    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+      composerMode = .new
+      selectedMessages = [eventId: message]
+      isSelectingMessages = true
+    }
+  }
+
+  public func toggleSelection(_ message: TimelineMessage) {
+    guard let eventId = message.eventId else { return }
+    if selectedMessages.removeValue(forKey: eventId) == nil { selectedMessages[eventId] = message }
+  }
+
+  public func isSelected(_ message: TimelineMessage) -> Bool {
+    message.eventId.map { selectedMessages[$0] != nil } ?? false
+  }
+
+  public func endSelecting() {
+    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+      isSelectingMessages = false
+      selectedMessages = [:]
+    }
+  }
+
+  /// The picked messages, oldest first.
+  public var orderedSelection: [TimelineMessage] {
+    selectedMessages.values.sorted { $0.date < $1.date }
+  }
+
+  /// Every picked message may be deleted by the user.
+  public var canDeleteSelection: Bool {
+    !selectedMessages.isEmpty && selectedMessages.values.allSatisfy(canDelete)
+  }
+
+  /// The text of the picked messages, oldest first, each with its sender, as Telegram copies several messages.
+  public var selectionText: String {
+    orderedSelection.compactMap { message in
+      Self.text(of: message.body).map { "\(message.senderName): \($0)" }
+    }.joined(separator: "\n")
+  }
+
+  public func copySelection() {
+    UIPasteboard.general.string = selectionText
+    showToast(selectedMessages.count == 1 ? "Copied" : "Copied \(selectedMessages.count) messages")
+    endSelecting()
+  }
+
+  public func deleteSelection() async {
+    guard canDeleteSelection else { return }
+    let messages = orderedSelection
+    endSelecting()
+    for message in messages { await delete(message) }
+  }
+
+  /// Forwards several messages to one room, oldest first.
+  public func forward(_ messages: [TimelineMessage], to room: RoomSummary) async {
+    var failed = false
+    for message in messages {
+      guard let eventId = message.eventId else { continue }
+      do { try await repository.forward(eventId: eventId, to: room.id) } catch { failed = true }
+    }
+    endSelecting()
+    if failed {
+      errorMessage = "Could not forward every message."
+    } else {
+      showToast("Forwarded to \(room.name)")
     }
   }
 
@@ -476,6 +742,18 @@ public final class RoomViewModel {
   func send(batch: [AttachmentLoader.Loaded], caption: String) async {
     let caption = caption.trimmingCharacters(in: .whitespacesAndNewlines)
     draft = ""
+    let limit = await media.maxUploadSize()
+    let tooLarge = batch.filter { item in limit.map { (item.size ?? 0) > $0 } ?? false }
+    for item in tooLarge { AttachmentLoader.remove(item) }
+    let batch = batch.filter { item in !tooLarge.contains { $0.id == item.id } }
+    var limitMessage: String?
+    if let limit, !tooLarge.isEmpty {
+      let size = Self.sizeText(limit) ?? "\(limit) bytes"
+      limitMessage =
+        tooLarge.count == 1
+        ? "This file is larger than the server allows (\(size))."
+        : "\(tooLarge.count) files are larger than the server allows (\(size))."
+    }
     for (index, item) in batch.enumerated() {
       let isLast = index == batch.count - 1
       await send(
@@ -483,6 +761,7 @@ public final class RoomViewModel {
         caption: isLast && !caption.isEmpty ? caption : nil)
       AttachmentLoader.remove(item)
     }
+    if let limitMessage { errorMessage = limitMessage }
   }
 
   public var canSend: Bool {
@@ -556,7 +835,12 @@ public final class RoomViewModel {
     errorMessage = nil
     do {
       switch mode {
-      case .new: try await repository.send(text: text)
+      case .new:
+        if let command = BotCommand.command(for: typed, in: botCommands) {
+          try await repository.send(command: command, text: typed)
+        } else {
+          try await repository.send(text: text)
+        }
       case .reply(let eventId, _): try await repository.reply(text: text, to: eventId)
       case .edit(let eventId): try await repository.edit(eventId: eventId, text: text)
       }
@@ -585,6 +869,11 @@ public final class RoomViewModel {
     do {
       try await repository.ignore(userId: message.senderId)
       showToast("Blocked \(message.senderName)")
+      if message.senderId == directUserId {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+          blockedUserId = message.senderId
+        }
+      }
     } catch {
       errorMessage = "Could not block \(message.senderName). Please try again."
     }
@@ -611,8 +900,128 @@ public final class RoomViewModel {
     composerMode = .new
   }
 
+  /// What the room's details decide about the screen: moderator rights, a successor room, a blocked person.
+  func loadRoomState() async {
+    guard let detailsRepository,
+      let details = try? await detailsRepository.details(roomId: roomId)
+    else { return }
+    canRedactOthers = details.canRedactOthers
+    canSendMessages = details.canSendMessages
+    directUserId = details.directUserId
+    var blocked: String?
+    if let userId = details.directUserId, let blocking, await blocking.isBlocked(userId) {
+      blocked = userId
+    }
+    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+      successorRoomId = details.successorRoomId
+      blockedUserId = blocked
+    }
+  }
+
+  /// The other person's presence in a direct chat, under the name in the header; `nil` elsewhere or when unknown.
+  public private(set) var presenceLine: String?
+
+  /// Reads the other person's presence now and every `interval` while the chat shows, as the web reads the presence
+  /// of the people shown (D80); it ends when the task is cancelled.
+  public func watchPresence(every interval: Duration = .seconds(15)) async {
+    guard threadRootId == nil, let detailsRepository else { return }
+    // The room's details load with the timeline: wait a few seconds for them to say whether this is a direct chat.
+    var waits = 0
+    while !Task.isCancelled {
+      guard let userId = directUserId else {
+        waits += 1
+        guard waits <= 10 else { return }
+        try? await Task.sleep(for: .seconds(1))
+        continue
+      }
+      let line = await detailsRepository.presence(of: userId)?.line
+      if line != presenceLine {
+        withAnimation(.easeInOut(duration: 0.25)) { presenceLine = line }
+      }
+      try? await Task.sleep(for: interval)
+    }
+  }
+
+  /// The link that opens the room that replaced this one.
+  public var successorLink: URL? {
+    successorRoomId.flatMap {
+      let via =
+        MatrixLink.server(of: $0).map { [$0] } ?? MatrixLink.server(of: roomId).map { [$0] } ?? []
+      return MatrixLink.room(idOrAlias: $0, eventId: nil, via: via).url
+    }
+  }
+
+  /// Unblocks the other person of this direct chat; the composer comes back.
+  public func unblock() async {
+    guard let userId = blockedUserId, let blocking else { return }
+    if await blocking.unblock(userId) {
+      withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { blockedUserId = nil }
+    } else {
+      errorMessage = "Could not unblock. Please try again."
+    }
+  }
+
+  /// Sends the poll the user wrote; `false` (with a message) when it failed, so the sheet stays open.
+  @discardableResult
+  public func createPoll(_ draft: PollDraft) async -> Bool {
+    guard draft.canSend else { return false }
+    errorMessage = nil
+    do {
+      try await repository.createPoll(draft)
+      sendCount += 1
+      return true
+    } catch {
+      errorMessage = "Could not send the poll."
+      return false
+    }
+  }
+
+  /// Votes for `answerId` in a poll that has not ended, or takes the vote back in a multiple-choice poll.
+  public func vote(_ answerId: String, in message: TimelineMessage) async {
+    guard let poll = message.poll, !poll.isEnded, let eventId = message.eventId else { return }
+    do {
+      try await repository.vote(poll.selection(tapping: answerId), in: eventId)
+    } catch {
+      errorMessage = "Could not send your vote."
+    }
+  }
+
+  /// The user may end this poll: they created it and it is still open.
+  public func canEndPoll(_ message: TimelineMessage) -> Bool {
+    message.isOwn && message.eventId != nil && message.poll.map { !$0.isEnded } == true
+  }
+
+  public func endPoll(_ message: TimelineMessage) async {
+    guard canEndPoll(message), let eventId = message.eventId else { return }
+    do {
+      try await repository.endPoll(eventId)
+    } catch {
+      errorMessage = "Could not end the poll."
+    }
+  }
+
+  /// The user may delete this message: their own, or anyone's as a moderator.
+  public func canDelete(_ message: TimelineMessage) -> Bool {
+    guard message.eventId != nil, message.body != .redacted else { return false }
+    return message.isOwn || canRedactOthers
+  }
+
+  /// The `matrix.to` link to the message, to share it outside the app; `nil` before it is sent.
+  public func link(to message: TimelineMessage) -> URL? {
+    guard let eventId = message.eventId else { return nil }
+    let via = MatrixLink.server(of: message.senderId).map { [$0] } ?? []
+    return MatrixLink.room(idOrAlias: roomId, eventId: eventId, via: via).url
+  }
+
+  /// Copies the message's link and confirms it.
+  public func copyLink(to message: TimelineMessage) {
+    guard let url = link(to: message) else { return }
+    UIPasteboard.general.url = url
+    showToast("Link copied")
+  }
+
   public func delete(_ message: TimelineMessage) async {
-    guard message.isOwn, let eventId = message.eventId else { return }
+    guard canDelete(message), let eventId = message.eventId else { return }
     do {
       try await repository.redact(eventId: eventId)
     } catch {
@@ -622,8 +1031,13 @@ public final class RoomViewModel {
 
   public func toggleReaction(_ key: String, on message: TimelineMessage) async {
     guard let eventId = message.eventId else { return }
+    let adds = !message.reactions.contains { $0.key == key && $0.includesOwn }
     do {
       try await repository.toggleReaction(key, on: eventId)
+      if adds {
+        reactionBar = Self.reactionBar(recents: [key] + reactionBar)
+        await repository.addRecentReaction(key)
+      }
     } catch {
       errorMessage = "Could not send the reaction."
     }

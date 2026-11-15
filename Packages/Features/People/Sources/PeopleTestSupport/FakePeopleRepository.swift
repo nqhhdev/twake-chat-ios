@@ -8,6 +8,7 @@ public final class FakePeopleRepository: PeopleRepository, @unchecked Sendable {
   private var _searches: [String] = []
   private var _created: [(name: String, userIds: [String])] = []
   private var _directs: [String] = []
+  private var _broadcasts: [(draft: BroadcastDraft, userIds: [String])] = []
   private var _fails = false
 
   public init() {}
@@ -23,6 +24,17 @@ public final class FakePeopleRepository: PeopleRepository, @unchecked Sendable {
   public var searches: [String] { lock.withLock { _searches } }
   public var directs: [String] { lock.withLock { _directs } }
   public var createdGroups: [(name: String, userIds: [String])] { lock.withLock { _created } }
+  public var createdBroadcasts: [(draft: BroadcastDraft, userIds: [String])] {
+    lock.withLock { _broadcasts }
+  }
+
+  public func createBroadcast(_ draft: BroadcastDraft, inviting userIds: [String])
+    async throws(PeopleError) -> String
+  {
+    if fails { throw .requestFailed }
+    lock.withLock { _broadcasts.append((draft, userIds)) }
+    return "!broadcast"
+  }
 
   public func search(_ text: String) async throws(PeopleError) -> [Person] {
     lock.withLock { _searches.append(text) }

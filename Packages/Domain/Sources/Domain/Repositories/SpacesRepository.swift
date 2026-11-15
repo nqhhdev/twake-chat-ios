@@ -40,4 +40,17 @@ public protocol SpacesRepository: Sendable {
   func children(of spaceId: String) async throws(SpacesError) -> [SpaceChild]
   /// Joins a room of the space and returns its id.
   func join(_ child: SpaceChild) async throws(SpacesError) -> String
+  /// The user may add rooms to the space `spaceId` (their power level lets them edit it).
+  func canAddChannel(to spaceId: String) async -> Bool
+  /// Creates an encrypted private room named `name` and adds it to the space; returns its id.
+  func createChannel(named name: String, in spaceId: String) async throws(SpacesError) -> String
+}
+
+extension SpacesRepository {
+  public func canAddChannel(to spaceId: String) async -> Bool { false }
+  public func createChannel(named name: String, in spaceId: String) async throws(SpacesError)
+    -> String
+  {
+    throw .requestFailed
+  }
 }

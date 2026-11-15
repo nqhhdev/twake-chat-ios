@@ -15,7 +15,10 @@ public actor LinkPreviewProxy: LinkPreviewRepository {
     session = .shared
   }
 
-  public func preview(of url: URL) async -> LinkPreview? {
+  public func preview(of url: URL, inRoom roomId: String) async -> LinkPreview? {
+    guard let room = try? await clientProxy()?.client.getRoom(roomId: roomId),
+      (try? await room.latestEncryptionState()) == .notEncrypted
+    else { return nil }
     if let cached = cache[url] { return cached }
     let preview = await fetch(url)
     cache[url] = preview

@@ -40,6 +40,13 @@ public actor MediaProxy: MediaRepository {
     }
   }
 
+  public func maxUploadSize() async -> Int? {
+    guard let client = await clientProxy()?.client,
+      let size = try? await client.getMaxMediaUploadSize(), size > 0
+    else { return nil }
+    return Int(clamping: size)
+  }
+
   public func content(_ media: MediaReference) async throws(MediaError) -> Data {
     let client = try await client()
     do {

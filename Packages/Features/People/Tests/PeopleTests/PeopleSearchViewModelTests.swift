@@ -104,3 +104,40 @@ struct PeopleSearchViewModelTests {
     #expect(viewModel.errorMessage == "Could not invite. Please try again.")
   }
 }
+
+@MainActor
+struct BroadcastCreationTests {
+  private let alice = Person(id: "@alice:example.org", displayName: "Alice")
+
+  @Test func theAddressFollowsTheNameUntilItIsEditedThenTheBroadcastOpens() async {
+    let repository = FakePeopleRepository()
+    var openedName: String?
+    let viewModel = PeopleSearchViewModel(
+      mode: .broadcast, repository: repository, debounce: .seconds(60),
+      onOpen: { openedName = $1 })
+    viewModel.broadcast.name = "Product News"
+    #expect(viewModel.broadcast.slug == "product-news")
+    viewModel.isSlugEdited = true
+    viewModel.broadcast.slug = "news"
+    viewModel.broadcast.name = "Product News 2026"
+    #expect(viewModel.broadcast.slug == "news")
+
+    await viewModel.tap(alice)
+    #expect(viewModel.canCreateBroadcast)
+    await viewModel.createBroadcast()
+
+    #expect(repository.createdBroadcasts.first?.draft.slug == "news")
+    #expect(repository.createdBroadcasts.first?.userIds == ["@alice:example.org"])
+    #expect(openedName == "Product News 2026")
+  }
+
+  @Test func aFailureSaysTheAddressMayBeTaken() async {
+    let repository = FakePeopleRepository()
+    repository.fails = true
+    let viewModel = PeopleSearchViewModel(
+      mode: .broadcast, repository: repository, debounce: .seconds(60), onOpen: { _, _ in })
+    viewModel.broadcast.name = "News"
+    await viewModel.createBroadcast()
+    #expect(viewModel.errorMessage == "Could not create the Broadcast. Its address may be taken.")
+  }
+}

@@ -20,6 +20,20 @@ struct DevicesProxyTests {
     #expect(sessions[2].lastSeen == Date(timeIntervalSince1970: 1))
   }
 
+  @Test func aChallengeOffersTheSingleSignOnPageAndThePassword() throws {
+    let json = Data(
+      #"{"session":"abc","flows":[{"stages":["m.login.sso"]},{"stages":["m.login.password"]}]}"#
+        .utf8)
+    let base = try #require(URL(string: "https://matrix.example.org/_matrix/client/v3/"))
+    let challenge = try #require(DevicesProxy.challenge(from: json, homeserver: base))
+    #expect(challenge.session == "abc")
+    #expect(challenge.acceptsPassword)
+    #expect(
+      challenge.webURL?.absoluteString
+        == "https://matrix.example.org/_matrix/client/v3/auth/m.login.sso/fallback/web?session=abc")
+    #expect(DevicesProxy.challenge(from: Data("{}".utf8), homeserver: base) == nil)
+  }
+
   @Test func anUnreadableAnswerIsAnEmptyList() {
     #expect(DevicesProxy.sessions(from: Data("nope".utf8), currentId: nil).isEmpty)
   }

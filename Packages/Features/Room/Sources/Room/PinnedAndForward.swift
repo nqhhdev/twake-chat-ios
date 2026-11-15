@@ -74,7 +74,7 @@ struct Toast: View {
 
 /// Pick a chat to forward a message to, with a search over the chat list.
 struct ForwardSheet: View {
-  let message: TimelineMessage
+  let messages: [TimelineMessage]
   let viewModel: RoomViewModel
 
   @Environment(\.dismiss) private var dismiss
@@ -91,7 +91,7 @@ struct ForwardSheet: View {
       List(rooms) { room in
         Button {
           Task {
-            await viewModel.forward(message, to: room)
+            await viewModel.forward(messages, to: room)
             dismiss()
           }
         } label: {
@@ -187,5 +187,52 @@ struct PinnedListSheet: View {
       .navigationBarTitleDisplayMode(.inline)
     }
     .presentationDetents([.medium, .large])
+  }
+}
+
+/// Every version of an edited message, the original first, each with its time (web Phase 2b « Edit history »). An
+/// encrypted chat cannot show them: the server holds the edits encrypted.
+struct EditHistorySheet: View {
+  let message: TimelineMessage
+  let viewModel: RoomViewModel
+  @State private var versions: [MessageVersion]??
+  @Environment(\.dismiss) private var dismiss
+
+  var body: some View {
+    NavigationStack {
+      Group {
+        switch versions {
+        case .none:
+          ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .some(.none):
+          ContentUnavailableView(
+            "Not available", systemImage: "lock",
+            description: Text("The edit history of an encrypted chat cannot be shown."))
+        case .some(.some(let list)):
+          List(Array(list.enumerated()), id: \.element.id) { index, version in
+            VStack(alignment: .leading, spacing: 4) {
+              Text(index == 0 ? "Original" : "Edit \(index)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(
+                  index == list.count - 1 ? SysColors.primary : SysColors.textSecondary)
+              Text(version.text)
+              Text(version.date, format: .dateTime.day().month(.abbreviated).hour().minute())
+                .font(.caption2)
+                .foregroundStyle(SysColors.textSecondary)
+            }
+            .padding(.vertical, 2)
+          }
+        }
+      }
+      .twakeTitle("Edit History")
+      .toolbar {
+        ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+      }
+    }
+    .presentationDetents([.medium, .large])
+    .task {
+      let found = await viewModel.editHistory(of: message)
+      withAnimation(.easeInOut) { versions = .some(found) }
+    }
   }
 }

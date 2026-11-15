@@ -46,4 +46,30 @@ struct MatrixLinkTests {
     #expect(link("https://matrix.to/#/hello") == nil)
     #expect(link("matrix:x/y") == nil)
   }
+
+  @Test func aMessageLinkNamesItsServers() {
+    let link = MatrixLink.room(
+      idOrAlias: "!abc:example.org", eventId: "$ev/1", via: ["example.org"])
+    #expect(
+      link.url?.absoluteString == "https://matrix.to/#/!abc:example.org/$ev%2F1?via=example.org")
+  }
+
+  @Test func anAliasLinkIsEncodedAndHasNoServers() {
+    let link = MatrixLink.room(idOrAlias: "#team:example.org", eventId: nil, via: ["example.org"])
+    #expect(link.url?.absoluteString == "https://matrix.to/#/%23team:example.org")
+  }
+
+  @Test func aLinkReadsBackAsTheSameLink() {
+    let original = MatrixLink.room(
+      idOrAlias: "!abc:example.org", eventId: "$e", via: ["a.org", "b.org"])
+    #expect(original.url.flatMap(MatrixLink.init(url:)) == original)
+    #expect(
+      MatrixLink.user(id: "@alice:example.org").url.flatMap(MatrixLink.init(url:))
+        == .user(id: "@alice:example.org"))
+  }
+
+  @Test func theServerOfAnId() {
+    #expect(MatrixLink.server(of: "@alice:example.org:8448") == "example.org:8448")
+    #expect(MatrixLink.server(of: "alice") == nil)
+  }
 }

@@ -42,6 +42,71 @@ public actor DevicesProxy: DevicesRepository {
     }
   }
 
+  public func signOut(deviceIds: [String], auth: DeviceAuth?) async throws(DevicesError)
+    -> DeviceSignOut
+  {
+    guard !deviceIds.isEmpty else { return .done }
+    var payload: [String: Any] = ["devices": deviceIds]
+    if let auth {
+      let userId = try? await clientProxy()?.userId
+      payload["auth"] = try await Self.authBody(auth, userId: userId)
+    }
+    let body = try? JSONSerialization.data(withJSONObject: payload)
+    let (_, request) = try await request(path: "delete_devices", method: "POST", body: body)
+    let data: Data
+    let status: Int
+    do {
+      let (answer, response) = try await session.data(for: request)
+      data = answer
+      status = (response as? HTTPURLResponse)?.statusCode ?? 0
+    } catch {
+      throw .requestFailed
+    }
+    if status == 200 { return .done }
+    guard status == 401,
+      let challenge = Self.challenge(
+        from: data, homeserver: request.url?.deletingLastPathComponent())
+    else { throw .requestFailed }
+    return .needsConfirmation(challenge)
+  }
+
+  /// The `auth` object of the retry: the session alone after the SSO fallback page (spec, "Fallback"), or the password
+  /// with the user's id.
+  static func authBody(_ auth: DeviceAuth, userId: String?) async throws(DevicesError) -> [String:
+    Any]
+  {
+    switch auth {
+    case .confirmedOnWeb(let session):
+      return ["session": session]
+    case .password(let password, let session):
+      guard let userId else { throw .notSignedIn }
+      return [
+        "type": "m.login.password", "session": session, "password": password,
+        "identifier": ["type": "m.id.user", "user": userId],
+      ]
+    }
+  }
+
+  /// The challenge in a 401 answer: its session, the SSO fallback page when a flow uses `m.login.sso`, and whether a
+  /// flow is the password alone. `base` is the homeserver's `_matrix/client/v3/` URL.
+  static func challenge(from data: Data, homeserver base: URL?) -> DeviceAuthChallenge? {
+    guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+      let session = object["session"] as? String
+    else { return nil }
+    let flows = (object["flows"] as? [[String: Any]] ?? []).compactMap { $0["stages"] as? [String] }
+    let usesSSO = flows.contains { $0 == ["m.login.sso"] }
+    var webURL: URL?
+    if usesSSO, let base {
+      var components = URLComponents(
+        url: base.appending(path: "auth/m.login.sso/fallback/web"), resolvingAgainstBaseURL: false)
+      components?.queryItems = [URLQueryItem(name: "session", value: session)]
+      webURL = components?.url
+    }
+    return DeviceAuthChallenge(
+      session: session, webURL: webURL,
+      acceptsPassword: flows.contains { $0 == ["m.login.password"] })
+  }
+
   private func request(path: String, method: String, body: Data?) async throws(DevicesError)
     -> (ClientProxy, URLRequest)
   {

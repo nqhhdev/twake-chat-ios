@@ -48,4 +48,26 @@ public actor SpacesProxy: SpacesRepository {
       memberCount: Int(clamping: room.numJoinedMembers), isJoined: room.state == .joined,
       isSpace: isSpace, via: room.via)
   }
+
+  public func canAddChannel(to spaceId: String) async -> Bool {
+    guard let client = await clientProxy()?.client else { return false }
+    return await client.spaceService().editableSpaces().contains { $0.roomId == spaceId }
+  }
+
+  public func createChannel(named name: String, in spaceId: String) async throws(SpacesError)
+    -> String
+  {
+    guard let client = await clientProxy()?.client else { throw .notSignedIn }
+    do {
+      let roomId = try await client.createRoom(
+        request: CreateRoomParameters(
+          name: name.trimmingCharacters(in: .whitespacesAndNewlines), isEncrypted: true,
+          isDirect: false, visibility: .private, preset: .privateChat))
+      try await client.spaceService().addChildToSpace(childId: roomId, spaceId: spaceId)
+      return roomId
+    } catch {
+      DebugLog.failure("createChannel", error)
+      throw .requestFailed
+    }
+  }
 }

@@ -95,4 +95,37 @@ struct VerificationViewModelTests {
     var value: String { lock.withLock { stored } }
     func set(_ id: String, _ name: String) { lock.withLock { stored = "\(id) \(name)" } }
   }
+
+  private actor SigningOut: DevicesRepository {
+    private(set) var calls: [[String]] = []
+    private(set) var auths: [DeviceAuth?] = []
+    func devices() async throws(DevicesError) -> [DeviceSession] {
+      [
+        DeviceSession(id: "ME", displayName: "iPhone", lastSeen: nil, isCurrent: true),
+        DeviceSession(id: "WEB", displayName: "Web", lastSeen: nil, isCurrent: false),
+      ]
+    }
+    func rename(deviceId: String, to name: String) async throws(DevicesError) {}
+    func signOut(deviceIds: [String], auth: DeviceAuth?) async throws(DevicesError)
+      -> DeviceSignOut
+    {
+      calls.append(deviceIds)
+      auths.append(auth)
+      return auth == nil
+        ? .needsConfirmation(.init(session: "S1", webURL: nil, acceptsPassword: true)) : .done
+    }
+  }
+
+  @Test func signingOutOthersAsksForThePasswordThenRetries() async {
+    let fake = SigningOut()
+    let viewModel = DevicesViewModel(repository: fake)
+    await viewModel.load()
+    await viewModel.signOut(viewModel.otherDevices)
+    #expect(viewModel.pendingSignOut?.challenge.session == "S1")
+    await viewModel.confirmSignOut(password: "secret")
+    #expect(viewModel.pendingSignOut == nil)
+    #expect(await fake.calls == [["WEB"], ["WEB"]])
+    #expect(await fake.auths == [nil, .password("secret", session: "S1")])
+    #expect(viewModel.errorMessage == nil)
+  }
 }

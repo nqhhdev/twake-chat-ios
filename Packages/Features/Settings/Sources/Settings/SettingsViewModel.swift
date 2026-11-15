@@ -72,6 +72,8 @@ public final class SettingsViewModel {
     avatar = await repository.avatar()
     directMode = await repository.defaultNotificationMode(isDirect: true)
     groupMode = await repository.defaultNotificationMode(isDirect: false)
+    doNotDisturb = await repository.isDoNotDisturbOn()
+    statusMessage = await repository.statusMessage()
     recoveryStatus = await repository.recoveryStatus()
   }
 
@@ -149,6 +151,83 @@ public final class SettingsViewModel {
     }
   }
 
+  /// The e-mail addresses and phone numbers of the account; `nil` until loaded.
+  public private(set) var linkedAddresses: [LinkedAddress]?
+
+  public func loadLinkedAddresses() async {
+    linkedAddresses = await repository.linkedAddresses()
+  }
+
+  /// Who sees the e-mail and phone; `nil` until ToM answers, and then the choice is not offered.
+  public private(set) var contactsVisibility: ContactsVisibility?
+
+  public func loadContactsVisibility() async {
+    contactsVisibility = await repository.contactsVisibility()
+  }
+
+  /// Saves the choice; the picker shows it at once and goes back if the server refuses.
+  public func setContactsVisibility(_ visibility: ContactsVisibility) async {
+    let previous = contactsVisibility
+    contactsVisibility = visibility
+    errorMessage = nil
+    do {
+      try await repository.setContactsVisibility(visibility)
+    } catch {
+      contactsVisibility = previous
+      errorMessage = "Could not change who sees your e-mail and phone."
+    }
+  }
+
+  /// The cached messages and media on the device, in bytes; `nil` until read or when unknown.
+  public private(set) var cacheSize: Int?
+  public private(set) var isClearingCache = false
+
+  public func loadCacheSize() async {
+    cacheSize = await repository.cacheSize()
+  }
+
+  public func clearCache() async {
+    guard !isClearingCache else { return }
+    isClearingCache = true
+    defer { isClearingCache = false }
+    errorMessage = nil
+    do {
+      try await repository.clearCache()
+      cacheSize = await repository.cacheSize()
+    } catch {
+      errorMessage = "Could not clear the cache. Please try again."
+    }
+  }
+
+  /// The status message others see on the user's profile.
+  public private(set) var statusMessage: String?
+
+  public func setStatusMessage(_ text: String) async {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    let previous = statusMessage
+    statusMessage = trimmed.isEmpty ? nil : trimmed
+    do {
+      try await repository.setStatusMessage(trimmed)
+    } catch {
+      statusMessage = previous
+      errorMessage = "Could not change your status. Please try again."
+    }
+  }
+
+  /// Every notification of the account is off.
+  public private(set) var doNotDisturb = false
+
+  public func setDoNotDisturb(_ on: Bool) async {
+    let previous = doNotDisturb
+    doNotDisturb = on
+    do {
+      try await repository.setDoNotDisturb(on)
+    } catch {
+      doNotDisturb = previous
+      errorMessage = "Could not change Do Not Disturb. Please try again."
+    }
+  }
+
   public func setNotificationMode(_ mode: NotificationMode, isDirect: Bool) async {
     let previous = isDirect ? directMode : groupMode
     if isDirect { directMode = mode } else { groupMode = mode }
@@ -192,6 +271,50 @@ public final class SettingsViewModel {
   }
 
   public func dismissNewRecoveryKey() { newRecoveryKey = nil }
+
+  /// What the identity reset under way waits for; `nil` when none is.
+  public private(set) var identityReset: IdentityResetStep?
+  public private(set) var didResetIdentity = false
+
+  public func startIdentityReset() async {
+    guard !isWorking else { return }
+    isWorking = true
+    defer { isWorking = false }
+    errorMessage = nil
+    do {
+      let step = try await repository.startIdentityReset()
+      if step == .done { await identityWasReset() } else { identityReset = step }
+    } catch {
+      errorMessage = "Could not reset your identity. Please try again."
+    }
+  }
+
+  /// Sends the password, or after the web page, finishes the reset.
+  public func finishIdentityReset(password: String? = nil) async {
+    guard identityReset != nil, !isWorking else { return }
+    isWorking = true
+    defer { isWorking = false }
+    do {
+      try await repository.finishIdentityReset(password: password)
+      identityReset = nil
+      await identityWasReset()
+    } catch {
+      errorMessage =
+        password == nil
+        ? "The reset was not approved. Please try again." : "Wrong password, or the reset failed."
+    }
+  }
+
+  public func cancelIdentityReset() async {
+    identityReset = nil
+    await repository.cancelIdentityReset()
+  }
+
+  private func identityWasReset() async {
+    didResetIdentity = true
+    recoveryStatus = await repository.recoveryStatus()
+    await verification?.refreshState()
+  }
 
   public func logOut() async {
     guard !isLoggingOut else { return }

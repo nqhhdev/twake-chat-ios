@@ -81,6 +81,19 @@ public struct TimelineMessage: Sendable, Equatable {
   }
 
   /// What a reply quotes: the original sender and a one-line preview, or `nil` text while it loads.
+  /// A thread started on this message (`m.thread`): how many replies it has and the latest one, as its root shows.
+  public struct ThreadPreview: Sendable, Equatable {
+    public let replyCount: Int
+    public let latestSenderName: String?
+    public let latestText: String?
+
+    public init(replyCount: Int, latestSenderName: String? = nil, latestText: String? = nil) {
+      self.replyCount = replyCount
+      self.latestSenderName = latestSenderName
+      self.latestText = latestText
+    }
+  }
+
   public struct Reply: Sendable, Equatable {
     public let senderName: String
     public let text: String?
@@ -118,14 +131,28 @@ public struct TimelineMessage: Sendable, Equatable {
   /// The text, emote or notice as its sender formatted it (bold, links, mentions, quotes, lists), from its HTML body;
   /// `nil` when it has none, and the plain `body` shows.
   public let formatted: AttributedString?
+  /// How much of the picture, video or file is uploaded (0…1) while it is sending; `nil` otherwise.
+  public let uploadProgress: Double?
+  /// The poll, its answers and votes, for a `.poll` body.
+  public let poll: Poll?
+  /// The thread started on this message, or `nil` when it has none.
+  public let thread: ThreadPreview?
+  /// The root of the thread this message is a reply in, or `nil` when it is in the room's main timeline.
+  public let threadRootId: String?
 
   public init(
     eventId: String?, senderId: String, senderName: String, isOwn: Bool, date: Date, body: Body,
     isEdited: Bool = false, reactions: [Reaction] = [], reply: Reply? = nil,
     sendState: SendState = .sent, media: MediaReference? = nil, isEmojiOnly: Bool = false,
     senderAvatar: MediaReference? = nil, readCount: Int = 0, readerIds: [String] = [],
-    replyToEventId: String? = nil, formatted: AttributedString? = nil
+    replyToEventId: String? = nil, formatted: AttributedString? = nil,
+    uploadProgress: Double? = nil, poll: Poll? = nil, thread: ThreadPreview? = nil,
+    threadRootId: String? = nil
   ) {
+    self.thread = thread
+    self.threadRootId = threadRootId
+    self.poll = poll
+    self.uploadProgress = uploadProgress
     self.formatted = formatted
     self.eventId = eventId
     self.senderId = senderId

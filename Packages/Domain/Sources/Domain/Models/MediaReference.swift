@@ -44,4 +44,10 @@ public protocol MediaRepository: Sendable {
   func content(_ media: MediaReference) async throws(MediaError) -> Data
   /// The media saved as a file named `filename` in a temporary folder, to open or share it.
   func file(_ media: MediaReference, filename: String) async throws(MediaError) -> URL
+  /// The largest file the homeserver accepts, in bytes (`/_matrix/client/v1/media/config`); `nil` when unknown.
+  func maxUploadSize() async -> Int?
+}
+
+extension MediaRepository {
+  public func maxUploadSize() async -> Int? { nil }
 }

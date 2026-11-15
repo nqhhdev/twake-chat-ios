@@ -34,7 +34,11 @@ public actor RoomDetailsProxy: RoomDetailsRepository {
         canInvite: canInvite, avatar: RoomSummaryMapper.avatar(of: info),
         joinRule: Self.joinRule(info.joinRule), canChangeAccess: canChangeAccess && !info.isDirect,
         canEnableEncryption: canEncrypt && !isEncrypted,
-        canBan: powerLevels?.canOwnUserBan() ?? false)
+        canBan: powerLevels?.canOwnUserBan() ?? false,
+        canRedactOthers: powerLevels?.canOwnUserRedactOther() ?? false,
+        successorRoomId: info.successorRoom?.roomId,
+        directUserId: info.isDirect && info.heroes.count == 1 ? info.heroes.first?.userId : nil,
+        canSendMessages: powerLevels?.canOwnUserSendMessage(message: .roomMessage) ?? true)
     } catch {
       throw .requestFailed
     }
@@ -81,10 +85,14 @@ public actor RoomDetailsProxy: RoomDetailsRepository {
 
   public func leave(roomId: String) async throws(RoomDetailsError) {
     let room = try await room(roomId)
+    let info = try? await room.roomInfo()
     do {
       try await room.leave()
     } catch {
       throw .requestFailed
+    }
+    if let client = await clientProxy()?.client {
+      await ArchiveAccountData.archive(room, info: info, client: client)
     }
   }
 
@@ -266,6 +274,41 @@ public actor RoomDetailsProxy: RoomDetailsRepository {
     } catch {
       throw .requestFailed
     }
+  }
+
+  public func statusMessage(of userId: String) async -> String? {
+    guard let client = await clientProxy(),
+      let request = ClientServerRequest.make(
+        client: client.client, path: "presence/\(ClientServerRequest.encode(userId))/status"),
+      let object = await ClientServerRequest.object(request)
+    else { return nil }
+    return (object["status_msg"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+  }
+
+  public func presence(of userId: String) async -> Presence? {
+    guard let client = await clientProxy(),
+      let request = ClientServerRequest.make(
+        client: client.client, path: "presence/\(ClientServerRequest.encode(userId))/status"),
+      let object = await ClientServerRequest.object(request)
+    else { return nil }
+    return Presence.from(object)
+  }
+
+  /// Reads each joined group's member from the local store; at most `limit` rooms, so a huge account stays quick.
+  public func roomsInCommon(with userId: String) async -> [RoomInCommon] {
+    guard let client = await clientProxy() else { return [] }
+    var found: [RoomInCommon] = []
+    for room in client.client.rooms().prefix(300) where room.membership() == .joined {
+      guard !(await room.isDirect()), !room.isSpace(),
+        let member = try? await room.member(userId: userId), member.membership == .join
+      else { continue }
+      let info = try? await room.roomInfo()
+      found.append(
+        RoomInCommon(
+          id: room.id(), name: room.displayName() ?? room.id(),
+          avatar: info.flatMap(RoomSummaryMapper.avatar(of:))))
+    }
+    return found.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
   }
 
   private func room(_ roomId: String) async throws(RoomDetailsError) -> Room {

@@ -15,6 +15,14 @@ struct ComposerView: View {
 
   var body: some View {
     VStack(spacing: 0) {
+      let commands = viewModel.commandSuggestions
+      if !commands.isEmpty {
+        CommandSuggestions(commands: commands) { command in
+          viewModel.pick(command)
+          isFocused = true
+        }
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+      }
       let suggestions = viewModel.mentionSuggestions
       if !suggestions.isEmpty {
         MentionSuggestions(members: suggestions, viewModel: viewModel) { member in
@@ -66,6 +74,7 @@ struct ComposerView: View {
       }
     }
     .animation(.spring(response: 0.3, dampingFraction: 0.85), value: viewModel.mentionSuggestions)
+    .animation(.spring(response: 0.3, dampingFraction: 0.85), value: viewModel.commandSuggestions)
     .onChange(of: viewModel.composerMode) { _, mode in
       if mode != .new { isFocused = true }
     }
@@ -261,5 +270,44 @@ struct MentionSuggestions: View {
     .shadow(color: .black.opacity(0.10), radius: 8, y: -2)
     .padding(.horizontal, 12)
     .padding(.bottom, 4)
+  }
+}
+
+/// The bot commands the "/" word may become (MSC4332): the syntax and what it does; a tap writes its name.
+struct CommandSuggestions: View {
+  let commands: [BotCommand]
+  let onPick: (BotCommand) -> Void
+
+  var body: some View {
+    VStack(spacing: 0) {
+      ForEach(commands) { command in
+        Button {
+          onPick(command)
+        } label: {
+          HStack(spacing: 10) {
+            Image(systemName: "terminal")
+              .foregroundStyle(SysColors.primary)
+              .frame(width: 28)
+            VStack(alignment: .leading, spacing: 2) {
+              Text("/" + command.syntax)
+                .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+                .foregroundStyle(SysColors.onSurface)
+              if !command.description.isEmpty {
+                Text(command.description)
+                  .font(.caption)
+                  .foregroundStyle(SysColors.textSecondary)
+                  .lineLimit(1)
+              }
+            }
+            Spacer()
+          }
+          .padding(.horizontal, 16)
+          .padding(.vertical, 8)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+      }
+    }
+    .background(.bar)
   }
 }

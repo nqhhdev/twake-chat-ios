@@ -82,6 +82,70 @@ public actor PeopleProxy: PeopleRepository {
     }
   }
 
+  /// Over `/createRoom`: the SDK's `CreateRoomParameters` has no room type.
+  public func createBroadcast(_ draft: BroadcastDraft, inviting userIds: [String])
+    async throws(PeopleError) -> String
+  {
+    let client = try await client()
+    guard
+      let request = ClientServerRequest.make(
+        client: client.client, path: "createRoom", method: "POST",
+        json: Self.broadcastBody(draft, inviting: userIds)),
+      let roomId = await ClientServerRequest.object(request)?["room_id"] as? String
+    else { throw .requestFailed }
+    return roomId
+  }
+
+  /// The `/createRoom` body of a Broadcast (web D90): typed `app.twake.chat.page`, posting from moderator (50) up,
+  /// reactions open to followers when chosen. An open one is a public chat in the directory with an address and a
+  /// history anyone reads; one on approval is in the directory with the `knock` join rule; one on invitation is
+  /// private and encrypted.
+  static func broadcastBody(_ draft: BroadcastDraft, inviting userIds: [String]) -> [String: Any] {
+    // The override replaces the default `events` map, so it is given whole: the levels Synapse sets by default.
+    var events: [String: Int] = [
+      "m.room.name": 50, "m.room.avatar": 50, "m.room.canonical_alias": 50, "m.room.topic": 50,
+      "m.room.power_levels": 100, "m.room.history_visibility": 100, "m.room.encryption": 100,
+      "m.room.tombstone": 100, "m.room.server_acl": 100, "app.twake.chat.page_style": 50,
+    ]
+    if draft.allowsReactions { events["m.reaction"] = 0 }
+    var body: [String: Any] = [
+      "name": draft.name.trimmingCharacters(in: .whitespacesAndNewlines),
+      "creation_content": ["type": BroadcastDraft.roomType],
+      "power_level_content_override": ["events_default": 50, "events": events],
+      "invite": userIds,
+    ]
+    let topic = draft.topic.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !topic.isEmpty { body["topic"] = topic }
+    var state: [[String: Any]] = []
+    switch draft.access {
+    case .open:
+      body["preset"] = "public_chat"
+      body["visibility"] = "public"
+      body["room_alias_name"] = draft.slug
+      state.append(
+        [
+          "type": "m.room.history_visibility", "state_key": "",
+          "content": ["history_visibility": "world_readable"],
+        ])
+    case .approval:
+      body["preset"] = "private_chat"
+      body["visibility"] = "public"
+      state.append([
+        "type": "m.room.join_rules", "state_key": "", "content": ["join_rule": "knock"],
+      ])
+    case .invitation:
+      body["preset"] = "private_chat"
+      body["visibility"] = "private"
+      state.append(
+        [
+          "type": "m.room.encryption", "state_key": "",
+          "content": ["algorithm": "m.megolm.v1.aes-sha2"],
+        ])
+    }
+    body["initial_state"] = state
+    return body
+  }
+
   private func client() async throws(PeopleError) -> ClientProxy {
     guard let client = await clientProxy() else { throw .notSignedIn }
     return client

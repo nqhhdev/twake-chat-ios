@@ -105,6 +105,164 @@ struct RoomViewModelTests {
     #expect(repository.calls == [.redact("$2")])
   }
 
+  @Test func aModeratorCanDeleteOthersMessages() async {
+    let repository = FakeTimelineRepository()
+    let details = FakeRoomDetailsRepository()
+    details.detailsResult = .success(
+      RoomDetails(
+        id: "!room:example.org", name: "Team", topic: nil, alias: nil, isDirect: false,
+        isEncrypted: true, isPublic: false, joinedMemberCount: 3, canRedactOthers: true))
+    let viewModel = RoomViewModel(
+      roomId: "!room:example.org", roomName: "Team", repository: repository,
+      media: FakeMediaRepository(), details: details)
+    #expect(!viewModel.canDelete(message("$1")))
+    let task = Task { await viewModel.start() }
+    while !viewModel.canRedactOthers { await Task.yield() }
+    #expect(viewModel.canDelete(message("$1")))
+    await viewModel.delete(message("$1"))
+    #expect(repository.calls.contains(.redact("$1")))
+    repository.finish()
+    await task.value
+  }
+
+  @Test func aMessageLinkPointsToTheRoomAndTheSendersServer() {
+    let viewModel = viewModel(FakeTimelineRepository())
+    #expect(
+      viewModel.link(to: message("$1"))?.absoluteString
+        == "https://matrix.to/#/!room:example.org/$1?via=example.org")
+    let unsent = TimelineMessage(
+      eventId: nil, senderId: "@me:example.org", senderName: "Me", isOwn: true, date: date,
+      body: .text("hi"))
+    #expect(viewModel.link(to: unsent) == nil)
+  }
+
+  @Test func votingSendsTheNewSelectionAndOnlyTheCreatorEndsAPoll() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = viewModel(repository)
+    let poll = Poll(
+      question: "Lunch?", answers: [.init(id: "a", text: "Pizza"), .init(id: "b", text: "Sushi")],
+      ownAnswerIds: ["a"])
+    let theirs = TimelineMessage(
+      eventId: "$p", senderId: "@bob:example.org", senderName: "Bob", isOwn: false, date: date,
+      body: .poll(question: "Lunch?"), poll: poll)
+    await viewModel.vote("b", in: theirs)
+    #expect(repository.calls == [.vote(["b"], "$p")])
+    #expect(!viewModel.canEndPoll(theirs))
+    let mine = TimelineMessage(
+      eventId: "$q", senderId: "@me:example.org", senderName: "Me", isOwn: true, date: date,
+      body: .poll(question: "Lunch?"), poll: poll)
+    #expect(viewModel.canEndPoll(mine))
+    await viewModel.endPoll(mine)
+    #expect(repository.calls.last == .endPoll("$q"))
+  }
+
+  @Test func aPollNeedsTwoAnswersToBeSent() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = viewModel(repository)
+    #expect(!(await viewModel.createPoll(PollDraft(question: "Q", answers: ["One"]))))
+    let draft = PollDraft(question: "Q", answers: ["One", "Two", ""])
+    #expect(await viewModel.createPoll(draft))
+    #expect(repository.calls == [.createPoll(draft)])
+  }
+
+  @Test func anUpgradedRoomLinksToItsSuccessorAndABlockedPersonCanBeUnblocked() async {
+    let details = FakeRoomDetailsRepository()
+    details.detailsResult = .success(
+      RoomDetails(
+        id: "!room:example.org", name: "Bob", topic: nil, alias: nil, isDirect: true,
+        isEncrypted: true, isPublic: false, joinedMemberCount: 2,
+        successorRoomId: "!new:example.org", directUserId: "@bob:example.org"))
+    let unblocked = UnblockLog()
+    let viewModel = RoomViewModel(
+      roomId: "!room:example.org", roomName: "Bob", repository: FakeTimelineRepository(),
+      media: FakeMediaRepository(), details: details,
+      blocking: .init(
+        isBlocked: { $0 == "@bob:example.org" },
+        unblock: { userId in
+          await unblocked.add(userId)
+          return true
+        }))
+    await viewModel.loadRoomState()
+    #expect(
+      viewModel.successorLink?.absoluteString
+        == "https://matrix.to/#/!new:example.org?via=example.org")
+    #expect(viewModel.blockedUserId == "@bob:example.org")
+    await viewModel.unblock()
+    #expect(viewModel.blockedUserId == nil)
+    #expect(await unblocked.ids == ["@bob:example.org"])
+  }
+
+  @Test func recentReactionsComeFirstWithoutDuplicates() {
+    #expect(
+      RoomViewModel.reactionBar(recents: ["🎉", "👍", "🔥"]) == ["🎉", "👍", "🔥", "❤️", "😂", "😮"])
+    #expect(RoomViewModel.reactionBar(recents: []) == RoomViewModel.quickReactions)
+  }
+
+  @Test func goingToADateFindsTheFirstMessageOfThatDay() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = viewModel(repository)
+    let task = Task { await viewModel.start() }
+    while !repository.calls.contains(.markAsRead) { await Task.yield() }
+    let calendar = Calendar(identifier: .gregorian)
+    let older = TimelineMessage(
+      eventId: "$old", senderId: "@bob:example.org", senderName: "Bob", isOwn: false,
+      date: date.addingTimeInterval(-3 * 86_400), body: .text("old"))
+    let newer = TimelineMessage(
+      eventId: "$new", senderId: "@bob:example.org", senderName: "Bob", isOwn: false,
+      date: date, body: .text("new"))
+    let items = [
+      TimelineItem(id: "1", kind: .message(older)), TimelineItem(id: "2", kind: .message(newer)),
+    ]
+    repository.publish(items)
+    while viewModel.state != .loaded(items) { await Task.yield() }
+    #expect(viewModel.oldestMessageDate == older.date)
+    #expect(
+      viewModel.firstMessage(onOrAfter: calendar.startOfDay(for: date.addingTimeInterval(-86_400)))?
+        .eventId == "$new")
+    #expect(viewModel.firstMessage(onOrAfter: date.addingTimeInterval(86_400)) == nil)
+    repository.finish()
+    await task.value
+  }
+
+  @Test func acceptingAnIdentityChangeAsksTheRepository() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = viewModel(repository)
+    await viewModel.accept(IdentityWarning(userId: "@bob:example.org", name: "Bob", kind: .changed))
+    #expect(repository.calls == [.acceptIdentity("@bob:example.org")])
+    #expect(viewModel.errorMessage == nil)
+  }
+
+  @Test func aSlashSuggestsTheBotsCommandsAndSendsOneAsACommand() async {
+    let repository = FakeTimelineRepository()
+    repository.commands = [BotCommand(botUserId: "@bot:s", syntax: "gif {search}", description: "")]
+    let viewModel = viewModel(repository)
+    let task = Task { await viewModel.start() }
+    while viewModel.botCommands.isEmpty { await Task.yield() }
+    viewModel.draft = "/g"
+    #expect(viewModel.commandSuggestions.map(\.name) == ["gif"])
+    viewModel.pick(viewModel.commandSuggestions[0])
+    #expect(viewModel.draft == "/gif ")
+    viewModel.draft = "/gif cats"
+    await viewModel.send()
+    #expect(repository.calls.contains(.command("gif", "/gif cats")))
+    repository.finish()
+    await task.value
+  }
+
+  @Test func aRoomWhereTheUserCannotPostSaysSo() async {
+    let details = FakeRoomDetailsRepository()
+    details.detailsResult = .success(
+      RoomDetails(
+        id: "!room:example.org", name: "News", topic: nil, alias: nil, isDirect: false,
+        isEncrypted: false, isPublic: true, joinedMemberCount: 40, canSendMessages: false))
+    let viewModel = RoomViewModel(
+      roomId: "!room:example.org", roomName: "News", repository: FakeTimelineRepository(),
+      media: FakeMediaRepository(), details: details)
+    #expect(viewModel.canSendMessages)
+    await viewModel.loadRoomState()
+    #expect(!viewModel.canSendMessages)
+  }
+
   @Test func cancellingAnEditClearsTheDraft() {
     let viewModel = viewModel(FakeTimelineRepository())
     viewModel.edit(message("$1", own: true, text: "typo"))
@@ -656,5 +814,114 @@ struct ChatDisplayRowsTests {
     choice.settings.hidesUnimportantEvents = false
     #expect(viewModel.rows.map(\.id) == ["joined", "topic"])
     task.cancel()
+  }
+}
+
+private actor UnblockLog {
+  private(set) var ids: [String] = []
+  func add(_ id: String) { ids.append(id) }
+}
+
+@MainActor
+struct MessageSelectionTests {
+  private let date = Date(timeIntervalSince1970: 1_700_000_000)
+
+  private func message(_ id: String, own: Bool, text: String, at offset: Double) -> TimelineMessage
+  {
+    TimelineMessage(
+      eventId: id, senderId: own ? "@me:example.org" : "@bob:example.org",
+      senderName: own ? "Me" : "Bob", isOwn: own, date: date.addingTimeInterval(offset),
+      body: .text(text))
+  }
+
+  @Test func pickedMessagesCopyInOrderAndDeleteOnlyWhenAllAreOwn() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = RoomViewModel(
+      roomId: "!room:example.org", roomName: "Team", repository: repository,
+      media: FakeMediaRepository())
+    let first = message("$1", own: false, text: "hi", at: 0)
+    let second = message("$2", own: true, text: "yo", at: 10)
+    viewModel.startSelecting(second)
+    viewModel.toggleSelection(first)
+    #expect(viewModel.selectionText == "Bob: hi\nMe: yo")
+    #expect(!viewModel.canDeleteSelection)
+    viewModel.toggleSelection(first)
+    #expect(viewModel.canDeleteSelection)
+    await viewModel.deleteSelection()
+    #expect(repository.calls == [.redact("$2")])
+    #expect(!viewModel.isSelectingMessages)
+  }
+
+  @Test func forwardingSeveralSendsEachOldestFirst() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = RoomViewModel(
+      roomId: "!room:example.org", roomName: "Team", repository: repository,
+      media: FakeMediaRepository())
+    let room = RoomSummary(
+      id: "!other:example.org", name: "Other", lastMessageText: nil, lastMessageSender: nil,
+      lastActivity: nil)
+    await viewModel.forward(
+      [message("$1", own: false, text: "a", at: 0), message("$2", own: true, text: "b", at: 5)],
+      to: room)
+    #expect(
+      repository.calls == [
+        .forward("$1", "!other:example.org"), .forward("$2", "!other:example.org"),
+      ])
+  }
+}
+
+@MainActor
+struct RoomThreadTests {
+  private let message = TimelineMessage(
+    eventId: "$root", senderId: "@bob:example.org", senderName: "Bob", isOwn: false,
+    date: Date(timeIntervalSince1970: 1_700_000_000), body: .text("Lunch?"),
+    thread: .init(replyCount: 2, latestSenderName: "Alice", latestText: "Yes"))
+
+  @Test func aMessageOpensItsThreadOnTheThreadTimeline() async {
+    var roots: [String] = []
+    let thread = FakeTimelineRepository()
+    let viewModel = RoomViewModel(
+      roomId: "!room:example.org", roomName: "Team", repository: FakeTimelineRepository(),
+      media: FakeMediaRepository(),
+      threadTimeline: { root in
+        roots.append(root)
+        return thread
+      })
+    #expect(viewModel.canOpenThreads)
+
+    viewModel.openThread(on: message)
+
+    #expect(roots == ["$root"])
+    let opened = viewModel.openedThread
+    #expect(opened != nil)
+    #expect(opened?.threadRootId == "$root")
+    #expect(opened?.roomName == "Team")
+    // A thread has no threads of its own.
+    #expect(opened?.canOpenThreads == false)
+  }
+
+  @Test func theThreadsListOpensTheThreadItPicks() async {
+    let main = FakeTimelineRepository()
+    main.threadEntries = [
+      ThreadListEntry(
+        rootEventId: "$t", rootSenderName: "Bob", rootText: "Lunch?",
+        date: Date(timeIntervalSince1970: 1_700_000_000), replyCount: 3)
+    ]
+    let viewModel = RoomViewModel(
+      roomId: "!room:example.org", roomName: "Team", repository: main,
+      media: FakeMediaRepository(), threadTimeline: { _ in FakeTimelineRepository() })
+
+    #expect(await viewModel.loadThreads().map(\.rootEventId) == ["$t"])
+    viewModel.openThread(root: "$t")
+    #expect(viewModel.openedThread?.threadRootId == "$t")
+  }
+
+  @Test func withoutThreadTimelinesNoThreadOpens() {
+    let viewModel = RoomViewModel(
+      roomId: "!room:example.org", roomName: "Team", repository: FakeTimelineRepository(),
+      media: FakeMediaRepository())
+    viewModel.openThread(on: message)
+    #expect(!viewModel.canOpenThreads)
+    #expect(viewModel.openedThread == nil)
   }
 }

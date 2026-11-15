@@ -14,6 +14,14 @@ struct SpaceViewModelTests {
     private(set) var joined: [String] = []
 
     func set(_ children: [SpaceChild]) { self.children = children }
+    private(set) var created: [String] = []
+
+    func canAddChannel(to spaceId: String) async -> Bool { true }
+
+    func createChannel(named name: String, in spaceId: String) async throws(SpacesError) -> String {
+      created.append(name)
+      return "!new"
+    }
     func failJoins() { joinFails = true }
 
     func children(of spaceId: String) async throws(SpacesError) -> [SpaceChild] { children }
@@ -91,4 +99,42 @@ struct SpaceViewModelTests {
       id: "!r", name: "Room", lastMessageText: nil, lastMessageSender: nil, lastActivity: nil)
     #expect(with.makeSpace(room, onOpen: { _ in }) == nil)
   }
+
+  @Test func anEditorCreatesAChannelInTheSpaceAndOpensIt() async {
+    let spaces = Spaces()
+    let opened = OpenedRooms()
+    let viewModel = SpaceViewModel(
+      space: space, repository: spaces, picture: { _ in nil }, onOpen: { opened.ids.append($0.id) })
+    await viewModel.load()
+    #expect(viewModel.canAddChannel)
+    await viewModel.createChannel(named: "  Design ")
+    #expect(await spaces.created == ["Design"])
+    #expect(opened.ids == ["!new"])
+  }
+
+  @Test func markingASpaceReadMarksEachJoinedRoomOnceIncludingSubSpaces() async {
+    let spaces = Spaces()
+    await spaces.set([
+      child("!a", "Alpha", joined: true), child("!b", "Beta", joined: false),
+      child("!s", "Sub", joined: true, space: true),
+    ])
+    let marked = MarkedRooms()
+    let viewModel = SpaceViewModel(
+      space: space, repository: spaces, picture: { _ in nil }, onOpen: { _ in },
+      markRead: { marked.ids.append($0) })
+    await viewModel.load()
+    await viewModel.markAllRead()
+    #expect(marked.ids == ["!a"])
+    #expect(!viewModel.isMarkingRead)
+  }
+}
+
+@MainActor
+private final class OpenedRooms {
+  var ids: [String] = []
+}
+
+@MainActor
+private final class MarkedRooms {
+  var ids: [String] = []
 }

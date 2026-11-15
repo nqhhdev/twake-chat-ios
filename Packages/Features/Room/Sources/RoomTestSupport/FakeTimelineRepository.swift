@@ -19,6 +19,34 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
     case report(String, String?)
     case retry
     case ignore(String)
+    case createPoll(PollDraft)
+    case vote([String], String)
+    case endPoll(String)
+    case acceptIdentity(String)
+    case command(String, String)
+  }
+
+  /// What `botCommands()` answers.
+  public var commands: [BotCommand] {
+    get { lock.withLock { _commands } }
+    set { lock.withLock { _commands = newValue } }
+  }
+  private var _commands: [BotCommand] = []
+
+  public func botCommands() async -> [BotCommand] { commands }
+
+  /// What `threads()` answers.
+  public var threadEntries: [ThreadListEntry] {
+    get { lock.withLock { _threadEntries } }
+    set { lock.withLock { _threadEntries = newValue } }
+  }
+  private var _threadEntries: [ThreadListEntry] = []
+
+  public func threads() async -> [ThreadListEntry] { threadEntries }
+
+  public func send(command: BotCommand, text: String) async throws(TimelineError) {
+    record(.command(command.name, text))
+    try actionResult.get()
   }
 
   private let lock = NSLock()
@@ -157,6 +185,26 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
   }
 
   public func retryFailedSends() async { record(.retry) }
+
+  public func createPoll(_ draft: PollDraft) async throws(TimelineError) {
+    record(.createPoll(draft))
+    try actionResult.get()
+  }
+
+  public func vote(_ answerIds: [String], in pollEventId: String) async throws(TimelineError) {
+    record(.vote(answerIds, pollEventId))
+    try actionResult.get()
+  }
+
+  public func accept(_ warning: IdentityWarning) async throws(TimelineError) {
+    record(.acceptIdentity(warning.userId))
+    try actionResult.get()
+  }
+
+  public func endPoll(_ pollEventId: String) async throws(TimelineError) {
+    record(.endPoll(pollEventId))
+    try actionResult.get()
+  }
 
   public func report(eventId: String, reason: String?) async throws(TimelineError) {
     record(.report(eventId, reason))

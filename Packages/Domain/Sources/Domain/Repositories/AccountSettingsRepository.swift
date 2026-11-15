@@ -57,6 +57,67 @@ public protocol AccountSettingsRepository: Sendable {
 
   func setDefaultNotificationMode(_ mode: NotificationMode, isDirect: Bool)
     async throws(SettingsError)
+
+  /// Do not disturb: every notification of the account is off (the `.m.rule.master` push rule is enabled).
+  func isDoNotDisturbOn() async -> Bool
+
+  /// Turns do not disturb on or off, for every device of the account.
+  func setDoNotDisturb(_ on: Bool) async throws(SettingsError)
+
+  /// Starts resetting the user's cryptographic identity (new cross-signing keys; other devices and people must verify
+  /// again). Returns what the server needs to allow it.
+  func startIdentityReset() async throws(SettingsError) -> IdentityResetStep
+
+  /// Finishes the reset started: with the account password, or with none after approving it on the web page.
+  func finishIdentityReset(password: String?) async throws(SettingsError)
+
+  /// Gives up the reset started.
+  func cancelIdentityReset() async
+
+  /// The e-mail addresses and phone numbers linked to the account (`GET /account/3pid`), as people find the user.
+  func linkedAddresses() async -> [LinkedAddress]
+
+  /// Who sees the user's e-mail and phone in the Twake address book (ToM `user_info/{id}/visibility`), or `nil` when
+  /// the server has no ToM or did not answer.
+  func contactsVisibility() async -> ContactsVisibility?
+
+  /// Changes who sees the user's e-mail and phone; both follow the one choice.
+  func setContactsVisibility(_ visibility: ContactsVisibility) async throws(SettingsError)
+
+  /// The space the cached messages and media take on the device, in bytes; `nil` when unknown.
+  func cacheSize() async -> Int?
+
+  /// Empties the cached messages and media; they load again from the server. Keys and the session stay.
+  func clearCache() async throws(SettingsError)
+
+  /// The user's status message (Matrix presence `status_msg`), or `nil`.
+  func statusMessage() async -> String?
+
+  /// Sets the status message others see; empty clears it.
+  func setStatusMessage(_ message: String) async throws(SettingsError)
+}
+
+extension AccountSettingsRepository {
+  public func isDoNotDisturbOn() async -> Bool { false }
+  public func setDoNotDisturb(_ on: Bool) async throws(SettingsError) { throw .requestFailed }
+  public func startIdentityReset() async throws(SettingsError) -> IdentityResetStep {
+    throw .requestFailed
+  }
+  public func finishIdentityReset(password: String?) async throws(SettingsError) {
+    throw .requestFailed
+  }
+  public func cancelIdentityReset() async {}
+  public func linkedAddresses() async -> [LinkedAddress] { [] }
+  public func contactsVisibility() async -> ContactsVisibility? { nil }
+  public func setContactsVisibility(_ visibility: ContactsVisibility) async throws(SettingsError) {
+    throw .requestFailed
+  }
+  public func cacheSize() async -> Int? { nil }
+  public func clearCache() async throws(SettingsError) { throw .requestFailed }
+  public func statusMessage() async -> String? { nil }
+  public func setStatusMessage(_ message: String) async throws(SettingsError) {
+    throw .requestFailed
+  }
 }
 
 /// Someone the user blocked.
@@ -72,4 +133,53 @@ public struct BlockedUser: Sendable, Equatable, Identifiable {
 
   /// The name shown, or the Matrix id when there is none.
   public var name: String { displayName.flatMap { $0.isEmpty ? nil : $0 } ?? id }
+}
+
+/// What resetting the identity needs from the user (Element X `ResetIdentity`).
+public enum IdentityResetStep: Sendable, Equatable {
+  /// Nothing: it is done.
+  case done
+  /// The account password (User-Interactive Authentication).
+  case password
+  /// Approval on the account's web page (OIDC account management), then finishing without a password.
+  case webApproval(URL)
+}
+
+/// An e-mail address or phone number linked to the account (a Matrix third-party identifier).
+public struct LinkedAddress: Sendable, Equatable, Hashable, Identifiable {
+  public enum Kind: Sendable, Equatable, Hashable {
+    case email
+    case phone
+  }
+
+  public let kind: Kind
+  public let address: String
+  public var id: String { address }
+
+  public init(kind: Kind, address: String) {
+    self.kind = kind
+    self.address = address
+  }
+
+  /// The `threepids` of the answer; a medium other than e-mail or phone is left out.
+  public static func addresses(fromJSON data: Data?) -> [LinkedAddress] {
+    guard let data, let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+      let list = object["threepids"] as? [[String: Any]]
+    else { return [] }
+    return list.compactMap { entry in
+      guard let address = entry["address"] as? String else { return nil }
+      switch entry["medium"] as? String {
+      case "email": return LinkedAddress(kind: .email, address: address)
+      case "msisdn": return LinkedAddress(kind: .phone, address: "+" + address)
+      default: return nil
+      }
+    }
+  }
+}
+
+/// Who sees the user's e-mail and phone (web D78, Flutter `settings_contacts_visibility`); the raw values are ToM's.
+public enum ContactsVisibility: String, Sendable, Equatable, CaseIterable {
+  case nobody = "private"
+  case contacts
+  case everyone = "public"
 }

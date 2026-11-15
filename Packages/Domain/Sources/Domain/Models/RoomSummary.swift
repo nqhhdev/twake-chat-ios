@@ -31,13 +31,23 @@ public struct RoomSummary: Sendable, Equatable, Identifiable {
   public let isArchived: Bool
   /// A space: it holds rooms instead of messages, and opens as the list of its rooms.
   public let isSpace: Bool
+  /// The user put the room in low priority (`m.lowpriority` tag); the list shows it at the bottom.
+  public let isLowPriority: Bool
+  /// The text the user left in the composer of this room, shown on its row in place of the last message.
+  public let draft: String?
+  /// Only moderators and administrators post (`events_default` 50 or more): a Broadcast, typed or not (web D109).
+  public let isBroadcast: Bool
 
   public init(
     id: String, name: String, lastMessageText: String?, lastMessageSender: String?,
     lastActivity: Date?, unreadCount: Int = 0, mentionCount: Int = 0, avatar: MediaReference? = nil,
     isInvite: Bool = false, isFavourite: Bool = false, isDirect: Bool = false,
-    isMuted: Bool = false, isArchived: Bool = false, isSpace: Bool = false
+    isMuted: Bool = false, isArchived: Bool = false, isSpace: Bool = false,
+    isLowPriority: Bool = false, draft: String? = nil, isBroadcast: Bool = false
   ) {
+    self.isBroadcast = isBroadcast
+    self.draft = draft
+    self.isLowPriority = isLowPriority
     self.isArchived = isArchived
     self.isSpace = isSpace
     self.id = id
@@ -61,4 +71,15 @@ extension RoomSummary: CustomStringConvertible, CustomDebugStringConvertible {
   }
 
   public var debugDescription: String { description }
+}
+
+extension RoomSummary {
+  /// What this room adds to the app icon badge: nothing when it is muted, since a muted room sends no notification
+  /// (its push rule is `dont_notify`), even for a mention.
+  public var badgeCount: Int { isMuted || isSpace ? 0 : unreadCount }
+
+  /// The app icon badge for these rooms: the unread messages of the rooms that are not muted.
+  public static func appBadge(for rooms: [RoomSummary]) -> Int {
+    rooms.reduce(0) { $0 + $1.badgeCount }
+  }
 }

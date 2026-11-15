@@ -20,6 +20,9 @@ public protocol RoomListRepository: Sendable {
   /// Adds the room to the favourites, or takes it out.
   func setFavourite(_ favourite: Bool, roomId: String) async throws(RoomListError)
 
+  /// Puts the room in low priority (`m.lowpriority` tag), or takes it out.
+  func setLowPriority(_ lowPriority: Bool, roomId: String) async throws(RoomListError)
+
   /// Mutes the room, or goes back to the account's default notifications.
   func setMuted(_ muted: Bool, roomId: String) async throws(RoomListError)
 
@@ -28,4 +31,11 @@ public protocol RoomListRepository: Sendable {
 
   /// Stops the updates and sync. Does nothing when not started.
   func stop() async
+}
+
+extension RoomListRepository {
+  /// Repositories that keep no tags cannot set low priority.
+  public func setLowPriority(_ lowPriority: Bool, roomId: String) async throws(RoomListError) {
+    throw .requestFailed
+  }
 }

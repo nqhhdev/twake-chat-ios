@@ -16,6 +16,8 @@ public final class ClientProxy: Sendable {
 
   private init(client: Client) {
     self.client = client
+    // Local echoes of pictures, videos and files then carry how much is uploaded, for the progress ring.
+    client.enableSendQueueUploadProgress(enable: true)
   }
 
   /// The signed-in user's Matrix id.
@@ -107,6 +109,12 @@ public final class ClientProxy: Sendable {
     await sync.pause()
   }
 
+  /// Empties the SDK's caches (events and media; never the keys or the session). The SDK stops the running sync
+  /// service first and starts it again after.
+  func clearCaches() async throws {
+    try await client.clearCaches(syncService: await sync.current())
+  }
+
   /// Starts the paused sync service again. Does nothing when sync was never started or was stopped for good.
   func resumeSync() async {
     await sync.resume()
@@ -142,6 +150,8 @@ public final class ClientProxy: Sendable {
         cachePath: cacheDirectory.path(percentEncoded: false)
       )
       .slidingSyncVersionBuilder(versionBuilder: .discoverNative)
+      // Threads (`m.thread`): the main timeline hides their replies and shows a summary on each root.
+      .threadsEnabled(enabled: true, threadSubscriptions: false)
       .crossProcessLockConfig(crossProcessLockConfig: .multiProcess(holderName: lockHolderName))
       .setSessionDelegate(sessionDelegate: delegate)
       .build()
@@ -201,6 +211,12 @@ private actor SyncServiceHolder {
       if running == task { running = nil }
       throw error
     }
+  }
+
+  /// The running sync service, if any, for `Client.clearCaches(syncService:)`.
+  func current() async -> SyncService? {
+    guard let task = running else { return nil }
+    return try? await task.value
   }
 
   /// Stops the SDK sync service but keeps it and what it feeds, so `resume` continues the same room lists and timelines.

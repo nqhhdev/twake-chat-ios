@@ -20,6 +20,18 @@ public actor RoomSearchProxy: RoomSearchRepository {
   public func search(_ term: String, roomId: String, from nextBatch: String?)
     async throws(RoomSearchError) -> RoomSearchPage
   {
+    try await run(term: term, roomId: roomId, from: nextBatch)
+  }
+
+  public func searchEverywhere(_ term: String, from nextBatch: String?)
+    async throws(RoomSearchError) -> RoomSearchPage
+  {
+    try await run(term: term, roomId: nil, from: nextBatch)
+  }
+
+  private func run(term: String, roomId: String?, from nextBatch: String?)
+    async throws(RoomSearchError) -> RoomSearchPage
+  {
     guard let client = await clientProxy(), let signedIn = try? client.client.session(),
       let base = URL(string: signedIn.homeserverUrl)
     else { throw .notSignedIn }
@@ -44,11 +56,13 @@ public actor RoomSearchProxy: RoomSearchRepository {
   }
 
   /// The request: room events of one room matching the term, newest first, with the senders' profiles.
-  static func body(term: String, roomId: String) -> Data? {
+  static func body(term: String, roomId: String?) -> Data? {
+    var filter: [String: Any] = ["limit": pageSize]
+    if let roomId { filter["rooms"] = [roomId] }
     let roomEvents: [String: Any] = [
       "search_term": term,
       "order_by": "recent",
-      "filter": ["rooms": [roomId], "limit": pageSize],
+      "filter": filter,
       "event_context": ["before_limit": 0, "after_limit": 0, "include_profile": true],
     ]
     return try? JSONSerialization.data(withJSONObject: [
@@ -76,7 +90,8 @@ public actor RoomSearchProxy: RoomSearchRepository {
       return RoomSearchResult(
         eventId: eventId, senderId: sender,
         senderName: name.flatMap { $0.isEmpty ? nil : $0 } ?? sender,
-        date: Date(timeIntervalSince1970: timestamp / 1000), text: body)
+        date: Date(timeIntervalSince1970: timestamp / 1000), text: body,
+        roomId: event["room_id"] as? String)
     }
     return RoomSearchPage(results: results, nextBatch: roomEvents["next_batch"] as? String)
   }

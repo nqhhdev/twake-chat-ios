@@ -17,7 +17,12 @@ enum RoomSummaryMapper {
       mentionCount: Int(clamping: info.numUnreadMentions), avatar: avatar(of: info),
       isInvite: room.membership() == .invited, isFavourite: info.isFavourite,
       isDirect: info.isDirect, isMuted: info.cachedUserDefinedNotificationMode == .mute,
-      isArchived: room.membership() == .left, isSpace: info.isSpace)
+      isArchived: room.membership() == .left, isSpace: info.isSpace,
+      isLowPriority: info.isLowPriority,
+      draft: (try? await room.loadComposerDraft(threadRoot: nil))?.plainText
+        .trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+      isBroadcast: !info.isDirect && !info.isSpace
+        && (info.powerLevels?.values().eventsDefault ?? 0) >= 50)
   }
 
   /// - Name: the display name, or the room id when the room has none.
@@ -73,4 +78,8 @@ enum RoomSummaryMapper {
   private static func date(_ timestamp: Timestamp) -> Date {
     Date(timeIntervalSince1970: TimeInterval(timestamp) / 1000)
   }
+}
+
+extension String {
+  fileprivate var nilIfEmpty: String? { isEmpty ? nil : self }
 }

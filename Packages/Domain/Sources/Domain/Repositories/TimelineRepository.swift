@@ -16,6 +16,15 @@ public protocol TimelineRepository: Sendable {
   /// Uploads and sends a picture, video, voice message or file; the timeline shows it as sending until it is done.
   func sendAttachment(_ attachment: OutgoingAttachment) async throws(TimelineError)
 
+  /// Sends a poll (MSC3381).
+  func createPoll(_ draft: PollDraft) async throws(TimelineError)
+
+  /// Votes in the poll `pollEventId` for `answerIds`, replacing the user's earlier vote.
+  func vote(_ answerIds: [String], in pollEventId: String) async throws(TimelineError)
+
+  /// Ends the poll `pollEventId`: the results show to everyone and no one can vote any more.
+  func endPoll(_ pollEventId: String) async throws(TimelineError)
+
   /// Tells the room the user is typing, or stopped.
   func setTyping(_ isTyping: Bool) async
 
@@ -63,4 +72,137 @@ public protocol TimelineRepository: Sendable {
 
   /// Stops following the timeline. Safe when not opened.
   func close() async
+
+  /// The emojis the user reacted with most recently, newest first, kept in the account data so every device shares
+  /// them (`io.element.recent_emoji`).
+  func recentReactions() async -> [String]
+
+  /// Records a reaction the user sent, for `recentReactions()`.
+  func addRecentReaction(_ key: String) async
+
+  /// The room's members whose identity changed, updated as it changes. Finishes when the timeline closes.
+  func identityWarnings() async -> AsyncStream<[IdentityWarning]>
+
+  /// Accepts the new identity of a warning: pins it, or withdraws the old verification.
+  func accept(_ warning: IdentityWarning) async throws(TimelineError)
+
+  /// The commands the room's bots announce (MSC4332).
+  func botCommands() async -> [BotCommand]
+
+  /// Sends `text` as a message that runs `command`.
+  func send(command: BotCommand, text: String) async throws(TimelineError)
+
+  /// The versions of the message `eventId`, the original first (its `m.replace` edits, spec "Event replacements");
+  /// `nil` in an encrypted room, whose edits the server cannot read.
+  func editHistory(of eventId: String) async -> [MessageVersion]?
+
+  /// The room's threads, the most recently active first (`/threads`); empty when it has none or they cannot load.
+  func threads() async -> [ThreadListEntry]
+}
+
+/// One version of an edited message.
+public struct MessageVersion: Sendable, Equatable, Identifiable {
+  public let id: String
+  public let text: String
+  public let date: Date
+
+  public init(id: String, text: String, date: Date) {
+    self.id = id
+    self.text = text
+    self.date = date
+  }
+
+  /// The versions in an original event and its `m.replace` relations, as the client-server API returns them: the
+  /// original's body, then each edit's `m.new_content` body, oldest first.
+  public static func versions(original: Data?, relations: Data?) -> [MessageVersion] {
+    func object(_ data: Data?) -> [String: Any]? {
+      data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+    }
+    func version(_ event: [String: Any], body: String?) -> MessageVersion? {
+      guard let id = event["event_id"] as? String, let body,
+        let ts = event["origin_server_ts"] as? NSNumber
+      else { return nil }
+      return MessageVersion(
+        id: id, text: body, date: Date(timeIntervalSince1970: ts.doubleValue / 1000))
+    }
+    var result: [MessageVersion] = []
+    if let event = object(original),
+      let first = version(event, body: (event["content"] as? [String: Any])?["body"] as? String)
+    {
+      result.append(first)
+    }
+    let edits = (object(relations)?["chunk"] as? [[String: Any]] ?? []).compactMap { event in
+      let content = event["content"] as? [String: Any]
+      return version(event, body: (content?["m.new_content"] as? [String: Any])?["body"] as? String)
+    }
+    return result + edits.sorted { $0.date < $1.date }
+  }
+}
+
+/// A member of the room whose cryptographic identity changed since the user last accepted it (Element X
+/// `IdentityStatusChange`): their messages may come from someone else until the user checks.
+public struct IdentityWarning: Sendable, Equatable, Identifiable {
+  public enum Kind: Sendable, Equatable {
+    /// Their identity changed; accepting it pins the new one.
+    case changed
+    /// The identity the user had verified changed; withdrawing the verification accepts the new one.
+    case verifiedChanged
+  }
+
+  public let userId: String
+  public let name: String
+  public let kind: Kind
+  public var id: String { userId }
+
+  public init(userId: String, name: String, kind: Kind) {
+    self.userId = userId
+    self.name = name
+    self.kind = kind
+  }
+}
+
+extension TimelineRepository {
+  public func identityWarnings() async -> AsyncStream<[IdentityWarning]> {
+    AsyncStream { $0.finish() }
+  }
+  public func accept(_ warning: IdentityWarning) async throws(TimelineError) {
+    throw .requestFailed
+  }
+  public func botCommands() async -> [BotCommand] { [] }
+  public func editHistory(of eventId: String) async -> [MessageVersion]? { nil }
+  public func threads() async -> [ThreadListEntry] { [] }
+  public func send(command: BotCommand, text: String) async throws(TimelineError) {
+    throw .requestFailed
+  }
+
+  public func recentReactions() async -> [String] { [] }
+  public func addRecentReaction(_ key: String) async {}
+}
+
+/// One thread of a room, as the room's Threads list shows it: its first message and its latest reply.
+public struct ThreadListEntry: Sendable, Equatable, Identifiable {
+  public var id: String { rootEventId }
+  public let rootEventId: String
+  public let rootSenderName: String
+  public let rootText: String?
+  public let date: Date
+  public let replyCount: Int
+  public let latestSenderName: String?
+  public let latestText: String?
+  /// When the latest reply was sent, or the root's date when it has none.
+  public let latestDate: Date
+
+  public init(
+    rootEventId: String, rootSenderName: String, rootText: String?, date: Date, replyCount: Int,
+    latestSenderName: String? = nil, latestText: String? = nil, latestDate: Date? = nil
+  ) {
+    self.rootEventId = rootEventId
+    self.rootSenderName = rootSenderName
+    self.rootText = rootText
+    self.date = date
+    self.replyCount = replyCount
+    self.latestSenderName = latestSenderName
+    self.latestText = latestText
+    self.latestDate = latestDate ?? date
+  }
 }

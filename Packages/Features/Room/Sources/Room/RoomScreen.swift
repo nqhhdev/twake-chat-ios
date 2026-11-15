@@ -10,8 +10,11 @@ public struct RoomScreen: View {
   @Bindable var viewModel: RoomViewModel
   @State private var details: RoomDetailsViewModel?
   @State private var search: RoomSearchViewModel?
+  @State private var isPickingDate = false
+  @State private var pickedDate = Date()
   @State private var forwarding: ForwardItem?
   @State private var showsPinnedList = false
+  @State private var showsThreads = false
   @State private var reporting: TimelineMessage?
   @State private var reportReason = ""
   @State private var blocking: TimelineMessage?
@@ -28,12 +31,18 @@ public struct RoomScreen: View {
           SessionWarningBanner(warning: warning) { viewModel.onFixSession?() }
             .transition(.move(edge: .top).combined(with: .opacity))
         }
-        PinnedBanner(viewModel: viewModel)
-          .contextMenu {
-            if !viewModel.pinned.isEmpty {
-              Button("All pinned messages", systemImage: "pin") { showsPinnedList = true }
+        if let warning = viewModel.identityWarnings.first {
+          IdentityWarningBanner(warning: warning) { Task { await viewModel.accept(warning) } }
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
+        if viewModel.threadRootId == nil {
+          PinnedBanner(viewModel: viewModel)
+            .contextMenu {
+              if !viewModel.pinned.isEmpty {
+                Button("All pinned messages", systemImage: "pin") { showsPinnedList = true }
+              }
             }
-          }
+        }
         timeline(bubbleWidth: TwakeLayout.bubbleWidth(in: geometry.size.width))
         if let message = viewModel.errorMessage {
           Text(message)
@@ -42,8 +51,27 @@ public struct RoomScreen: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 4)
         }
-        if viewModel.isArchived {
+        if viewModel.isSelectingMessages {
+          MessageSelectionBar(viewModel: viewModel) { messages in
+            forwarding = ForwardItem(messages: messages)
+          }
+          .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else if viewModel.isArchived {
           ArchivedRoomBar(viewModel: viewModel)
+        } else if let link = viewModel.successorLink {
+          SuccessorRoomBar(link: link)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else if !viewModel.canSendMessages {
+          Label("Only admins and moderators can post here.", systemImage: "megaphone")
+            .font(.subheadline)
+            .foregroundStyle(SysColors.textSecondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(.bar)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else if viewModel.blockedUserId != nil {
+          BlockedPersonBar(viewModel: viewModel)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
         } else {
           ComposerView(viewModel: viewModel)
         }
@@ -64,9 +92,25 @@ public struct RoomScreen: View {
         }
       }
     }
-    .sheet(item: $forwarding) { item in ForwardSheet(message: item.message, viewModel: viewModel) }
+    .sheet(item: $forwarding) { item in ForwardSheet(messages: item.messages, viewModel: viewModel)
+    }
+    .sheet(
+      isPresented: Binding(
+        get: { viewModel.historyMessage != nil }, set: { if !$0 { viewModel.historyMessage = nil } }
+      )
+    ) {
+      if let message = viewModel.historyMessage {
+        EditHistorySheet(message: message, viewModel: viewModel)
+      }
+    }
     .sheet(item: $viewModel.peopleSheet) { sheet in
       PeopleListSheet(sheet: sheet, viewModel: viewModel)
+    }
+    .sheet(isPresented: $showsThreads) {
+      ThreadsListSheet(viewModel: viewModel) { root in
+        showsThreads = false
+        viewModel.openThread(root: root)
+      }
     }
     .sheet(isPresented: $showsPinnedList) {
       PinnedListSheet(viewModel: viewModel) { eventId in
@@ -112,31 +156,71 @@ public struct RoomScreen: View {
       if phase == .active { Task { await viewModel.refreshSessionWarning() } }
     }
     .sensoryFeedback(.success, trigger: viewModel.toast) { _, new in new != nil }
-    .navigationTitle(viewModel.roomName)
+    .navigationTitle(viewModel.threadRootId == nil ? viewModel.roomName : "Thread")
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
-      // As in the Flutter chat, the header opens the chat details.
-      ToolbarItem(placement: .principal) {
-        Button {
-          details = viewModel.makeDetails()
-        } label: {
-          HStack(spacing: 8) {
-            TwakeAvatar(
-              name: viewModel.roomName, size: 32, pictureID: viewModel.roomAvatar?.source,
-              load: viewModel.roomAvatar.map { reference in
-                { @Sendable [viewModel] in await viewModel.picture(reference) }
-              })
-            Text(viewModel.roomName).textStyle(TextStyles.titleMedium).lineLimit(1)
+      if viewModel.threadRootId != nil {
+        ToolbarItem(placement: .principal) {
+          VStack(spacing: 0) {
+            Text("Thread").textStyle(TextStyles.titleMedium)
+            Text(viewModel.roomName)
+              .textStyle(TextStyles.labelSmall)
+              .foregroundStyle(SysColors.textSecondary)
+              .lineLimit(1)
+          }
+          .accessibilityElement(children: .combine)
+        }
+      } else {
+        // As in the Flutter chat, the header opens the chat details.
+        ToolbarItem(placement: .principal) {
+          Button {
+            details = viewModel.makeDetails()
+          } label: {
+            HStack(spacing: 8) {
+              TwakeAvatar(
+                name: viewModel.roomName, size: 32, pictureID: viewModel.roomAvatar?.source,
+                load: viewModel.roomAvatar.map { reference in
+                  { @Sendable [viewModel] in await viewModel.picture(reference) }
+                })
+              VStack(alignment: .leading, spacing: 0) {
+                Text(viewModel.roomName).textStyle(TextStyles.titleMedium).lineLimit(1)
+                if let presence = viewModel.presenceLine {
+                  Text(presence)
+                    .textStyle(TextStyles.labelSmall)
+                    .foregroundStyle(
+                      presence == "Online"
+                        ? AnyShapeStyle(.green) : AnyShapeStyle(SysColors.textSecondary)
+                    )
+                    .lineLimit(1)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+              }
+            }
+          }
+          .buttonStyle(.plain)
+          .accessibilityHint("Shows the chat details")
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+          Menu("More", systemImage: "ellipsis.circle") {
+            if viewModel.canSearch {
+              Button("Search", systemImage: "magnifyingglass") { search = viewModel.makeSearch() }
+            }
+            if viewModel.canOpenThreads {
+              Button("Threads", systemImage: "bubble.left.and.text.bubble.right") {
+                showsThreads = true
+              }
+            }
+            Button("Go to Date", systemImage: "calendar") { isPickingDate = true }
+            Button("Select Messages", systemImage: "checkmark.circle") {
+              if let last = viewModel.rows.reversed().lazy.compactMap(\.selectableMessage).first {
+                viewModel.startSelecting(last)
+              }
+            }
           }
         }
-        .buttonStyle(.plain)
-        .accessibilityHint("Shows the chat details")
       }
-      ToolbarItem(placement: .topBarTrailing) {
-        if viewModel.canSearch {
-          Button("Search", systemImage: "magnifyingglass") { search = viewModel.makeSearch() }
-        }
-      }
+    }
+    .navigationDestination(item: $viewModel.openedThread) { thread in RoomScreen(viewModel: thread)
     }
     .navigationDestination(item: $details) { details in RoomDetailsScreen(viewModel: details) }
     .navigationDestination(item: $search) { search in
@@ -147,6 +231,29 @@ public struct RoomScreen: View {
       }
     }
     .task(id: viewModel.roomId) { await viewModel.start() }
+    .task(id: viewModel.roomId) { await viewModel.watchPresence() }
+    .sheet(isPresented: $isPickingDate) {
+      NavigationStack {
+        DatePicker("Date", selection: $pickedDate, in: ...Date(), displayedComponents: .date)
+          .datePickerStyle(.graphical)
+          .padding()
+          .navigationTitle("Go to Date")
+          .navigationBarTitleDisplayMode(.inline)
+          .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+              Button("Cancel") { isPickingDate = false }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+              Button("Go") {
+                isPickingDate = false
+                let date = pickedDate
+                Task { await viewModel.jump(toDate: date) }
+              }
+            }
+          }
+      }
+      .presentationDetents([.medium, .large])
+    }
   }
 
   @ViewBuilder private func timeline(bubbleWidth: CGFloat) -> some View {
@@ -266,6 +373,14 @@ struct ChatRowView: View {
   let viewModel: RoomViewModel
 
   var body: some View {
+    if viewModel.isSelectingMessages, let message = row.selectableMessage {
+      SelectableRow(message: message, viewModel: viewModel) { content }
+    } else {
+      content
+    }
+  }
+
+  @ViewBuilder private var content: some View {
     switch row {
     case .message(let model):
       MessageRow(
@@ -404,6 +519,11 @@ struct MessageRow: View {
       .background(alignment: .trailing) { replyHint }
       .simultaneousGesture(swipeToReply, isEnabled: !isPreview)
       if !message.reactions.isEmpty { reactions }
+      if let thread = message.thread, thread.replyCount > 0, viewModel.canOpenThreads, !isPreview {
+        ThreadSummaryButton(thread: thread, isOwn: message.isOwn) {
+          viewModel.openThread(on: message)
+        }
+      }
     }
     .frame(maxWidth: .infinity, alignment: message.isOwn ? .trailing : .leading)
     .padding(.top, position.isFirst ? 8 : 2)
@@ -533,6 +653,9 @@ struct MessageRow: View {
       } else if let media = message.media {
         MessageMediaView(message: message, media: media, width: contentWidth, viewModel: viewModel)
         if let caption = Self.caption(of: message.body) { captionText(caption) }
+      } else if let poll = message.poll {
+        PollView(poll: poll, message: message, viewModel: viewModel)
+          .frame(width: contentWidth)
       } else {
         MessageBody(content: message.body, formatted: message.formatted)
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -704,6 +827,35 @@ struct PressScaleButtonStyle: ButtonStyle {
 struct MessageBody: View {
   let content: TimelineMessage.Body
   var formatted: AttributedString?
+  /// The reader tapped the message: its spoilers show.
+  @State private var revealsSpoilers = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  /// The text with each spoiler covered by a solid block and its links turned off, until revealed.
+  static func concealingSpoilers(_ text: AttributedString) -> AttributedString {
+    var result = text
+    for run in text.runs where run[SpoilerAttribute.self] == true {
+      result[run.range].foregroundColor = .clear
+      result[run.range].backgroundColor = Color.secondary.opacity(0.45)
+      result[run.range].link = nil
+    }
+    return result
+  }
+
+  /// A formatted text, its spoilers covered until the reader taps it.
+  @ViewBuilder private func rich(_ text: AttributedString) -> some View {
+    if text.hasSpoiler {
+      Text(revealsSpoilers ? text : Self.concealingSpoilers(text))
+        .contentTransition(.opacity)
+        .onTapGesture {
+          withAnimation(reduceMotion ? nil : .easeOut(duration: 0.35)) { revealsSpoilers.toggle() }
+        }
+        .accessibilityHint(revealsSpoilers ? "Hides the spoiler" : "Shows the spoiler")
+        .accessibilityAddTraits(.isButton)
+    } else {
+      Text(text)
+    }
+  }
 
   /// A message without HTML: its inline Markdown (bold, italic, code, links) and bare addresses as links. The text is
   /// never looked up as a localisation key.
@@ -731,10 +883,10 @@ struct MessageBody: View {
   var body: some View {
     Group {
       switch content {
-      case .text(let text): Text(formatted ?? Self.plain(text))
-      case .emote(let text): Text(Self.emote(formatted ?? Self.plain(text)))
+      case .text(let text): rich(formatted ?? Self.plain(text))
+      case .emote(let text): rich(Self.emote(formatted ?? Self.plain(text)))
       case .notice(let text):
-        Text(formatted ?? Self.plain(text)).foregroundStyle(SysColors.textSecondary)
+        rich(formatted ?? Self.plain(text)).foregroundStyle(SysColors.textSecondary)
       case .image(let caption): Label(caption ?? "Picture", systemImage: "photo")
       case .video(let caption): Label(caption ?? "Video", systemImage: "video")
       case .audio(let caption): Label(caption ?? "Audio", systemImage: "waveform")
@@ -794,6 +946,100 @@ struct HuggingStack: Layout {
 }
 
 /// In place of the composer in a chat the user left: why it is read-only, and Rejoin.
+/// In place of the composer once the room was upgraded (`m.room.tombstone`, Flutter `ChatUpgradeBanner`): the
+/// conversation goes on in the new room, which the button opens.
+struct SuccessorRoomBar: View {
+  let link: URL
+  @Environment(\.openURL) private var openURL
+
+  var body: some View {
+    VStack(spacing: 8) {
+      Label(
+        "This chat has been replaced and is no longer active.",
+        systemImage: "arrow.up.forward.square"
+      )
+      .font(.subheadline)
+      .foregroundStyle(SysColors.textSecondary)
+      .multilineTextAlignment(.center)
+      Button("Go to the new chat") { openURL(link) }
+        .buttonStyle(.borderedProminent)
+    }
+    .frame(maxWidth: .infinity)
+    .padding(12)
+    .background(.bar)
+  }
+}
+
+/// In place of the composer in a direct chat with someone the user blocked (Flutter `BlockedUserBanner`).
+struct BlockedPersonBar: View {
+  let viewModel: RoomViewModel
+  @State private var isWorking = false
+
+  var body: some View {
+    VStack(spacing: 8) {
+      Label("You blocked this person.", systemImage: "hand.raised")
+        .font(.subheadline)
+        .foregroundStyle(SysColors.textSecondary)
+      Button {
+        isWorking = true
+        Task {
+          await viewModel.unblock()
+          isWorking = false
+        }
+      } label: {
+        Group { if isWorking { ProgressView() } else { Text("Unblock") } }
+          .frame(maxWidth: 280)
+      }
+      .buttonStyle(.bordered)
+      .disabled(isWorking)
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 12)
+    .background(.bar)
+  }
+}
+
+/// Above the timeline when a member's identity changed (Element X `IdentityPinningViolation`): their messages may
+/// not be from them until the user accepts the new identity, or checks with them first.
+struct IdentityWarningBanner: View {
+  let warning: IdentityWarning
+  let onAccept: () -> Void
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 12) {
+      Image(systemName: "exclamationmark.shield.fill")
+        .font(.title3)
+        .foregroundStyle(
+          warning.kind == .verifiedChanged
+            ? AnyShapeStyle(SysColors.error) : AnyShapeStyle(Color.orange)
+        )
+        .symbolEffect(.pulse, options: .repeat(2), isActive: !reduceMotion)
+      VStack(alignment: .leading, spacing: 6) {
+        Text(
+          warning.kind == .verifiedChanged
+            ? "\(warning.name)'s verified identity was reset."
+            : "\(warning.name)'s identity was reset."
+        )
+        .font(.subheadline.weight(.semibold))
+        Text("Check with them another way before trusting new messages.")
+          .font(.footnote)
+          .foregroundStyle(SysColors.textSecondary)
+        Button(warning.kind == .verifiedChanged ? "Withdraw verification" : "OK, I understand") {
+          onAccept()
+        }
+        .font(.footnote.weight(.semibold))
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+      }
+      Spacer(minLength: 0)
+    }
+    .padding(12)
+    .background(.bar)
+    .accessibilityElement(children: .contain)
+  }
+}
+
 struct ArchivedRoomBar: View {
   let viewModel: RoomViewModel
 

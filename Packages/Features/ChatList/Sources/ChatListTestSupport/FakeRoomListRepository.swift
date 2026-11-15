@@ -55,6 +55,10 @@ public final class FakeRoomListRepository: RoomListRepository, @unchecked Sendab
     lock.withLock { _decisions.append("\(favourite ? "favourite" : "unfavourite") \(roomId)") }
   }
 
+  public func setLowPriority(_ lowPriority: Bool, roomId: String) async throws(RoomListError) {
+    lock.withLock { _decisions.append("\(lowPriority ? "low" : "normal") \(roomId)") }
+  }
+
   public func setMuted(_ muted: Bool, roomId: String) async throws(RoomListError) {
     lock.withLock { _decisions.append("\(muted ? "mute" : "unmute") \(roomId)") }
   }

@@ -16,6 +16,8 @@
 	<string>$(TWAKE_PRIVACY_URL)</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Twake Chat uses Face ID to unlock the app when App Lock is on.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Twake Chat uses the camera to take pictures and videos you send in a chat.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Twake Chat records voice messages with the microphone while you hold the record button.</string>
 	<key>CFBundleURLTypes</key>

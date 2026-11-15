@@ -70,3 +70,23 @@ struct RoomListRepositoryTests {
     #expect(String(describing: Self.room).contains("!a:example.org"))
   }
 }
+
+@Suite struct AppBadgeTests {
+  @Test func mutedRoomsAndSpacesAreLeftOutOfTheBadge() {
+    let rooms = [
+      RoomSummary(
+        id: "!a", name: "A", lastMessageText: nil, lastMessageSender: nil, lastActivity: nil,
+        unreadCount: 3),
+      RoomSummary(
+        id: "!b", name: "B", lastMessageText: nil, lastMessageSender: nil, lastActivity: nil,
+        unreadCount: 5,
+        mentionCount: 1, isMuted: true),
+      RoomSummary(
+        id: "!c", name: "C", lastMessageText: nil, lastMessageSender: nil, lastActivity: nil,
+        unreadCount: 2,
+        isSpace: true),
+    ]
+    #expect(RoomSummary.appBadge(for: rooms) == 3)
+    #expect(rooms[1].badgeCount == 0)
+  }
+}
