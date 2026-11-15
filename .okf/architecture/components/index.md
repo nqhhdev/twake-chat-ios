@@ -1,6 +1,6 @@
 C4 level 3 - the modules inside the app and what each may import. Level 4 is the code itself: link real files from each page once they exist.
 
-Each layer is a local Swift package, so a forbidden import fails to compile ([ADR 0005](../../adr/0005-layered-local-swift-packages.md)).
+Each layer is a local Swift package, so a forbidden import fails to compile ([ADR 0005](../../../docs/adr/0005-layered-local-swift-packages.md)).
 
 ```
 Features  ->  Domain  <-  MatrixData  ->  Matrix SDK

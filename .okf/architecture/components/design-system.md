@@ -34,7 +34,7 @@ public extension View {
 The sketch shows the intent; check the exact iOS 26 API against the SDK in use before copying it.
 
 Feature code calls `adaptiveSurface` and never writes `#available`. When iOS 18 support ends, only this package changes.
-Reasoning: [ADR 0002](../../adr/0002-ios-18-minimum-ios-26-styling.md).
+Reasoning: [ADR 0002](../../../docs/adr/0002-ios-18-minimum-ios-26-styling.md).
 
 ## Source of the visual language
 The Flutter app's colours, typography and component shapes are the reference. Whether tokens are copied by hand or

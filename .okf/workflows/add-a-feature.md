@@ -9,7 +9,7 @@ status: draft
 
 Checked against the first feature, `Authentication` (TWAK-65).
 
-1. Check the feature is in scope ([ADR 0011](../adr/0011-v1-scope-core-chat.md)) and read how the Flutter app does it
+1. Check the feature is in scope ([ADR 0011](../../docs/adr/0011-v1-scope-core-chat.md)) and read how the Flutter app does it
    (`lib/pages/<feature>` and `lib/domain` in `twake-on-matrix`).
 2. **Domain**: add the models and the repository protocol the screens need. Add a use case only if logic spans
    repositories. Write tests for any use case.

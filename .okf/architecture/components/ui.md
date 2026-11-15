@@ -23,12 +23,12 @@ status: draft
 
 A feature never checks the iOS version; that belongs to the [Design System](design-system.md).
 
-Reasoning: [ADR 0004](../../adr/0004-swiftui-observable-coordinators.md).
+Reasoning: [ADR 0004](../../../docs/adr/0004-swiftui-observable-coordinators.md).
 
 ## Authentication (built, TWAK-65)
 `Packages/Features/Authentication/` holds the password sign-in for Debug builds
-([ADR 0019](../../adr/0019-password-login-debug-builds.md)); SSO and discovery
-([ADR 0008](../../adr/0008-authentication-sso-and-discovery.md)) are not built yet.
+([ADR 0019](../../../docs/adr/0019-password-login-debug-builds.md)); SSO and discovery
+([ADR 0008](../../../docs/adr/0008-authentication-sso-and-discovery.md)) are not built yet.
 - `PasswordLoginScreen` and `PasswordLoginViewModel`: homeserver (prefilled from the Debug build configuration),
   username, password, a loading state and one message per `AuthenticationError`. As in the Flutter app's
   `lib/pages/login/login.dart` `login()`, an empty username or password shows its own message and is not sent, and a
@@ -59,7 +59,7 @@ restore error counts as signed out"; it was accepted on 2026-11-13 under the own
 Signed out, the feature opens on `TwakeWelcomeScreen` (linagora-design-flutter `TwakeWelcomeScreen`): Create Twake ID
 and Sign in open the registration site, "Use your company server" opens `HomeserverPickerScreen`, which goes to the
 server's single SSO provider, to `ConnectScreen` (one button per provider) or to `PasswordLoginScreen` on a server
-without SSO, as [ADR 0021](../../adr/0021-sign-in-as-the-flutter-app.md) says. The feature is the same in Debug and
+without SSO, as [ADR 0021](../../../docs/adr/0021-sign-in-as-the-flutter-app.md) says. The feature is the same in Debug and
 Release. SSO pages open through the feature's `WebAuthenticator` protocol, which the app implements with
 `ASWebAuthenticationSession` (`TwakeChat/SystemWebAuthenticator.swift`). The composition root,
 `TwakeChat/TwakeChatApp.swift`, builds `KeychainSessionStore` and `MatrixAuthenticationRepository` and a
@@ -79,7 +79,7 @@ MatrixData): the profile, Privacy & Security (chat backup: enter the recovery ke
 backup and see the new key once), Notifications (default mode for direct and group chats), About, and Logout with its
 confirmation. Chat info also sets the room's own notification mode or its default. The chat list has the Flutter header: the centred "Chats" title and a search field that
 filters the rooms by name. The shell lays the screens out by
-[ADR 0022](../../adr/0022-adaptive-layout-flutter-breakpoints.md): one stack under 905 pt (phones, a folded Duo), the
+[ADR 0022](../../../docs/adr/0022-adaptive-layout-flutter-breakpoints.md): one stack under 905 pt (phones, a folded Duo), the
 472 pt chat list beside the chat from 905 pt (an unfolded Duo, iPads). `Packages/Features/Room/` (Domain and
 DesignSystem only) is the chat: `RoomViewModel` follows the room's `TimelineRepository`, loads older messages, and
 sends, replies to, edits, deletes and reacts to messages; `RoomScreen` shows Twake bubbles (own on the right in

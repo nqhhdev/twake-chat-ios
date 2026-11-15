@@ -20,7 +20,7 @@ Checked 2026-11-12 on the staging homeserver `https://matrix.stg.lin-saas.com`:
   [ADR 0003](0003-matrix-rust-sdk.md) requires.
 
 The pinned SDK has the password login call and the server's login flows; see
-[Matrix SDK 26.04.01 API](../references/matrix-sdk-26-04-01-api.md) (Login, session, restore and logout).
+[Matrix SDK 26.04.01 API](../../.okf/references/matrix-sdk-26-04-01-api.md) (Login, session, restore and logout).
 
 ## Decision
 - Debug builds offer `m.login.password` through the SDK's

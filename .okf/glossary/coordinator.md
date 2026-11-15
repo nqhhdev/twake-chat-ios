@@ -7,4 +7,4 @@ status: draft
 ---
 # Coordinator
 
-The object that owns navigation for one flow and creates its view models. See [ADR 0004](../adr/0004-swiftui-observable-coordinators.md).
+The object that owns navigation for one flow and creates its view models. See [ADR 0004](../../docs/adr/0004-swiftui-observable-coordinators.md).

@@ -12,10 +12,10 @@ status: draft
 ## The system
 Twake Chat for iOS is a native Swift chat client for the [Matrix](https://spec.matrix.org) protocol. It is the native
 counterpart of the Flutter Twake Chat app (`twake-on-matrix`) and talks to the same servers. It runs on iPhone, on
-iOS 18 and iOS 26 ([ADR 0002](../adr/0002-ios-18-minimum-ios-26-styling.md)).
+iOS 18 and iOS 26 ([ADR 0002](../../docs/adr/0002-ios-18-minimum-ios-26-styling.md)).
 
 Version 1 covers core chat only: sign-in, chat list, room timeline, end-to-end encryption with recovery, and push
-notifications ([ADR 0011](../adr/0011-v1-scope-core-chat.md)).
+notifications ([ADR 0011](../../docs/adr/0011-v1-scope-core-chat.md)).
 
 ## Who uses it
 | Actor | Interaction |
@@ -34,4 +34,4 @@ notifications ([ADR 0011](../adr/0011-v1-scope-core-chat.md)).
 
 ## Boundaries
 This repository is the iOS client only. The servers, the Flutter app and the web app are out of scope. The Matrix SDK is a
-binary dependency, not part of this repository ([ADR 0003](../adr/0003-matrix-rust-sdk.md)).
+binary dependency, not part of this repository ([ADR 0003](../../docs/adr/0003-matrix-rust-sdk.md)).

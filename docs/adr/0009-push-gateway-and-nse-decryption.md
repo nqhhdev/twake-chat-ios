@@ -21,7 +21,7 @@ device must fetch and decrypt the event.
   ([ADR 0012](0012-reuse-flutter-bundle-identifier.md)).
 - The pusher asks for identifiers only (room id and event id), never message content.
 - The push is a visible, mutable notification so the system starts the
-  [Notification Service Extension](../architecture/containers/notification-service-extension.md), which fetches and
+  [Notification Service Extension](../../.okf/architecture/containers/notification-service-extension.md), which fetches and
   decrypts the event through the SDK's notification client and rewrites the text.
 - If decryption fails or time runs out, the notification shows a generic text; it never shows ciphertext or nothing.
 - Sign-out removes the pusher.

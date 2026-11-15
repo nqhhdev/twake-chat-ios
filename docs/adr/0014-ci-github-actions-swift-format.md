@@ -10,9 +10,9 @@ status: draft
 **Status:** Accepted by the project owner, 2026-11-12 (TWAK-37). The answer date is not recorded anywhere, so this is the date it was written down.
 
 ## Context
-The repository has no CI and no linter. [Build](../workflows/build.md) lists "Format and lint" as not chosen, and
-[Open Verifications](../backlog/open-verifications.md) lists the CI service and the linter as undecided. Several
-constraints already assume a CI build ([Constraints](../engineering/constraints.md), rows 5, 8 and 9). The Flutter
+The repository has no CI and no linter. [Build](../../.okf/workflows/build.md) lists "Format and lint" as not chosen, and
+[Open Verifications](../../.okf/backlog/open-verifications.md) lists the CI service and the linter as undecided. Several
+constraints already assume a CI build ([Constraints](../../.okf/engineering/constraints.md), rows 5, 8 and 9). The Flutter
 app's CI runs on GitHub Actions with GitHub-hosted macOS runners (`twake-on-matrix/.github/workflows`). swift-format
 ships with Xcode 26, so it needs no extra dependency. The app must be built and tested on an iOS 18 and an iOS 26
 simulator ([ADR 0010](0010-testing-strategy-two-ios-versions.md)).

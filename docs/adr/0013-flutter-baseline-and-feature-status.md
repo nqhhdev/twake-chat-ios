@@ -34,7 +34,7 @@ SDK login token only ([ADR 0008](0008-authentication-sso-and-discovery.md)).
 
 **Status of each Flutter feature.** One line per row of the migration inventory's Features table.
 *Kept* means in v1 per [ADR 0011](0011-v1-scope-core-chat.md). *Deferred* means listed in
-[Deferred Features](../backlog/deferred-features.md). *Dropped* means it will not be rebuilt; nothing is dropped
+[Deferred Features](../../.okf/backlog/deferred-features.md). *Dropped* means it will not be rebuilt; nothing is dropped
 until the owner says so.
 
 | Flutter feature | Status | Reason |

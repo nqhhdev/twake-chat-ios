@@ -28,5 +28,5 @@ status: draft
 ## Why it shares the store
 In the Flutter app the main app runs the Dart SDK and the NSE runs the Rust SDK, so the NSE has no keys of its own and
 the recovery key is copied into the Keychain for it (that app's ADR 35). Here both processes run the same SDK on the same
-store, so no key copying is needed. See [ADR 0007](../../adr/0007-shared-session-store-app-group.md) and
-[ADR 0009](../../adr/0009-push-gateway-and-nse-decryption.md).
+store, so no key copying is needed. See [ADR 0007](../../../docs/adr/0007-shared-session-store-app-group.md) and
+[ADR 0009](../../../docs/adr/0009-push-gateway-and-nse-decryption.md).

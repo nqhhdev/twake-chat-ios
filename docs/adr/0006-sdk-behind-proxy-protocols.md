@@ -15,7 +15,7 @@ listeners, which are awkward in SwiftUI and cannot be created in unit tests with
 
 ## Decision
 - `MatrixData` is the only package that imports the SDK.
-- Each long-lived SDK object has one proxy (see [Data Layer](../architecture/components/data.md)) that implements a
+- Each long-lived SDK object has one proxy (see [Data Layer](../../.okf/architecture/components/data.md)) that implements a
   protocol declared in `Domain`.
 - Proxies map SDK types to Domain value types and SDK errors to Domain errors, and turn listeners into `AsyncStream`.
 - View models and use cases depend on the protocols and are tested with hand-written fakes.

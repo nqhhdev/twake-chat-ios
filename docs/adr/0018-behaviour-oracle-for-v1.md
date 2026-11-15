@@ -45,7 +45,7 @@ Facts this decision rests on:
 | Push: notifications with decrypted text | No Patrol scenario. Unit tests `test/utils/push_*`. | Unit tests of the extension's payload handling with fakes. Manual push matrix on a device: locked device, encrypted room. ADR 0012 first-launch cleanup: one unit test, plus a manual check on a device that had the Flutter app. | CI; device before each build | Unit tests gate every pull request |
 
 Manual checks run on iOS 26 only. The project owner decided on 2026-11-12 that no step needs an iOS 18 runtime;
-compiling against the iOS 18.0 deployment target is enough ([Build](../workflows/build.md)).
+compiling against the iOS 18.0 deployment target is enough ([Build](../../.okf/workflows/build.md)).
 
 **Baseline.** One recorded run of the Patrol scenarios above on the Flutter app, at the commit pinned by
 [ADR 0013](0013-flutter-baseline-and-feature-status.md), is the reference for the manual scripts. It runs on an iOS

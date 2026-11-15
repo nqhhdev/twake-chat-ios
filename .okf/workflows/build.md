@@ -17,8 +17,8 @@ Run every command from the repository root unless a step says otherwise.
 | Build without a simulator runtime | `xcodebuild build -project TwakeChat.xcodeproj -scheme TwakeChat -destination 'generic/platform=iOS Simulator'` |
 | Build a package that also targets macOS | `cd Packages/Domain && swift build`, and the same in `Packages/AppShared` |
 | Build an iOS-only package | `DesignSystem` and `MatrixData` declare iOS only, so build them through the app scheme |
-| Format and lint | swift-format, which ships with Xcode 26 ([ADR 0014](../adr/0014-ci-github-actions-swift-format.md)); see Format and lint below |
-| CI | `.github/workflows/ci.yml` on GitHub Actions ([ADR 0014](../adr/0014-ci-github-actions-swift-format.md)); see CI below |
+| Format and lint | swift-format, which ships with Xcode 26 ([ADR 0014](../../docs/adr/0014-ci-github-actions-swift-format.md)); see Format and lint below |
+| CI | `.github/workflows/ci.yml` on GitHub Actions ([ADR 0014](../../docs/adr/0014-ci-github-actions-swift-format.md)); see CI below |
 | Release build and signing | Not designed; the Flutter app uses fastlane |
 
 Use any installed iOS 26 simulator: `xcrun simctl list devices available` lists them, and the `OS=` and `name=` values above are examples.

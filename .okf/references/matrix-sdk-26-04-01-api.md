@@ -8,7 +8,7 @@ status: draft
 # Matrix SDK 26.04.01 API
 
 The names below come from `matrix-rust-components-swift` at tag `26.04.01`, revision
-`2916f3f9cc2aea86ba3a820cb6a8389e13e0284a`, the version pinned by [ADR 0015](../adr/0015-pin-matrix-rust-components-swift-26-04-01.md).
+`2916f3f9cc2aea86ba3a820cb6a8389e13e0284a`, the version pinned by [ADR 0015](../../docs/adr/0015-pin-matrix-rust-components-swift-26-04-01.md).
 They do not come from Element X or from memory. Write code against this page, or against the checkout itself. Do not
 use Element X `main`: it follows newer releases.
 
@@ -16,11 +16,11 @@ use Element X `main`: it follows newer releases.
 `Packages/MatrixData/.build/checkouts/matrix-rust-components-swift/` (Xcode also puts a copy under its
 `SourcePackages/checkouts/`). Every citation is `Sources/MatrixRustSDK/<file>:<line>` in that checkout. All the names
 here are in `matrix_sdk_ffi.swift`, so the table gives only the line. After an SDK upgrade (its own pull request,
-[ADR 0003](../adr/0003-matrix-rust-sdk.md)), the page must be checked again.
+[ADR 0003](../../docs/adr/0003-matrix-rust-sdk.md)), the page must be checked again.
 
 The page records names only. It decides nothing about which login flow ships (see
-[ADR 0008](../adr/0008-authentication-sso-and-discovery.md)). The proxies that wrap these types come with the features
-that need them ([ADR 0006](../adr/0006-sdk-behind-proxy-protocols.md), [ADR 0011](../adr/0011-v1-scope-core-chat.md)).
+[ADR 0008](../../docs/adr/0008-authentication-sso-and-discovery.md)). The proxies that wrap these types come with the features
+that need them ([ADR 0006](../../docs/adr/0006-sdk-behind-proxy-protocols.md), [ADR 0011](../../docs/adr/0011-v1-scope-core-chat.md)).
 
 ## Building a client: `ClientBuilder` (class at line 3609)
 

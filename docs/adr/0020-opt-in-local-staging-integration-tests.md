@@ -13,7 +13,7 @@ status: draft
 [ADR 0010](0010-testing-strategy-two-ios-versions.md) says integration tests against a real homeserver are out of scope
 until a test server exists. The staging homeserver `https://matrix.stg.lin-saas.com` is now the development
 homeserver ([ADR 0019](0019-password-login-debug-builds.md), now [ADR 0021](0021-sign-in-as-the-flutter-app.md)) and has test accounts. CI must not hold account
-credentials, and the project has no secret scanner ([Constraints](../engineering/constraints.md)).
+credentials, and the project has no secret scanner ([Constraints](../../.okf/engineering/constraints.md)).
 
 ## Decision
 - Integration tests against staging are opt-in and run locally only. CI never runs them.
