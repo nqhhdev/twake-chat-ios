@@ -33,6 +33,8 @@ struct MemberProfileScreen: View {
   @State private var isConfirmingBlock = false
   @State private var isWorking = false
   @State private var copied = false
+  @State private var common: [RoomInCommon]?
+  @State private var status: String?
 
   var body: some View {
     List {
@@ -62,9 +64,27 @@ struct MemberProfileScreen: View {
         .frame(maxWidth: .infinity)
         .listRowBackground(Color.clear)
       }
+      if let status {
+        Section("Status") {
+          Label(status, systemImage: "quote.bubble")
+            .transition(.opacity)
+        }
+      }
       Section {
         LabeledContent("Matrix ID") {
           Text(member.id).textSelection(.enabled).lineLimit(1).truncationMode(.middle)
+        }
+      }
+      if let common, !common.isEmpty, !member.isOwn {
+        Section(common.count == 1 ? "1 group in common" : "\(common.count) groups in common") {
+          ForEach(common) { room in
+            Label {
+              Text(room.name).lineLimit(1)
+            } icon: {
+              TwakeAvatar(name: room.name, size: 28)
+            }
+            .transition(.opacity.combined(with: .move(edge: .top)))
+          }
         }
       }
       if !member.assignableRoles.isEmpty {
@@ -118,6 +138,13 @@ struct MemberProfileScreen: View {
     .navigationTitle(member.name)
     .navigationBarTitleDisplayMode(.inline)
     .sensoryFeedback(.success, trigger: copied)
+    .task(id: member.id) {
+      async let message = viewModel.statusMessage(of: member.id)
+      let found = await viewModel.roomsInCommon(with: member.id)
+      let statusText = await message
+      withAnimation(.easeInOut) { status = statusText }
+      withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { common = found }
+    }
     .confirmationDialog(
       "Ban \(member.name) from this chat?", isPresented: $isConfirmingBan, titleVisibility: .visible
     ) {

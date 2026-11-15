@@ -1,6 +1,7 @@
 import Domain
 import Foundation
 import Observation
+import SwiftUI
 
 /// The chat list: the joined rooms, as the repository orders them (most recent activity first), kept up to date, and
 /// the Log out action. Logging out is the app's job: the coordinator passes it in, so this feature does not know the
@@ -25,7 +26,7 @@ public final class ChatListViewModel {
   public var selection = Set<String>()
 
   public enum Filter: String, CaseIterable, Identifiable, Sendable {
-    case all, unread, favourites, people, groups
+    case all, unread, favourites, people, groups, broadcasts
     public var id: Self { self }
     public var title: String {
       switch self {
@@ -34,6 +35,7 @@ public final class ChatListViewModel {
       case .favourites: "Favourites"
       case .people: "People"
       case .groups: "Groups"
+      case .broadcasts: "Broadcasts"
       }
     }
 
@@ -44,6 +46,7 @@ public final class ChatListViewModel {
       case .favourites: room.isFavourite
       case .people: room.isDirect
       case .groups: !room.isDirect
+      case .broadcasts: room.isBroadcast
       }
     }
   }
@@ -76,14 +79,124 @@ public final class ChatListViewModel {
     archive: (any ArchivedRoomsRepository)? = nil,
     publicRooms: (any PublicRoomsRepository)? = nil,
     spaces: (any SpacesRepository)? = nil,
+    messageSearch: (any RoomSearchRepository)? = nil,
+    doNotDisturb: DoNotDisturb? = nil,
+    saved: (any SavedMessagesRepository)? = nil,
+    people: (any PeopleRepository)? = nil,
+    openPerson: (@MainActor (String) async -> Bool)? = nil,
     logOut: @escaping @MainActor () async -> Bool
   ) {
+    self.people = people
+    self.openPerson = openPerson
+    self.saved = saved
+    self.doNotDisturb = doNotDisturb
+    self.messageSearch = messageSearch
     self.spaces = spaces
     self.archive = archive
     self.publicRooms = publicRooms
     self.repository = repository
     self.media = media
     self.logOutAction = logOut
+  }
+
+  @ObservationIgnored private let messageSearch: (any RoomSearchRepository)?
+  @ObservationIgnored let saved: (any SavedMessagesRepository)?
+  @ObservationIgnored private let people: (any PeopleRepository)?
+  @ObservationIgnored private let openPerson: (@MainActor (String) async -> Bool)?
+  /// The people the search text finds (the user directory and ToM contacts), for the global search.
+  public private(set) var peopleResults: [Person] = []
+
+  /// Opens the direct chat with someone the search found, creating it when needed.
+  public func open(_ person: Person) async {
+    guard let openPerson else { return }
+    if await !openPerson(person.id) { actionErrorMessage = "Could not open the chat." }
+  }
+
+  /// Reading and turning off the account's do not disturb, given by the app from the account settings.
+  public struct DoNotDisturb: Sendable {
+    public let isOn: @Sendable () async -> Bool
+    public let turnOff: @Sendable () async -> Bool
+
+    public init(
+      isOn: @escaping @Sendable () async -> Bool, turnOff: @escaping @Sendable () async -> Bool
+    ) {
+      self.isOn = isOn
+      self.turnOff = turnOff
+    }
+  }
+  @ObservationIgnored private let doNotDisturb: DoNotDisturb?
+  /// Do not disturb is on: the list shows a banner to turn it off.
+  public private(set) var isDoNotDisturbOn = false
+
+  public func refreshDoNotDisturb() async {
+    guard let doNotDisturb else { return }
+    let on = await doNotDisturb.isOn()
+    guard on != isDoNotDisturbOn else { return }
+    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { isDoNotDisturbOn = on }
+  }
+
+  public func turnOffDoNotDisturb() async {
+    guard let doNotDisturb else { return }
+    if await doNotDisturb.turnOff() {
+      withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { isDoNotDisturbOn = false }
+    } else {
+      actionErrorMessage = "Could not turn off Do Not Disturb."
+    }
+  }
+  /// The messages the server found for the search text, in rooms the list knows.
+  public private(set) var messageResults: [RoomSearchResult] = []
+  public private(set) var isSearchingMessages = false
+
+  /// Searches the server's messages for the search text, after a short pause in typing (the caller's task is
+  /// cancelled by the next keystroke). Encrypted messages are not on the server's index.
+  public func searchMessages() async {
+    let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard term.count >= 2 else {
+      messageResults = []
+      peopleResults = []
+      return
+    }
+    guard let messageSearch else {
+      try? await Task.sleep(for: .milliseconds(400))
+      guard !Task.isCancelled else { return }
+      let persons = await searchPeople(term)
+      guard !Task.isCancelled else { return }
+      withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { peopleResults = persons }
+      return
+    }
+    try? await Task.sleep(for: .milliseconds(400))
+    guard !Task.isCancelled else { return }
+    isSearchingMessages = true
+    defer { isSearchingMessages = false }
+    async let found = searchPeople(term)
+    let page = try? await messageSearch.searchEverywhere(term, from: nil)
+    let persons = await found
+    guard !Task.isCancelled, term == query.trimmingCharacters(in: .whitespacesAndNewlines) else {
+      return
+    }
+    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { peopleResults = persons }
+    let known = Set(allJoinedRooms.map(\.id))
+    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+      messageResults = (page?.results ?? []).filter { $0.roomId.map(known.contains) ?? false }
+    }
+  }
+
+  /// At most five people, leaving out those already shown as a direct chat in the list.
+  private func searchPeople(_ term: String) async -> [Person] {
+    guard let people, let found = try? await people.search(term) else { return [] }
+    let shown = Set(visibleRooms.filter(\.isDirect).map(\.name))
+    return Array(found.filter { !shown.contains($0.name) }.prefix(5))
+  }
+
+  /// Every loaded room the user is in, whatever the search text and filter: what the app icon badge counts.
+  public var allJoinedRooms: [RoomSummary] {
+    guard case .loaded(let rooms) = state else { return [] }
+    return rooms.filter { !$0.isInvite }
+  }
+
+  /// The room a message result belongs to.
+  public func room(of result: RoomSearchResult) -> RoomSummary? {
+    allJoinedRooms.first { $0.id == result.roomId }
   }
 
   /// Whether the list offers "Archived chats".
@@ -97,7 +210,8 @@ public final class ChatListViewModel {
     return SpaceViewModel(
       space: space, repository: spaces,
       picture: { @Sendable [weak self] reference in await self?.picture(reference) },
-      onOpen: onOpen)
+      onOpen: onOpen,
+      markRead: { [repository] roomId in try? await repository.setUnread(false, roomId: roomId) })
   }
 
   /// The public groups screen's model; joining a group opens it through `onJoined`.
@@ -176,8 +290,22 @@ public final class ChatListViewModel {
   /// The joined favourites, shown first.
   public var favouriteRooms: [RoomSummary] { joinedRooms.filter(\.isFavourite) }
 
-  /// The joined rooms that are not favourites.
-  public var otherRooms: [RoomSummary] { joinedRooms.filter { !$0.isFavourite } }
+  /// The joined rooms that are neither favourites nor low priority.
+  public var otherRooms: [RoomSummary] {
+    joinedRooms.filter { !$0.isFavourite && !$0.isLowPriority }
+  }
+
+  /// The joined rooms put in low priority, shown last (a favourite stays with the favourites).
+  public var lowPriorityRooms: [RoomSummary] {
+    joinedRooms.filter { $0.isLowPriority && !$0.isFavourite }
+  }
+
+  /// Puts a room in low priority, or takes it out.
+  public func setLowPriority(_ lowPriority: Bool, room: RoomSummary) async {
+    await act("Could not update the chat.") { [repository] () async throws(RoomListError) in
+      try await repository.setLowPriority(lowPriority, roomId: room.id)
+    }
+  }
 
   /// Why the last swipe action failed.
   public private(set) var actionErrorMessage: String?
@@ -226,6 +354,12 @@ public final class ChatListViewModel {
     let rooms = selectedRooms
     let favourite = !rooms.allSatisfy(\.isFavourite)
     for room in rooms { await setFavourite(favourite, room: room) }
+    selection = []
+  }
+
+  /// Leaves every picked chat, then ends select mode.
+  public func leaveSelection() async {
+    for room in selectedRooms { await leave(room) }
     selection = []
   }
 

@@ -102,11 +102,27 @@ struct MessageActionsOverlay: View {
       list.append(
         .init(title: "Reply", icon: "arrowshape.turn.up.left") { viewModel.reply(to: message) })
     }
+    if message.eventId != nil, viewModel.canOpenThreads {
+      list.append(
+        .init(title: "Reply in Thread", icon: "bubble.left.and.text.bubble.right") {
+          viewModel.openThread(on: message)
+        })
+    }
     if let text = RoomViewModel.text(of: message.body) {
       list.append(.init(title: "Copy", icon: "doc.on.doc") { UIPasteboard.general.string = text })
     }
     if message.eventId != nil {
       list.append(.init(title: "Forward", icon: "arrowshape.turn.up.right") { onForward(message) })
+      list.append(.init(title: "Copy Link", icon: "link") { viewModel.copyLink(to: message) })
+      if viewModel.canSave {
+        let saved = viewModel.isSaved(message)
+        list.append(
+          .init(title: saved ? "Unsave" : "Save", icon: saved ? "bookmark.slash" : "bookmark") {
+            Task { await viewModel.toggleSaved(message) }
+          })
+      }
+      list.append(
+        .init(title: "Select", icon: "checkmark.circle") { viewModel.startSelecting(message) })
       let pinned = viewModel.isPinned(message)
       list.append(
         .init(title: pinned ? "Unpin" : "Pin", icon: pinned ? "pin.slash" : "pin") {
@@ -119,7 +135,19 @@ struct MessageActionsOverlay: View {
     if message.isOwn, message.eventId != nil {
       list.append(.init(title: "Seen by", icon: "eye") { viewModel.showReaders(of: message) })
     }
-    if message.isOwn, message.eventId != nil {
+    if message.isEdited, message.eventId != nil {
+      list.append(
+        .init(title: "Edit History", icon: "clock.arrow.circlepath") {
+          viewModel.historyMessage = message
+        })
+    }
+    if viewModel.canEndPoll(message) {
+      list.append(
+        .init(title: "End Poll", icon: "checkmark.circle") {
+          Task { await viewModel.endPoll(message) }
+        })
+    }
+    if viewModel.canDelete(message) {
       list.append(
         .init(title: "Delete", icon: "trash", isDestructive: true) {
           Task { await viewModel.delete(message) }
@@ -183,7 +211,7 @@ struct MessageActionsOverlay: View {
       }
       .buttonStyle(PressScaleButtonStyle())
       .accessibilityLabel("More reactions")
-      ForEach(RoomViewModel.quickReactions, id: \.self) { key in
+      ForEach(viewModel.reactionBar, id: \.self) { key in
         let isMine = message.reactions.contains { $0.key == key && $0.includesOwn }
         Button {
           Task { await viewModel.toggleReaction(key, on: message) }
@@ -271,8 +299,11 @@ struct MenuRowButtonStyle: ButtonStyle {
 
 /// The message a sheet forwards; one sheet is one value.
 struct ForwardItem: Identifiable {
-  let message: TimelineMessage
+  let messages: [TimelineMessage]
   let id = UUID()
+
+  init(message: TimelineMessage) { messages = [message] }
+  init(messages: [TimelineMessage]) { self.messages = messages }
 }
 
 /// Any emoji as a reaction, as iMessage's "+" offers: a grid of the common ones, grouped as the emoji keyboard is.

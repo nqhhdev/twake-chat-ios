@@ -16,12 +16,20 @@ public final class SpaceViewModel {
   @ObservationIgnored private let repository: any SpacesRepository
   @ObservationIgnored private let onOpen: @MainActor (RoomSummary) -> Void
   @ObservationIgnored let picture: @Sendable (MediaReference) async -> Data?
+  /// Marks one room read; `nil` hides "Mark All as Read".
+  @ObservationIgnored let markRead: (@MainActor (String) async -> Void)?
+  public private(set) var isMarkingRead = false
+  /// The user may add rooms to this space.
+  public private(set) var canAddChannel = false
+  public private(set) var isCreating = false
 
   public init(
     space: RoomSummary, repository: any SpacesRepository,
     picture: @escaping @Sendable (MediaReference) async -> Data?,
-    onOpen: @escaping @MainActor (RoomSummary) -> Void
+    onOpen: @escaping @MainActor (RoomSummary) -> Void,
+    markRead: (@MainActor (String) async -> Void)? = nil
   ) {
+    self.markRead = markRead
     self.space = space
     self.repository = repository
     self.picture = picture
@@ -30,6 +38,7 @@ public final class SpaceViewModel {
 
   public func load() async {
     errorMessage = nil
+    canAddChannel = await repository.canAddChannel(to: space.id)
     do {
       let found = try await repository.children(of: space.id)
       // Sub-spaces first, then rooms; joined ones before the others; by name.
@@ -70,13 +79,52 @@ public final class SpaceViewModel {
         lastActivity: nil, avatar: child.avatar))
   }
 
+  /// Creates a room in this space and opens it.
+  public func createChannel(named name: String) async {
+    let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !name.isEmpty, !isCreating else { return }
+    isCreating = true
+    defer { isCreating = false }
+    errorMessage = nil
+    do {
+      let roomId = try await repository.createChannel(named: name, in: space.id)
+      await load()
+      onOpen(
+        RoomSummary(
+          id: roomId, name: name, lastMessageText: nil, lastMessageSender: nil, lastActivity: nil))
+    } catch {
+      errorMessage = "Could not create the channel."
+    }
+  }
+
+  /// Marks every room the user is in read: this space's and its sub-spaces', as the web's "Mark space as read".
+  public func markAllRead() async {
+    guard let markRead, !isMarkingRead else { return }
+    isMarkingRead = true
+    defer { isMarkingRead = false }
+    var pending = [space.id]
+    var seen = Set(pending)
+    while let spaceId = pending.popLast() {
+      let found =
+        spaceId == space.id
+        ? (children ?? []) : ((try? await repository.children(of: spaceId)) ?? [])
+      for child in found where seen.insert(child.id).inserted {
+        if child.isSpace {
+          pending.append(child.id)
+        } else if child.isJoined {
+          await markRead(child.id)
+        }
+      }
+    }
+  }
+
   /// The page of a sub-space.
   public func subspace(_ child: SpaceChild) -> SpaceViewModel {
     SpaceViewModel(
       space: RoomSummary(
         id: child.id, name: child.name, lastMessageText: nil, lastMessageSender: nil,
         lastActivity: nil, avatar: child.avatar, isSpace: true),
-      repository: repository, picture: picture, onOpen: onOpen)
+      repository: repository, picture: picture, onOpen: onOpen, markRead: markRead)
   }
 }
 
@@ -91,6 +139,8 @@ extension SpaceViewModel: Hashable {
 /// A space page: its picture and name, then its sub-spaces and rooms, each with its picture, description and size.
 struct SpaceScreen: View {
   let viewModel: SpaceViewModel
+  @State private var isNaming = false
+  @State private var newName = ""
 
   var body: some View {
     List {
@@ -147,6 +197,34 @@ struct SpaceScreen: View {
     .listStyle(.insetGrouped)
     .navigationTitle(viewModel.space.name)
     .navigationBarTitleDisplayMode(.inline)
+    .alert("New channel", isPresented: $isNaming) {
+      TextField("Name", text: $newName)
+      Button("Cancel", role: .cancel) {}
+      Button("Create") {
+        let name = newName
+        newName = ""
+        Task { await viewModel.createChannel(named: name) }
+      }
+    } message: {
+      Text("Members of \(viewModel.space.name) can find it in the space.")
+    }
+    .toolbar {
+      if viewModel.canAddChannel {
+        ToolbarItem(placement: .topBarTrailing) {
+          Button("New Channel", systemImage: "plus") { isNaming = true }
+            .disabled(viewModel.isCreating)
+        }
+      }
+      if viewModel.markRead != nil {
+        ToolbarItem(placement: .topBarTrailing) {
+          Button("Mark All as Read", systemImage: "envelope.open") {
+            Task { await viewModel.markAllRead() }
+          }
+          .disabled(viewModel.isMarkingRead || viewModel.children == nil)
+          .symbolEffect(.bounce, value: viewModel.isMarkingRead)
+        }
+      }
+    }
     .task { await viewModel.load() }
     .refreshable { await viewModel.load() }
   }

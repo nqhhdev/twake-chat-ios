@@ -103,8 +103,9 @@ public struct NewChatScreen: View {
         Picker(
           "Kind", selection: Binding(get: { viewModel.mode }, set: { viewModel.switchMode($0) })
         ) {
-          Text("New direct message").tag(PeopleSearchViewModel.Mode.direct)
-          Text("New Group Chat").tag(PeopleSearchViewModel.Mode.group)
+          Text("Direct").tag(PeopleSearchViewModel.Mode.direct)
+          Text("Group").tag(PeopleSearchViewModel.Mode.group)
+          Text("Broadcast").tag(PeopleSearchViewModel.Mode.broadcast)
         }
         .pickerStyle(.segmented)
         .padding(.horizontal, 16)
@@ -115,6 +116,10 @@ public struct NewChatScreen: View {
             .padding(12)
             .background(SysColors.surface, in: .rect(cornerRadius: 12))
             .padding(.horizontal, 16)
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
+        if viewModel.mode == .broadcast {
+          BroadcastForm(viewModel: viewModel)
             .transition(.move(edge: .top).combined(with: .opacity))
         }
         PeopleSearchList(viewModel: viewModel)
@@ -130,6 +135,12 @@ public struct NewChatScreen: View {
           ToolbarItem(placement: .confirmationAction) {
             Button("Create") { Task { await viewModel.createGroup() } }
               .disabled(!viewModel.canCreateGroup)
+          }
+        }
+        if viewModel.mode == .broadcast {
+          ToolbarItem(placement: .confirmationAction) {
+            Button("Create") { Task { await viewModel.createBroadcast() } }
+              .disabled(!viewModel.canCreateBroadcast)
           }
         }
       }
@@ -178,6 +189,75 @@ public struct InviteScreen: View {
           }
         }
         .onChange(of: viewModel.didInvite) { _, invited in if invited { dismiss() } }
+    }
+  }
+}
+
+/// The Broadcast of the new chat sheet (web D90): name, description, who follows (fixed once created), its address
+/// when open, and whether followers react. The people picked below are invited to follow.
+struct BroadcastForm: View {
+  @Bindable var viewModel: PeopleSearchViewModel
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      TextField("Broadcast name", text: $viewModel.broadcast.name)
+        .textStyle(TextStyles.bodyLarge)
+        .padding(12)
+        .background(SysColors.surface, in: .rect(cornerRadius: 12))
+      TextField("Description (optional)", text: $viewModel.broadcast.topic, axis: .vertical)
+        .lineLimit(1...3)
+        .textStyle(TextStyles.bodyMedium)
+        .padding(12)
+        .background(SysColors.surface, in: .rect(cornerRadius: 12))
+      Picker("Who follows", selection: $viewModel.broadcast.access) {
+        Label("Anyone", systemImage: "globe").tag(BroadcastDraft.Access.open)
+        Label("On approval", systemImage: "hand.raised").tag(BroadcastDraft.Access.approval)
+        Label("Invited people", systemImage: "envelope").tag(BroadcastDraft.Access.invitation)
+      }
+      .pickerStyle(.menu)
+      if viewModel.broadcast.access == .open {
+        HStack(spacing: 2) {
+          Text("#").foregroundStyle(SysColors.textSecondary)
+          TextField(
+            "address",
+            text: Binding(
+              get: { viewModel.broadcast.slug },
+              set: {
+                viewModel.isSlugEdited = true
+                viewModel.broadcast.slug = $0.lowercased()
+              })
+          )
+          .textInputAutocapitalization(.never)
+          .autocorrectionDisabled()
+        }
+        .textStyle(TextStyles.bodyMedium)
+        .padding(12)
+        .background(SysColors.surface, in: .rect(cornerRadius: 12))
+        .overlay(
+          RoundedRectangle(cornerRadius: 12).strokeBorder(
+            SysColors.error.opacity(
+              viewModel.broadcast.slug.isEmpty
+                || BroadcastDraft.isValidSlug(viewModel.broadcast.slug)
+                ? 0 : 0.8))
+        )
+        .transition(.move(edge: .top).combined(with: .opacity))
+      }
+      Toggle("Followers can react", isOn: $viewModel.broadcast.allowsReactions)
+      Text(footer)
+        .textStyle(TextStyles.labelSmall)
+        .foregroundStyle(SysColors.textSecondary)
+        .contentTransition(.opacity)
+    }
+    .padding(.horizontal, 16)
+    .animation(.spring(response: 0.35, dampingFraction: 0.85), value: viewModel.broadcast.access)
+  }
+
+  private var footer: String {
+    let posting = "Only you and moderators post."
+    switch viewModel.broadcast.access {
+    case .open: return "\(posting) Listed in the server's directory; anyone can read it."
+    case .approval: return "\(posting) Listed in the directory; you approve who follows."
+    case .invitation: return "\(posting) Only the people you invite follow it."
     }
   }
 }

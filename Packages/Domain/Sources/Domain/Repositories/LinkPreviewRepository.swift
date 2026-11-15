@@ -25,7 +25,10 @@ public struct LinkPreview: Sendable, Equatable {
 
 /// Link previews from the homeserver (Flutter `preview_url`): the server fetches the page, so the device never
 /// contacts the linked site. Implemented in MatrixData (ADR 0006).
+/// No preview in an encrypted room, nor in a room whose encryption is unknown: asking for one would tell the
+/// homeserver the links of an end-to-end encrypted chat (web D211, security audit 2026-10-16). The gate is in the
+/// repository, which every caller passes.
 public protocol LinkPreviewRepository: Sendable {
-  /// The preview of `url`, or `nil` when the server has none.
-  func preview(of url: URL) async -> LinkPreview?
+  /// The preview of `url` posted in `roomId`, or `nil` when the server has none or the room is encrypted.
+  func preview(of url: URL, inRoom roomId: String) async -> LinkPreview?
 }

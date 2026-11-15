@@ -25,6 +25,14 @@ public struct RoomDetails: Sendable, Equatable {
   public let canEnableEncryption: Bool
   /// The user may ban members and unban them.
   public let canBan: Bool
+  /// The user may delete other people's messages, as a moderator (`redact` power level, Flutter `canRedact`).
+  public let canRedactOthers: Bool
+  /// The room that replaced this one after an upgrade (`m.room.tombstone`); `nil` while the room is current.
+  public let successorRoomId: String?
+  /// The other person of a direct chat with one person; `nil` for a group.
+  public let directUserId: String?
+  /// The user's power level lets them post messages (not so in a Broadcast, where only moderators post, web D90).
+  public let canSendMessages: Bool
 
   /// Who can join a room.
   public enum JoinRule: Sendable, Equatable, CaseIterable {
@@ -41,8 +49,13 @@ public struct RoomDetails: Sendable, Equatable {
     isPublic: Bool,
     joinedMemberCount: Int, canEdit: Bool = false, canInvite: Bool = false,
     avatar: MediaReference? = nil, joinRule: JoinRule? = nil, canChangeAccess: Bool = false,
-    canEnableEncryption: Bool = false, canBan: Bool = false
+    canEnableEncryption: Bool = false, canBan: Bool = false, canRedactOthers: Bool = false,
+    successorRoomId: String? = nil, directUserId: String? = nil, canSendMessages: Bool = true
   ) {
+    self.canSendMessages = canSendMessages
+    self.successorRoomId = successorRoomId
+    self.directUserId = directUserId
+    self.canRedactOthers = canRedactOthers
     self.joinRule = joinRule
     self.canChangeAccess = canChangeAccess
     self.canEnableEncryption = canEnableEncryption
@@ -160,4 +173,72 @@ public protocol RoomDetailsRepository: Sendable {
   func setAvatar(_ picture: PictureUpload, roomId: String) async throws(RoomDetailsError)
   /// Removes the room's avatar.
   func removeAvatar(roomId: String) async throws(RoomDetailsError)
+  /// The group chats the user and `userId` are both in, by name (direct chats left out).
+  func roomsInCommon(with userId: String) async -> [RoomInCommon]
+  /// The status message `userId` set (Matrix presence `status_msg`), or `nil`.
+  func statusMessage(of userId: String) async -> String?
+  /// Whether `userId` is online, when they were last active, and their status (`GET /presence/{userId}/status`); `nil`
+  /// when the server keeps no presence.
+  func presence(of userId: String) async -> Presence?
+}
+
+extension RoomDetailsRepository {
+  public func roomsInCommon(with userId: String) async -> [RoomInCommon] { [] }
+  public func statusMessage(of userId: String) async -> String? { nil }
+  public func presence(of userId: String) async -> Presence? { nil }
+}
+
+/// What a direct chat's header says about the other person (Matrix presence).
+public struct Presence: Sendable, Equatable {
+  public let isOnline: Bool
+  /// How long ago they were last active, when the server says.
+  public let lastActive: TimeInterval?
+  public let statusMessage: String?
+
+  public init(isOnline: Bool, lastActive: TimeInterval? = nil, statusMessage: String? = nil) {
+    self.isOnline = isOnline
+    self.lastActive = lastActive
+    self.statusMessage = statusMessage
+  }
+
+  /// From the presence JSON: `presence`, `currently_active`, `last_active_ago` (ms), `status_msg`.
+  public static func from(_ object: [String: Any]) -> Presence {
+    let state = object["presence"] as? String
+    let active = object["currently_active"] as? Bool ?? false
+    let ago = (object["last_active_ago"] as? NSNumber).map { $0.doubleValue / 1000 }
+    let status = (object["status_msg"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+    return Presence(
+      isOnline: state == "online" && (active || (ago ?? .infinity) < 300), lastActive: ago,
+      statusMessage: status)
+  }
+
+  /// One line under the name: the status when set, else « Online » or « Active 5 min ago »; `nil` when nothing is
+  /// known.
+  public var line: String? {
+    if let statusMessage { return statusMessage }
+    if isOnline { return "Online" }
+    guard let lastActive else { return nil }
+    let minutes = Int(lastActive / 60)
+    switch minutes {
+    case ..<1: return "Active just now"
+    case ..<60: return "Active \(minutes) min ago"
+    case ..<(24 * 60): return "Active \(minutes / 60) h ago"
+    default:
+      let days = minutes / (24 * 60)
+      return days == 1 ? "Active yesterday" : "Active \(days) days ago"
+    }
+  }
+}
+
+/// A group chat shared with someone, on their profile.
+public struct RoomInCommon: Sendable, Equatable, Identifiable {
+  public let id: String
+  public let name: String
+  public let avatar: MediaReference?
+
+  public init(id: String, name: String, avatar: MediaReference? = nil) {
+    self.id = id
+    self.name = name
+    self.avatar = avatar
+  }
 }

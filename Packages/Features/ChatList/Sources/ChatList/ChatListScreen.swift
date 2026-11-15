@@ -16,8 +16,11 @@ public struct ChatListScreen: View {
   @State private var showsInvites = false
   @State private var leaving: RoomSummary?
   @State private var isSelecting = false
+  @State private var isConfirmingLeaveSelection = false
   /// The space opened from the list, pushed over it.
   @State private var openedSpace: SpaceViewModel?
+  @State private var connectivity = Connectivity()
+  @Environment(\.scenePhase) private var scenePhase
 
   public init(
     viewModel: ChatListViewModel, selectedRoomId: String? = nil,
@@ -46,13 +49,32 @@ public struct ChatListScreen: View {
       }
       .searchable(
         text: $viewModel.query, placement: .navigationBarDrawer(displayMode: .always),
-        prompt: "Search"
+        prompt: "Search chats and messages"
       )
+      .task(id: viewModel.query) { await viewModel.searchMessages() }
+      .task { await viewModel.refreshDoNotDisturb() }
+      .onChange(of: scenePhase) { _, phase in
+        if phase == .active { Task { await viewModel.refreshDoNotDisturb() } }
+      }
       // Select mode starts from a chat's long-press menu, as in Mail and Files; only then does the bar show Done.
       .toolbar {
         if isSelecting {
           ToolbarItem(placement: .confirmationAction) {
             Button("Done") { endSelecting() }
+          }
+        } else {
+          ToolbarItem(placement: .topBarTrailing) {
+            NavigationLink {
+              ActivityScreen(viewModel: viewModel, onSelect: onSelect)
+                .ignoresSafeArea(.container, edges: isBesideChat ? .trailing : [])
+            } label: {
+              Image(systemName: viewModel.mentionTotal > 0 ? "bell.badge.fill" : "bell")
+                .symbolEffect(.bounce, value: viewModel.mentionTotal)
+                .contentTransition(.symbolEffect(.replace))
+            }
+            .accessibilityLabel(
+              viewModel.mentionTotal > 0
+                ? "Activity, \(viewModel.mentionTotal) mentions" : "Activity")
           }
         }
       }
@@ -166,8 +188,23 @@ public struct ChatListScreen: View {
           endSelecting()
         }
       }
+      Spacer()
+      Button("Leave", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
+        isConfirmingLeaveSelection = true
+      }
+      .confirmationDialog(
+        "Leave \(count == 1 ? "this chat" : "\(count) chats")?",
+        isPresented: $isConfirmingLeaveSelection, titleVisibility: .visible
+      ) {
+        Button("Leave", role: .destructive) {
+          Task {
+            await viewModel.leaveSelection()
+            endSelecting()
+          }
+        }
+      }
     }
-    .labelStyle(.titleAndIcon)
+    .labelStyle(StackedLabelStyle())
     .disabled(count == 0)
     .padding(.horizontal, 24)
     .padding(.vertical, 12)
@@ -178,6 +215,10 @@ public struct ChatListScreen: View {
   /// on a wide screen.
   private var list: some View {
     VStack(spacing: 0) {
+      if connectivity.isOffline { OfflineBanner() }
+      if viewModel.isDoNotDisturbOn {
+        DoNotDisturbBanner { Task { await viewModel.turnOffDoNotDisturb() } }
+      }
       filterBar
       if isSelecting {
         List(selection: $viewModel.selection) { listContent }
@@ -220,6 +261,15 @@ public struct ChatListScreen: View {
         row(room)
       }
     }
+    let lowPriority = viewModel.lowPriorityRooms
+    if !lowPriority.isEmpty, viewModel.filter != .favourites {
+      Section("Low priority") {
+        ForEach(lowPriority) { room in row(room) }
+      }
+    }
+    if !viewModel.query.trimmingCharacters(in: .whitespaces).isEmpty, !isSelecting {
+      MessageResultsSection(viewModel: viewModel)
+    }
     if viewModel.filter == .all, !isSelecting {
       Section {
         if let publicRooms = viewModel.makePublicRooms(onJoined: { [onSelect] in onSelect($0) }) {
@@ -228,6 +278,15 @@ public struct ChatListScreen: View {
               .ignoresSafeArea(.container, edges: isBesideChat ? .trailing : [])
           } label: {
             Label("Public groups", systemImage: "person.3")
+              .foregroundStyle(SysColors.textSecondary)
+          }
+        }
+        if let saved = viewModel.saved {
+          NavigationLink {
+            SavedMessagesScreen(repository: saved)
+              .ignoresSafeArea(.container, edges: isBesideChat ? .trailing : [])
+          } label: {
+            Label("Saved messages", systemImage: "bookmark")
               .foregroundStyle(SysColors.textSecondary)
           }
         }
@@ -297,6 +356,12 @@ public struct ChatListScreen: View {
       readButton(room)
       favouriteButton(room)
       muteButton(room)
+      Button(
+        room.isLowPriority ? "Normal priority" : "Low priority",
+        systemImage: room.isLowPriority ? "arrow.up.circle" : "arrow.down.circle"
+      ) {
+        Task { await viewModel.setLowPriority(!room.isLowPriority, room: room) }
+      }
       Divider()
       Button("Leave", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
         leaving = room
@@ -364,12 +429,21 @@ struct ChatListRow: View {
           }
         }
         HStack(alignment: .top) {
-          Text(room.isSpace ? "Space" : ChatListViewModel.preview(of: room) ?? " ")
-            .font(.subheadline)
-            .foregroundStyle(SysColors.textSecondary)
-            .lineLimit(2, reservesSpace: true)
+          Group {
+            if let draft = room.draft, !room.isSpace {
+              Text("\(Text("Draft:").foregroundStyle(SysColors.error)) \(draft)")
+                .foregroundStyle(SysColors.textSecondary)
+            } else {
+              Text(room.isSpace ? "Space" : ChatListViewModel.preview(of: room) ?? " ")
+                .foregroundStyle(SysColors.textSecondary)
+            }
+          }
+          .font(.subheadline)
+          .lineLimit(2, reservesSpace: true)
+          .contentTransition(.opacity)
+          .animation(.easeInOut(duration: 0.25), value: room.draft)
           Spacer(minLength: 4)
-          UnreadBadge(unread: room.unreadCount, mentions: room.mentionCount)
+          UnreadBadge(unread: room.unreadCount, mentions: room.mentionCount, isMuted: room.isMuted)
         }
       }
       // The separator starts under the text, as in Messages.
@@ -385,6 +459,10 @@ struct ChatListRow: View {
 struct UnreadBadge: View {
   let unread: Int
   let mentions: Int
+  /// A muted room's count is grey, as in Messages and WhatsApp: it is unread, but nothing asks for attention.
+  var isMuted = false
+
+  private var fill: ColorToken { isMuted ? SysColors.textSecondary : SysColors.primary }
 
   var body: some View {
     HStack(spacing: 4) {
@@ -393,7 +471,7 @@ struct UnreadBadge: View {
           .textStyle(TextStyles.labelMedium)
           .foregroundStyle(SysColors.onPrimary)
           .frame(width: 20, height: 20)
-          .background(SysColors.primary, in: Circle())
+          .background(fill, in: Circle())
           .transition(.scale.combined(with: .opacity))
       }
       if unread > 0 {
@@ -403,7 +481,7 @@ struct UnreadBadge: View {
           .contentTransition(.numericText(value: Double(unread)))
           .padding(.horizontal, 6)
           .frame(minWidth: 20, minHeight: 20)
-          .background(SysColors.primary, in: Capsule())
+          .background(fill, in: Capsule())
           .transition(.scale.combined(with: .opacity))
       }
     }
@@ -520,5 +598,92 @@ struct InviteRow: View {
     .buttonStyle(.plain)
     .padding(.horizontal, 16)
     .frame(height: 64)
+  }
+}
+
+/// An icon above a small title, as the toolbars of Mail and Photos lay out several actions side by side.
+struct StackedLabelStyle: LabelStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    VStack(spacing: 3) {
+      configuration.icon.font(.system(size: 19))
+      configuration.title.font(.caption2)
+    }
+    .frame(minWidth: 52)
+  }
+}
+
+/// The messages the server found for the search text, under the matching chats: the chat, the sender and the text; a
+/// tap opens the chat at that message.
+struct MessageResultsSection: View {
+  let viewModel: ChatListViewModel
+  @Environment(\.openURL) private var openURL
+
+  var body: some View {
+    if !viewModel.peopleResults.isEmpty {
+      Section("People") {
+        ForEach(viewModel.peopleResults) { person in
+          Button {
+            Task { await viewModel.open(person) }
+          } label: {
+            HStack(spacing: 12) {
+              TwakeAvatar(name: person.name, size: 36)
+              VStack(alignment: .leading, spacing: 2) {
+                Text(person.name).font(.body.weight(.semibold)).lineLimit(1)
+                Text(person.id).font(.caption).foregroundStyle(SysColors.textSecondary)
+                  .lineLimit(1)
+              }
+            }
+            .contentShape(Rectangle())
+          }
+          .buttonStyle(.plain)
+          .transition(.opacity.combined(with: .move(edge: .top)))
+        }
+      }
+    }
+    Section {
+      if viewModel.isSearchingMessages, viewModel.messageResults.isEmpty {
+        HStack {
+          Spacer()
+          ProgressView()
+          Spacer()
+        }
+      }
+      ForEach(viewModel.messageResults) { result in
+        Button {
+          if let roomId = result.roomId,
+            let url = MatrixLink.room(idOrAlias: roomId, eventId: result.eventId, via: []).url
+          {
+            openURL(url)
+          }
+        } label: {
+          VStack(alignment: .leading, spacing: 3) {
+            HStack {
+              Text(viewModel.room(of: result)?.name ?? "")
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+              Spacer()
+              Text(ChatListViewModel.timeText(result.date))
+                .font(.caption)
+                .foregroundStyle(SysColors.textSecondary)
+            }
+            Text("\(Text(result.senderName).bold()): \(result.text)")
+              .font(.subheadline)
+              .foregroundStyle(SysColors.textSecondary)
+              .lineLimit(2)
+          }
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .transition(.opacity.combined(with: .move(edge: .top)))
+      }
+    } header: {
+      if viewModel.isSearchingMessages || !viewModel.messageResults.isEmpty {
+        Text("Messages")
+      }
+    } footer: {
+      if !viewModel.messageResults.isEmpty {
+        Text("Messages in encrypted chats are searched inside each chat.")
+      }
+    }
   }
 }

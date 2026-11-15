@@ -6,7 +6,7 @@ import SwiftUI
 /// It shows the view model's state and forwards taps; it holds no logic.
 /// The pages Settings opens.
 public enum SettingsPage: Hashable, CaseIterable, Sendable {
-  case chat, security, notifications, about
+  case chat, security, notifications, storage, about
 }
 
 /// One Settings page on its own, for the column beside the list on a wide screen.
@@ -24,6 +24,7 @@ public struct SettingsPageView: View {
     case .chat: ChatSettingsScreen(viewModel: viewModel)
     case .security: SecurityScreen(viewModel: viewModel)
     case .notifications: NotificationSettingsScreen(viewModel: viewModel)
+    case .storage: StorageSettingsScreen(viewModel: viewModel)
     case .about: AboutScreen()
     }
   }
@@ -37,6 +38,8 @@ public struct SettingsScreen: View {
   let selection: Binding<SettingsPage?>?
   @State private var isConfirmingLogout = false
   @State private var isRenaming = false
+  @State private var isEditingStatus = false
+  @State private var statusDraft = ""
 
   public init(viewModel: SettingsViewModel, selection: Binding<SettingsPage?>? = nil) {
     self.viewModel = viewModel
@@ -92,6 +95,21 @@ public struct SettingsScreen: View {
         .onTapGesture { isRenaming = true }
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Changes your picture and display name")
+        Button {
+          statusDraft = viewModel.statusMessage ?? ""
+          isEditingStatus = true
+        } label: {
+          Label {
+            Text(viewModel.statusMessage ?? "Set a status")
+              .foregroundStyle(
+                viewModel.statusMessage == nil ? SysColors.textSecondary : SysColors.onSurface
+              )
+              .contentTransition(.opacity)
+          } icon: {
+            Image(systemName: "quote.bubble").foregroundStyle(SysColors.primary)
+          }
+        }
+        .animation(.easeInOut, value: viewModel.statusMessage)
       }
       Section {
         if viewModel.hasChatPage {
@@ -99,6 +117,7 @@ public struct SettingsScreen: View {
         }
         pageRow(.security, title: "Privacy & Security", icon: "lock", detail: recoveryBadge)
         pageRow(.notifications, title: "Notifications", icon: "bell", detail: nil)
+        pageRow(.storage, title: "Data and Storage", icon: "internaldrive", detail: nil)
         pageRow(.about, title: "About", icon: "info.circle", detail: nil)
       }
       Section {
@@ -123,6 +142,19 @@ public struct SettingsScreen: View {
     .animation(.default, value: viewModel.displayName)
     .task { await viewModel.load() }
     .sheet(isPresented: $isRenaming) { EditProfileSheet(viewModel: viewModel) }
+    .alert("Status", isPresented: $isEditingStatus) {
+      TextField("What are you up to?", text: $statusDraft)
+      Button("Cancel", role: .cancel) {}
+      if viewModel.statusMessage != nil {
+        Button("Clear", role: .destructive) { Task { await viewModel.setStatusMessage("") } }
+      }
+      Button("Save") {
+        let text = statusDraft
+        Task { await viewModel.setStatusMessage(text) }
+      }
+    } message: {
+      Text("People see it on your profile.")
+    }
     .confirmationDialog(
       "Are you sure you want to log out?", isPresented: $isConfirmingLogout,
       titleVisibility: .visible
@@ -218,6 +250,8 @@ struct SecurityScreen: View {
   let viewModel: SettingsViewModel
   @State private var key = ""
   @State private var isVerifying = false
+  @State private var isConfirmingReset = false
+  @State private var resetPassword = ""
 
   var body: some View {
     List {
@@ -295,14 +329,63 @@ struct SecurityScreen: View {
         }
         .transition(.scale.combined(with: .opacity))
       }
+      if viewModel.didResetIdentity {
+        Section {
+          Label(
+            "Your identity was reset. Set up the chat backup again.",
+            systemImage: "checkmark.shield"
+          )
+          .foregroundStyle(SysColors.success)
+        }
+        .transition(.scale.combined(with: .opacity))
+      }
       if let message = viewModel.errorMessage {
         Section { Text(message).foregroundStyle(SysColors.error) }
       }
       if viewModel.isWorking {
         Section { ProgressView().frame(maxWidth: .infinity) }
       }
+      Section {
+        Button("Reset identity", role: .destructive) { isConfirmingReset = true }
+          .disabled(viewModel.isWorking)
+      } footer: {
+        Text(
+          "Only if you lost every device and your recovery key. Your verified devices and people must verify you again, and older encrypted messages stay locked."
+        )
+      }
     }
     .twakeTitle("Privacy & Security")
+    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: viewModel.didResetIdentity)
+    .confirmationDialog(
+      "Reset your identity?", isPresented: $isConfirmingReset, titleVisibility: .visible
+    ) {
+      Button("Reset", role: .destructive) { Task { await viewModel.startIdentityReset() } }
+    } message: {
+      Text("This cannot be undone.")
+    }
+    .alert(
+      "Confirm with your password",
+      isPresented: Binding(
+        get: { viewModel.identityReset == .password },
+        set: { if !$0 { resetPassword = "" } })
+    ) {
+      SecureField("Password", text: $resetPassword)
+      Button("Cancel", role: .cancel) { Task { await viewModel.cancelIdentityReset() } }
+      Button("Reset", role: .destructive) {
+        let typed = resetPassword
+        resetPassword = ""
+        Task { await viewModel.finishIdentityReset(password: typed) }
+      }
+    }
+    .sheet(
+      isPresented: Binding(
+        get: { if case .webApproval = viewModel.identityReset { true } else { false } },
+        set: { if !$0 { Task { await viewModel.finishIdentityReset() } } })
+    ) {
+      if case .webApproval(let url) = viewModel.identityReset {
+        SafariView(url: url).ignoresSafeArea()
+      }
+    }
     .task { await viewModel.verification?.refreshState() }
     .sheet(isPresented: $isVerifying) {
       if let verification = viewModel.verification {
@@ -371,6 +454,18 @@ struct NotificationSettingsScreen: View {
 
   var body: some View {
     List {
+      Section {
+        Toggle(
+          isOn: Binding(
+            get: { viewModel.doNotDisturb },
+            set: { on in Task { await viewModel.setDoNotDisturb(on) } })
+        ) {
+          Label("Do Not Disturb", systemImage: "moon.fill")
+        }
+        .tint(.indigo)
+      } footer: {
+        Text("No notifications on any of your devices until you turn it off.")
+      }
       modePicker("Direct Chats", selection: viewModel.directMode, isDirect: true)
       modePicker("Group chats", selection: viewModel.groupMode, isDirect: false)
       if let message = viewModel.errorMessage {
@@ -401,6 +496,82 @@ struct NotificationSettingsScreen: View {
     }
     .animation(.spring(response: 0.3, dampingFraction: 0.7), value: selection)
     .sensoryFeedback(.selection, trigger: selection)
+  }
+}
+
+/// Data and Storage (Flutter `settings_data_and_storage`): how much the cached messages and media take, and a button
+/// that empties them; they load again from the server. Keys and the session are never cleared.
+struct StorageSettingsScreen: View {
+  let viewModel: SettingsViewModel
+  @State private var isConfirming = false
+
+  var body: some View {
+    List {
+      if let addresses = viewModel.linkedAddresses, !addresses.isEmpty {
+        Section {
+          ForEach(addresses) { address in
+            Label(address.address, systemImage: address.kind == .email ? "envelope" : "phone")
+              .textSelection(.enabled)
+          }
+        } header: {
+          Text("E-mails and phones")
+        } footer: {
+          Text("People who have these in their contacts can find you.")
+        }
+      }
+      if let visibility = viewModel.contactsVisibility {
+        Section {
+          Picker(
+            "Who sees them",
+            selection: Binding(
+              get: { visibility },
+              set: { new in Task { await viewModel.setContactsVisibility(new) } })
+          ) {
+            Text("Nobody").tag(ContactsVisibility.nobody)
+            Text("My contacts").tag(ContactsVisibility.contacts)
+            Text("Everyone").tag(ContactsVisibility.everyone)
+          }
+          .pickerStyle(.inline)
+          .labelsHidden()
+        } header: {
+          Text("Who sees my e-mail and phone")
+        }
+        .transition(.opacity)
+      }
+      Section {
+        LabeledContent("Cache") {
+          if let size = viewModel.cacheSize {
+            Text(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
+              .contentTransition(.numericText(value: Double(size)))
+          } else {
+            ProgressView()
+          }
+        }
+        Button("Clear Cache", role: .destructive) { isConfirming = true }
+          .disabled(viewModel.isClearingCache)
+      } footer: {
+        Text(
+          "Messages and media load again from the server. Your keys and session stay on this device."
+        )
+      }
+      if let message = viewModel.errorMessage {
+        Section { Text(message).foregroundStyle(SysColors.error) }
+      }
+    }
+    .twakeTitle("Data and Storage")
+    .overlay { if viewModel.isClearingCache { ProgressView().controlSize(.large) } }
+    .animation(.spring(response: 0.4, dampingFraction: 0.85), value: viewModel.cacheSize)
+    .animation(.easeInOut(duration: 0.25), value: viewModel.contactsVisibility)
+    .sensoryFeedback(.selection, trigger: viewModel.contactsVisibility)
+    .task {
+      async let size: Void = viewModel.loadCacheSize()
+      async let addresses: Void = viewModel.loadLinkedAddresses()
+      async let visibility: Void = viewModel.loadContactsVisibility()
+      _ = await (size, addresses, visibility)
+    }
+    .confirmationDialog("Clear the cache?", isPresented: $isConfirming, titleVisibility: .visible) {
+      Button("Clear Cache", role: .destructive) { Task { await viewModel.clearCache() } }
+    }
   }
 }
 

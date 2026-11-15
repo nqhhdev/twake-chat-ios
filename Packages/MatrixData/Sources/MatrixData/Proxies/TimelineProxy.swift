@@ -13,6 +13,8 @@ public actor TimelineProxy: TimelineRepository {
   private let roomId: String
   /// The one kind of message this timeline shows, for a chat details tab; `nil` shows the whole room.
   private let content: RoomContentKind?
+  /// The root of the thread this timeline shows, or `nil` for the room's main timeline.
+  private let threadRoot: String?
   /// Typing subscriptions, cancelled when the timeline closes.
   private var typingHandles: [TaskHandle] = []
   private let clientProxy: @Sendable () async -> ClientProxy?
@@ -22,12 +24,14 @@ public actor TimelineProxy: TimelineRepository {
   ///   - roomId: The room this timeline shows.
   ///   - authentication: Gives the signed-in client.
   ///   - content: Shows only this kind of message, for a chat details tab.
+  ///   - threadRoot: Shows this thread (its root and replies); what is sent goes into it.
   public init(
     roomId: String, authentication: MatrixAuthenticationRepository,
-    only content: RoomContentKind? = nil
+    only content: RoomContentKind? = nil, threadRoot: String? = nil
   ) {
     self.roomId = roomId
     self.content = content
+    self.threadRoot = threadRoot
     clientProxy = { await authentication.clientProxy }
   }
 
@@ -42,15 +46,15 @@ public actor TimelineProxy: TimelineRepository {
         throw TimelineError.roomNotFound
       }
       room = found
-      if let content {
-        timeline = try await room.timelineWithConfiguration(
-          configuration: Self.configuration(only: content))
-      } else {
-        timeline = try await room.timeline()
-      }
+      let configuration =
+        if let content { Self.configuration(only: content) } else {
+          Self.configuration(threadRoot: threadRoot)
+        }
+      timeline = try await room.timelineWithConfiguration(configuration: configuration)
     } catch let error as TimelineError {
       throw error
     } catch {
+      DebugLog.failure("openTimeline", error)
       throw .unavailable
     }
     let ownUserId = try? client.userId
@@ -106,6 +110,16 @@ public actor TimelineProxy: TimelineRepository {
       reportUtds: false)
   }
 
+  /// The room's main timeline, where a thread's replies are hidden and its root shows their count (`m.thread`), or one
+  /// thread's timeline, in which messages are sent as replies in that thread. Both track read receipts. `reportUtds`
+  /// stays off: the SDK refuses it without a UTD hook manager, which this client does not set.
+  static func configuration(threadRoot: String?) -> TimelineConfiguration {
+    TimelineConfiguration(
+      focus: threadRoot.map { .thread(rootEventId: $0) } ?? .live(hideThreadedEvents: true),
+      filter: .all, internalIdPrefix: threadRoot.map { "thread-\($0)" },
+      dateDividerMode: .daily, trackReadReceipts: .allEvents, reportUtds: false)
+  }
+
   public func loadOlder() async throws(TimelineError) -> Bool {
     let timeline = try openedTimeline()
     do {
@@ -130,43 +144,225 @@ public actor TimelineProxy: TimelineRepository {
       source: .file(filename: attachment.fileURL.path(percentEncoded: false)),
       caption: attachment.caption,
       formattedCaption: nil, mentions: nil, inReplyTo: attachment.replyTo)
-    let size = attachment.size.map { UInt64(max(0, $0)) }
+    let url = attachment.fileURL
+    let size = AttachmentMetadata.size(of: url, given: attachment.size)
+    let mimeType = Self.mimeType(for: attachment)
     do {
       let handle: SendAttachmentJoinHandle
       switch attachment.kind {
       case .image(let width, let height):
+        let image = AttachmentMetadata.image(at: url, width: width, height: height)
         handle = try timeline.sendImage(
           params: params, thumbnailSource: nil,
           imageInfo: ImageInfo(
-            height: height.map(UInt64.init), width: width.map(UInt64.init),
-            mimetype: attachment.mimeType,
-            size: size, thumbnailInfo: nil, thumbnailSource: nil, blurhash: nil, isAnimated: nil))
+            height: image.height, width: image.width, mimetype: mimeType, size: size,
+            thumbnailInfo: nil, thumbnailSource: nil, blurhash: image.blurhash, isAnimated: nil))
       case .video(let width, let height, let duration):
+        let video = await AttachmentMetadata.video(
+          at: url, width: width, height: height, duration: duration)
         handle = try timeline.sendVideo(
           params: params, thumbnailSource: nil,
           videoInfo: VideoInfo(
-            duration: duration, height: height.map(UInt64.init), width: width.map(UInt64.init),
-            mimetype: attachment.mimeType, size: size, thumbnailInfo: nil, thumbnailSource: nil,
-            blurhash: nil))
+            duration: video.duration ?? 0, height: video.height, width: video.width,
+            mimetype: mimeType, size: size, thumbnailInfo: nil, thumbnailSource: nil,
+            blurhash: video.blurhash))
       case .audio(let duration):
+        let seconds = await AttachmentMetadata.audioDuration(of: url, given: duration)
         handle = try timeline.sendAudio(
           params: params,
-          audioInfo: AudioInfo(duration: duration, size: size, mimetype: attachment.mimeType))
+          audioInfo: AudioInfo(duration: seconds, size: size, mimetype: mimeType))
       case .voice(let duration, let waveform):
         handle = try timeline.sendVoiceMessage(
           params: params,
-          audioInfo: AudioInfo(duration: duration, size: size, mimetype: attachment.mimeType),
+          audioInfo: AudioInfo(duration: duration, size: size, mimetype: mimeType),
           waveform: waveform)
       case .file:
         handle = try timeline.sendFile(
           params: params,
           fileInfo: FileInfo(
-            mimetype: attachment.mimeType, size: size, thumbnailInfo: nil, thumbnailSource: nil))
+            mimetype: mimeType, size: size, thumbnailInfo: nil, thumbnailSource: nil))
       }
       try await handle.join()
     } catch {
+      DebugLog.failure("sendAttachment", error)
       throw .requestFailed
     }
+  }
+
+  /// The SDK refuses an attachment without a MIME type (`RoomError.InvalidAttachmentMimeType`), which a file whose
+  /// extension the system does not know has none of; such a file goes as `application/octet-stream` (spec, `m.file`).
+  static func mimeType(for attachment: OutgoingAttachment) -> String {
+    if let type = attachment.mimeType, !type.isEmpty { return type }
+    return switch attachment.kind {
+    case .image: "image/jpeg"
+    case .video: "video/mp4"
+    case .audio, .voice: "audio/ogg"
+    case .file: "application/octet-stream"
+    }
+  }
+
+  public func createPoll(_ draft: PollDraft) async throws(TimelineError) {
+    let timeline = try openedTimeline()
+    let answers = draft.cleanAnswers
+    do {
+      try await timeline.createPoll(
+        question: draft.question.trimmingCharacters(in: .whitespacesAndNewlines),
+        answers: Array(answers.prefix(PollDraft.maxAnswers)),
+        maxSelections: draft.allowsMultipleChoices ? UInt8(clamping: answers.count) : 1,
+        pollKind: draft.hidesResults ? .undisclosed : .disclosed)
+    } catch {
+      DebugLog.failure("createPoll", error)
+      throw .requestFailed
+    }
+  }
+
+  public func vote(_ answerIds: [String], in pollEventId: String) async throws(TimelineError) {
+    let timeline = try openedTimeline()
+    do {
+      try await timeline.sendPollResponse(pollStartEventId: pollEventId, answers: answerIds)
+    } catch {
+      DebugLog.failure("sendPollResponse", error)
+      throw .requestFailed
+    }
+  }
+
+  public func endPoll(_ pollEventId: String) async throws(TimelineError) {
+    let timeline = try openedTimeline()
+    do {
+      // The fallback text of `m.poll.end`, for clients without polls.
+      try await timeline.endPoll(pollStartEventId: pollEventId, text: "The poll has ended.")
+    } catch {
+      DebugLog.failure("endPoll", error)
+      throw .requestFailed
+    }
+  }
+
+  public func identityWarnings() async -> AsyncStream<[IdentityWarning]> {
+    guard let opened else { return AsyncStream { $0.finish() } }
+    let room = opened.room
+    let (stream, continuation) = AsyncStream<[IdentityWarning]>.makeStream(
+      bufferingPolicy: .bufferingNewest(1))
+    let states = IdentityStates()
+    let listener = IdentityListener { changes in
+      Task {
+        let current = await states.apply(changes)
+        var warnings: [IdentityWarning] = []
+        for (userId, kind) in current.sorted(by: { $0.key < $1.key }) {
+          let name =
+            ((try? await room.memberDisplayName(userId: userId)) ?? nil)
+            .flatMap { $0.isEmpty ? nil : $0 } ?? userId
+          warnings.append(IdentityWarning(userId: userId, name: name, kind: kind))
+        }
+        continuation.yield(warnings)
+      }
+    }
+    guard let handle = try? await room.subscribeToIdentityStatusChanges(listener: listener) else {
+      continuation.finish()
+      return stream
+    }
+    continuation.onTermination = { _ in handle.cancel() }
+    typingHandles.append(handle)
+    return stream
+  }
+
+  public func accept(_ warning: IdentityWarning) async throws(TimelineError) {
+    guard let client = await clientProxy()?.client else { throw .notSignedIn }
+    do {
+      guard
+        let identity = try await client.encryption().userIdentity(
+          userId: warning.userId, fallbackToServer: false)
+      else { throw TimelineError.requestFailed }
+      switch warning.kind {
+      case .changed: try await identity.pin()
+      case .verifiedChanged: try await identity.withdrawVerification()
+      }
+    } catch {
+      DebugLog.failure("acceptIdentity", error)
+      throw .requestFailed
+    }
+  }
+
+  /// Reads the room's state over `GET /rooms/{id}/state` (the pinned SDK reads no custom state event) and keeps the
+  /// command announcements of joined members, under the unstable and the stable name, as the web does.
+  public func botCommands() async -> [BotCommand] {
+    guard let opened,
+      let request = ClientServerRequest.make(
+        client: opened.client.client, path: "rooms/\(ClientServerRequest.encode(roomId))/state"),
+      let (data, response) = try? await URLSession.shared.data(for: request),
+      (response as? HTTPURLResponse)?.statusCode == 200,
+      let events = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+    else { return [] }
+    var commands: [BotCommand] = []
+    for event in events {
+      guard let type = event["type"] as? String,
+        type == "org.matrix.msc4332.commands" || type == "m.bot.commands",
+        let bot = event["state_key"] as? String, !bot.isEmpty,
+        let content = event["content"] as? [String: Any],
+        let member = try? await opened.room.member(userId: bot), member.membership == .join
+      else { continue }
+      commands += BotCommand.commands(botUserId: bot, content: content)
+    }
+    return commands
+  }
+
+  /// The first page of the room's threads from the SDK's thread list (`/threads`), newest activity first.
+  public func threads() async -> [ThreadListEntry] {
+    guard let room = opened?.room else { return [] }
+    let service = room.threadListService()
+    do {
+      try await service.paginate()
+    } catch {
+      DebugLog.failure("threadList", error)
+      return []
+    }
+    return service.items().map(TimelineItemMapper.threadEntry)
+      .sorted { $0.latestDate > $1.latestDate }
+  }
+
+  public func editHistory(of eventId: String) async -> [MessageVersion]? {
+    guard let opened, (try? await opened.room.latestEncryptionState()) == .notEncrypted else {
+      return nil
+    }
+    let room = ClientServerRequest.encode(roomId)
+    let event = ClientServerRequest.encode(eventId)
+    let client = opened.client.client
+    async let original = Self.data(
+      ClientServerRequest.make(client: client, path: "rooms/\(room)/event/\(event)"))
+    async let relations = Self.data(
+      ClientServerRequest.make(
+        client: client, path: "rooms/\(room)/relations/\(event)/m.replace?limit=50", version: "v1"))
+    return MessageVersion.versions(original: await original, relations: await relations)
+  }
+
+  private static func data(_ request: URLRequest?) async -> Data? {
+    guard let request, let (data, response) = try? await URLSession.shared.data(for: request),
+      (response as? HTTPURLResponse)?.statusCode == 200
+    else { return nil }
+    return data
+  }
+
+  public func send(command: BotCommand, text: String) async throws(TimelineError) {
+    let room = try openedState().room
+    guard let data = try? JSONSerialization.data(withJSONObject: command.content(for: text)),
+      let content = String(data: data, encoding: .utf8)
+    else { throw .requestFailed }
+    do {
+      try await room.sendRaw(eventType: "m.room.message", content: content)
+    } catch {
+      DebugLog.failure("sendCommand", error)
+      throw .requestFailed
+    }
+  }
+
+  public func recentReactions() async -> [String] {
+    guard let client = await clientProxy()?.client,
+      let recents = try? await client.getRecentEmojis()
+    else { return [] }
+    return recents.map(\.emoji)
+  }
+
+  public func addRecentReaction(_ key: String) async {
+    try? await clientProxy()?.client.addRecentEmoji(emoji: key)
   }
 
   public func setTyping(_ isTyping: Bool) async {
@@ -281,19 +477,21 @@ public actor TimelineProxy: TimelineRepository {
   }
 
   public func loadDraft() async -> String? {
-    guard let draft = try? await opened?.room.loadComposerDraft(threadRoot: nil) else { return nil }
+    guard let draft = try? await opened?.room.loadComposerDraft(threadRoot: threadRoot) else {
+      return nil
+    }
     return draft.plainText.isEmpty ? nil : draft.plainText
   }
 
   public func saveDraft(_ text: String) async {
     guard let room = opened?.room else { return }
     if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-      try? await room.clearComposerDraft(threadRoot: nil)
+      try? await room.clearComposerDraft(threadRoot: threadRoot)
     } else {
       try? await room.saveComposerDraft(
         draft: ComposerDraft(
           plainText: text, htmlText: nil, draftType: .newMessage, attachments: []),
-        threadRoot: nil)
+        threadRoot: threadRoot)
     }
   }
 
@@ -381,6 +579,34 @@ private final class DiffListener: TimelineListener {
 }
 
 /// Forwards the SDK's typing notifications to `TimelineProxy`.
+/// The members in violation, kept as the SDK reports changes (it sends only what changed).
+private actor IdentityStates {
+  private var violations: [String: IdentityWarning.Kind] = [:]
+
+  func apply(_ changes: [IdentityStatusChange]) -> [String: IdentityWarning.Kind] {
+    for change in changes {
+      switch change.changedTo {
+      case .pinViolation: violations[change.userId] = .changed
+      case .verificationViolation: violations[change.userId] = .verifiedChanged
+      default: violations[change.userId] = nil
+      }
+    }
+    return violations
+  }
+}
+
+private final class IdentityListener: IdentityStatusChangeListener {
+  private let onChange: @Sendable ([IdentityStatusChange]) -> Void
+
+  init(_ onChange: @escaping @Sendable ([IdentityStatusChange]) -> Void) {
+    self.onChange = onChange
+  }
+
+  func call(identityStatusChange: [IdentityStatusChange]) {
+    onChange(identityStatusChange)
+  }
+}
+
 private final class TypingListener: TypingNotificationsListener {
   private let onChange: @Sendable ([String]) -> Void
 

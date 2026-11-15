@@ -10,6 +10,8 @@ public final class PeopleSearchViewModel {
   public enum Mode: Equatable {
     case direct
     case group
+    /// A Broadcast: a page only moderators post to; the picked people are invited to follow it.
+    case broadcast
     /// Picks people to invite into an existing room.
     case invite
   }
@@ -18,6 +20,16 @@ public final class PeopleSearchViewModel {
     didSet { scheduleSearch() }
   }
   public var groupName = ""
+  /// The Broadcast being written, in `.broadcast` mode. Its address follows the name until it is edited.
+  public var broadcast = BroadcastDraft() {
+    didSet {
+      if broadcast.name != oldValue.name, !isSlugEdited {
+        broadcast.slug = BroadcastDraft.slug(from: broadcast.name)
+      }
+    }
+  }
+  /// The user typed the address: the name no longer changes it.
+  @ObservationIgnored public var isSlugEdited = false
   public private(set) var mode: Mode
   public private(set) var results: [Person] = []
   public private(set) var selected: [Person] = []
@@ -99,7 +111,7 @@ public final class PeopleSearchViewModel {
   /// Direct mode opens the chat; group and invite modes add or remove the person.
   public func tap(_ person: Person) async {
     switch mode {
-    case .group, .invite:
+    case .group, .broadcast, .invite:
       if let index = selected.firstIndex(of: person) {
         selected.remove(at: index)
       } else {
@@ -120,6 +132,23 @@ public final class PeopleSearchViewModel {
 
   public var canCreateGroup: Bool {
     !selected.isEmpty && !groupName.trimmingCharacters(in: .whitespaces).isEmpty && !isCreating
+  }
+
+  public var canCreateBroadcast: Bool { broadcast.canCreate && !isCreating }
+
+  public func createBroadcast() async {
+    guard canCreateBroadcast else { return }
+    isCreating = true
+    defer { isCreating = false }
+    do {
+      let roomId = try await repository.createBroadcast(broadcast, inviting: selected.map(\.id))
+      onOpen(roomId, broadcast.name.trimmingCharacters(in: .whitespaces))
+    } catch {
+      errorMessage =
+        broadcast.access == .open
+        ? "Could not create the Broadcast. Its address may be taken."
+        : "Could not create the Broadcast."
+    }
   }
 
   public func createGroup() async {

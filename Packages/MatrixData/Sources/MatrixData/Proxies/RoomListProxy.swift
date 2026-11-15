@@ -96,6 +96,15 @@ public actor RoomListProxy: RoomListRepository {
     }
   }
 
+  public func setLowPriority(_ lowPriority: Bool, roomId: String) async throws(Domain.RoomListError)
+  {
+    let room = try await room(roomId)
+    do { try await room.setIsLowPriority(isLowPriority: lowPriority, tagOrder: nil) } catch {
+      DebugLog.failure("setIsLowPriority", error)
+      throw .requestFailed
+    }
+  }
+
   public func setMuted(_ muted: Bool, roomId: String) async throws(Domain.RoomListError) {
     guard let client = await clientProxy()?.client else { throw .requestFailed }
     let settings = await client.getNotificationSettings()
@@ -112,7 +121,16 @@ public actor RoomListProxy: RoomListRepository {
 
   public func leave(roomId: String) async throws(Domain.RoomListError) {
     let room = try await room(roomId)
+    let info = try? await room.roomInfo()
     do { try await room.leave() } catch { throw .requestFailed }
+    guard let client = await clientProxy()?.client else { return }
+    await ArchiveAccountData.archive(room, info: info, client: client)
+  }
+
+  /// Adds the room to the account data archive, or with `nil` drops it.
+  func updateArchive(roomId: String, with entry: ArchivedRoomEntry?) async {
+    guard let client = await clientProxy()?.client else { return }
+    await ArchiveAccountData.update(client: client, roomId: roomId, with: entry)
   }
 
   private func room(_ roomId: String) async throws(Domain.RoomListError) -> Room {
@@ -156,5 +174,32 @@ private final class EntriesListener: RoomListEntriesListener {
 
   func onUpdate(roomEntriesUpdate: [RoomListEntriesUpdate]) {
     updates.yield(roomEntriesUpdate)
+  }
+}
+
+/// The web's archive in the account data (`app.twake.chat.archived_rooms`), kept by every way of leaving a chat.
+enum ArchiveAccountData {
+  /// Records a room just left, so it shows as archived on every device.
+  static func archive(_ room: Room, info: RoomInfo?, client: Client) async {
+    await update(
+      client: client, roomId: room.id(),
+      with: ArchivedRoomEntry(
+        roomId: room.id(), name: room.displayName() ?? room.id(), isDirect: info?.isDirect ?? false,
+        leftAt: Int64(Date.now.timeIntervalSince1970 * 1000), avatarURL: info?.avatarUrl))
+  }
+
+  /// Adds the room, or with `nil` drops it. A failure leaves the archive as it was.
+  static func update(client: Client, roomId: String, with entry: ArchivedRoomEntry?) async {
+    let current = try? await client.accountData(eventType: RoomArchive.accountDataType)
+    guard
+      let data = RoomArchive.json(
+        updating: current.flatMap { $0 }.map { Data($0.utf8) }, roomId: roomId, with: entry),
+      let content = String(data: data, encoding: .utf8)
+    else { return }
+    do {
+      try await client.setAccountData(eventType: RoomArchive.accountDataType, content: content)
+    } catch {
+      DebugLog.failure("updateArchive", error)
+    }
   }
 }

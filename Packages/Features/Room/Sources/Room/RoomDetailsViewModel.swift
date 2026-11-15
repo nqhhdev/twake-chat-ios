@@ -25,6 +25,16 @@ public final class RoomDetailsViewModel {
   public private(set) var followsDefault = true
 
   @ObservationIgnored private let repository: any RoomDetailsRepository
+
+  /// The status message `userId` set, for their profile.
+  public func statusMessage(of userId: String) async -> String? {
+    await repository.statusMessage(of: userId)
+  }
+
+  /// The group chats shared with `userId`, for their profile.
+  public func roomsInCommon(with userId: String) async -> [RoomInCommon] {
+    await repository.roomsInCommon(with: userId)
+  }
   @ObservationIgnored private let onLeft: @MainActor () -> Void
   /// The app's people picker for inviting into this room (ADR 0005: the Room feature does not know People); `nil` hides
   /// "Add people". The closure it is given runs once people were invited.

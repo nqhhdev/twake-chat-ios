@@ -2,6 +2,7 @@ import DesignSystem
 import Domain
 import Foundation
 import Observation
+import SafariServices
 import SwiftUI
 
 /// Emoji verification of this session (Flutter `key_verification`): this device asks the user's other devices, or
@@ -197,6 +198,57 @@ public final class DevicesViewModel {
     }
   }
 
+  /// The confirmation the server asks for before signing sessions out; the screen shows the web page or the password
+  /// field, then calls `confirmSignOut`.
+  public private(set) var pendingSignOut: (deviceIds: [String], challenge: DeviceAuthChallenge)?
+  public private(set) var isSigningOut = false
+
+  /// The other sessions, which "Sign out other devices" ends.
+  public var otherDevices: [DeviceSession] {
+    guard case .loaded(let devices) = state else { return [] }
+    return devices.filter { !$0.isCurrent }
+  }
+
+  /// Signs sessions out; when the server asks for a confirmation, it waits in `pendingSignOut`.
+  public func signOut(_ devices: [DeviceSession]) async {
+    let ids = devices.filter { !$0.isCurrent }.map(\.id)
+    guard !ids.isEmpty else { return }
+    await signOut(ids, auth: nil)
+  }
+
+  /// Sends the user's confirmation for `pendingSignOut`: `password`, or none after the web page.
+  public func confirmSignOut(password: String? = nil) async {
+    guard let pending = pendingSignOut else { return }
+    pendingSignOut = nil
+    let auth: DeviceAuth =
+      if let password { .password(password, session: pending.challenge.session) } else {
+        .confirmedOnWeb(session: pending.challenge.session)
+      }
+    await signOut(pending.deviceIds, auth: auth)
+  }
+
+  public func cancelSignOut() { pendingSignOut = nil }
+
+  private func signOut(_ ids: [String], auth: DeviceAuth?) async {
+    errorMessage = nil
+    isSigningOut = true
+    defer { isSigningOut = false }
+    do {
+      switch try await repository.signOut(deviceIds: ids, auth: auth) {
+      case .done:
+        await load()
+      case .needsConfirmation(let challenge):
+        if auth != nil || (challenge.webURL == nil && !challenge.acceptsPassword) {
+          errorMessage = "Could not confirm it is you. Please try again."
+        } else {
+          pendingSignOut = (ids, challenge)
+        }
+      }
+    } catch {
+      errorMessage = "Could not sign the device out."
+    }
+  }
+
   /// Renames a session; an empty name is ignored.
   public func rename(_ device: DeviceSession, to name: String) async {
     let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -215,6 +267,8 @@ struct DevicesScreen: View {
   let viewModel: DevicesViewModel
   @State private var renaming: DeviceSession?
   @State private var newName = ""
+  @State private var confirmingSignOut: [DeviceSession]?
+  @State private var password = ""
 
   var body: some View {
     Group {
@@ -245,11 +299,23 @@ struct DevicesScreen: View {
               }
             }
             .swipeActions {
+              if !device.isCurrent {
+                Button("Sign Out", role: .destructive) { confirmingSignOut = [device] }
+              }
               Button("Rename") {
                 newName = device.name
                 renaming = device
               }
               .tint(SysColors.primary)
+            }
+            .transition(.move(edge: .trailing).combined(with: .opacity))
+          }
+          if viewModel.otherDevices.count > 1 {
+            Section {
+              Button("Sign out of all other devices", role: .destructive) {
+                confirmingSignOut = viewModel.otherDevices
+              }
+              .disabled(viewModel.isSigningOut)
             }
           }
           if let message = viewModel.errorMessage {
@@ -257,10 +323,56 @@ struct DevicesScreen: View {
           }
         }
         .refreshable { await viewModel.load() }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: devices)
+        .overlay { if viewModel.isSigningOut { ProgressView().controlSize(.large) } }
       }
     }
     .navigationTitle("Devices")
     .task { await viewModel.load() }
+    .confirmationDialog(
+      confirmingSignOut.map {
+        $0.count == 1 ? "Sign out \($0[0].name)?" : "Sign out of \($0.count) devices?"
+      } ?? "",
+      isPresented: Binding(
+        get: { confirmingSignOut != nil }, set: { if !$0 { confirmingSignOut = nil } }),
+      titleVisibility: .visible
+    ) {
+      Button("Sign Out", role: .destructive) {
+        if let devices = confirmingSignOut { Task { await viewModel.signOut(devices) } }
+      }
+    } message: {
+      Text("Those devices will no longer receive messages, and lose access to encrypted ones.")
+    }
+    .sheet(
+      isPresented: Binding(
+        get: { viewModel.pendingSignOut?.challenge.webURL != nil },
+        set: { if !$0 { Task { await viewModel.confirmSignOut() } } })
+    ) {
+      if let url = viewModel.pendingSignOut?.challenge.webURL {
+        SafariView(url: url).ignoresSafeArea()
+      }
+    }
+    .alert(
+      "Confirm it is you",
+      isPresented: Binding(
+        get: {
+          viewModel.pendingSignOut.map {
+            $0.challenge.webURL == nil && $0.challenge.acceptsPassword
+          }
+            ?? false
+        },
+        set: { if !$0 { password = "" } })
+    ) {
+      SecureField("Password", text: $password)
+      Button("Cancel", role: .cancel) { viewModel.cancelSignOut() }
+      Button("Sign Out", role: .destructive) {
+        let typed = password
+        password = ""
+        Task { await viewModel.confirmSignOut(password: typed) }
+      }
+    } message: {
+      Text("Enter your account password to sign the devices out.")
+    }
     .alert(
       "Rename device",
       isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })
@@ -292,4 +404,15 @@ struct DevicesScreen: View {
     guard let lastSeen = device.lastSeen else { return device.id }
     return "Last seen \(lastSeen.formatted(.relative(presentation: .named)))"
   }
+}
+
+/// The server's single sign-on confirmation page, in Safari inside the app; closing it sends the confirmation.
+struct SafariView: UIViewControllerRepresentable {
+  let url: URL
+
+  func makeUIViewController(context: Context) -> SFSafariViewController {
+    SFSafariViewController(url: url)
+  }
+
+  func updateUIViewController(_ controller: SFSafariViewController, context: Context) {}
 }

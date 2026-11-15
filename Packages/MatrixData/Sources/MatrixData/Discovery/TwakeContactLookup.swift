@@ -53,6 +53,36 @@ struct TwakeContactLookup: Sendable {
     }
   }
 
+  /// Who sees the user's e-mail and phone: `GET /_twake/v1/user_info/{id}/visibility`; `nil` when ToM has none.
+  func visibility(of userId: String, tom: URL, accessToken: String) async -> String? {
+    var request = URLRequest(url: Self.visibilityURL(userId, tom: tom))
+    request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    guard case (let data, let response)? = try? await session.data(for: request),
+      (response as? HTTPURLResponse)?.statusCode == 200,
+      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else { return nil }
+    return object["visibility"] as? String
+  }
+
+  /// Sets it, for the e-mail and the phone together, as the web client does.
+  func setVisibility(_ visibility: String, of userId: String, tom: URL, accessToken: String) async
+    -> Bool
+  {
+    var request = URLRequest(url: Self.visibilityURL(userId, tom: tom))
+    request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    request.httpBody = try? JSONSerialization.data(withJSONObject: [
+      "matrix_id": userId, "visibility": visibility, "visible_fields": ["email", "phone"],
+    ])
+    guard case (_, let response)? = try? await session.data(for: request) else { return false }
+    return (response as? HTTPURLResponse)?.statusCode == 200
+  }
+
+  static func visibilityURL(_ userId: String, tom: URL) -> URL {
+    tom.appending(path: "_twake/v1/user_info").appending(path: userId).appending(path: "visibility")
+  }
+
   private struct WellKnown: Decodable {
     struct TServer: Decodable {
       let baseURL: String

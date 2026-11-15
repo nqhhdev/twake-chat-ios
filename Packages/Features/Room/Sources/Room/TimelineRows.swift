@@ -207,3 +207,14 @@ public enum TimelineRows {
     return true
   }
 }
+
+extension ChatRow {
+  /// The message picked when this row is tapped in selection mode: a sent message, or the last picture of an album.
+  var selectableMessage: TimelineMessage? {
+    switch self {
+    case .message(let model): model.message.eventId == nil ? nil : model.message
+    case .album(let model): model.messages.last
+    case .other, .notices: nil
+    }
+  }
+}

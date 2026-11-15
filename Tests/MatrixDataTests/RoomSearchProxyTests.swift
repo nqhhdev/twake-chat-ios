@@ -43,4 +43,17 @@ struct RoomSearchProxyTests {
     #expect(page.results.isEmpty)
     #expect(page.nextBatch == nil)
   }
+
+  @Test func aSearchEverywhereHasNoRoomFilterAndKeepsEachRoom() throws {
+    let body = try #require(RoomSearchProxy.body(term: "lunch", roomId: nil))
+    let object = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+    let filter =
+      (((object["search_categories"] as? [String: Any])?["room_events"]
+        as? [String: Any])?["filter"] as? [String: Any])
+    #expect(filter?["rooms"] == nil)
+    let answer = Data(
+      #"{"search_categories":{"room_events":{"results":[{"result":{"event_id":"$e","sender":"@a:s","room_id":"!r:s","origin_server_ts":1000,"content":{"body":"lunch?"}}}]}}}"#
+        .utf8)
+    #expect(RoomSearchProxy.page(from: answer).results.first?.roomId == "!r:s")
+  }
 }

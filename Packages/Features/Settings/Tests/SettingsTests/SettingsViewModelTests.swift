@@ -162,4 +162,49 @@ struct ChatDisplaySettingsPageTests {
     #expect(!viewModel.hasChatPage)
     #expect(viewModel.chatDisplay == ChatDisplaySettings())
   }
+
+  @Test func resettingTheIdentityAsksForThePasswordThenFinishes() async {
+    let repository = FakeAccountSettingsRepository()
+    let settings = SettingsViewModel(userId: "@alice:example.org", repository: repository) { true }
+    await settings.startIdentityReset()
+    #expect(settings.identityReset == .password)
+    await settings.finishIdentityReset(password: "secret")
+    #expect(repository.resetPassword == "secret")
+    #expect(settings.identityReset == nil)
+    #expect(settings.didResetIdentity)
+  }
+
+  @Test func theContactsVisibilityChangesAndGoesBackWhenRefused() async {
+    let repository = FakeAccountSettingsRepository()
+    let settings = SettingsViewModel(userId: "@alice:example.org", repository: repository) { true }
+    await settings.loadContactsVisibility()
+    #expect(settings.contactsVisibility == .contacts)
+    await settings.setContactsVisibility(.everyone)
+    #expect(repository.visibility == .everyone)
+    repository.visibilityFails = true
+    await settings.setContactsVisibility(.nobody)
+    #expect(settings.contactsVisibility == .everyone)
+    #expect(settings.errorMessage == "Could not change who sees your e-mail and phone.")
+  }
+
+  @Test func clearingTheCacheShowsTheNewSize() async {
+    let repository = FakeAccountSettingsRepository()
+    let settings = SettingsViewModel(userId: "@alice:example.org", repository: repository) { true }
+    await settings.loadCacheSize()
+    #expect(settings.cacheSize == 2_048)
+    await settings.clearCache()
+    #expect(settings.cacheSize == 0)
+    #expect(settings.errorMessage == nil)
+  }
+
+  @Test func theStatusMessageIsTrimmedAndClearedWhenEmpty() async {
+    let repository = FakeAccountSettingsRepository()
+    let settings = SettingsViewModel(userId: "@alice:example.org", repository: repository) { true }
+    await settings.setStatusMessage("  In a meeting ")
+    #expect(settings.statusMessage == "In a meeting")
+    #expect(repository.statusText == "In a meeting")
+    await settings.setStatusMessage("")
+    #expect(settings.statusMessage == nil)
+    #expect(repository.statusText == nil)
+  }
 }
