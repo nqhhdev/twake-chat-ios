@@ -51,12 +51,17 @@ service once and shares it; it then subscribes to all rooms through the dynamic 
 joined filter, keeping the entries task handle alive. The SDK listener only queues each batch of updates; one task
 applies them in order. Each update is turned into the generic `ListDiff<Element>` (the eleven cases of the SDK's list
 update), only the rooms it carries are mapped to `RoomSummary` (`RoomSummaryMapper`: display name or else the room
-id; the body of a message as text, `nil` for other events; the sender's display name or else their Matrix id; the
-millisecond timestamp as a date), and the diff is applied to the published list, which is never re-sorted.
+id; the kind of the last message and its text (a body, a caption, a file name, a poll question; nothing for an
+undecryptable message), `nil` for other events; whether it is the user's and its send state; the sender's display name
+or else their Matrix id; the millisecond timestamp as a date; marked unread and encryption from the room info), and
+the diff is applied to the published list, which is never re-sorted. `RoomListTyping` subscribes to typing in each
+joined room of the list (the room list's sliding sync carries typing for all of them) and feeds the same queue, so the
+rows say who types; it cancels the subscriptions when the applying task ends.
 The SDK room list, its controller and the entries task handle are kept by the `ClientProxy`
 (`keepWhileSyncing`), which cancels and releases them whenever sync stops: the SDK aborts the process when a room list
 is freed after its client, so they must never outlive it, and the applying task holds the client until it ends.
-`stop()` ends the subscription and stops sync. `ClientProxy.logout()` stops sync for good (a `start()` after it
+`stop()` ends the subscription and releases the room list; sync keeps running, because a chat opened over the chat
+list (on an iPhone, where the list goes away) has its timeline on it. `ClientProxy.logout()` stops sync for good (a `start()` after it
 fails, so no sync service is built while the store is removed), and so releases the room list, before the server
 sign-out, so nothing writes to the store while `MatrixAuthenticationRepository` deletes it, also
 when the chat list calls `stop()` only after logout. Nothing here logs: the summaries hold

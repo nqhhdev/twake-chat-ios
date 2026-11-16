@@ -13,7 +13,9 @@ enum RoomSummaryMapper {
     return RoomSummary(
       id: base.id, name: base.name, lastMessageText: base.lastMessageText,
       lastMessageSender: base.lastMessageSender, lastActivity: base.lastActivity,
-      unreadCount: Int(clamping: max(info.numUnreadMessages, info.isMarkedUnread ? 1 : 0)),
+      lastMessageKind: base.lastMessageKind, isLastMessageOwn: base.isLastMessageOwn,
+      lastMessageSendState: base.lastMessageSendState,
+      unreadCount: Int(clamping: info.numUnreadMessages), isMarkedUnread: info.isMarkedUnread,
       mentionCount: Int(clamping: info.numUnreadMentions), avatar: avatar(of: info),
       isInvite: room.membership() == .invited, isFavourite: info.isFavourite,
       isDirect: info.isDirect, isMuted: info.cachedUserDefinedNotificationMode == .mute,
@@ -22,12 +24,14 @@ enum RoomSummaryMapper {
       draft: (try? await room.loadComposerDraft(threadRoot: nil))?.plainText
         .trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
       isBroadcast: !info.isDirect && !info.isSpace
-        && (info.powerLevels?.values().eventsDefault ?? 0) >= 50)
+        && (info.powerLevels?.values().eventsDefault ?? 0) >= 50,
+      isEncrypted: info.encryptionState == .encrypted)
   }
 
   /// - Name: the display name, or the room id when the room has none.
-  /// - Text: the body of a message (`m.room.message`); `nil` for any other latest event.
+  /// - Message: what the last message is and its text (`message(of:)`); none for any other latest event.
   /// - Sender: the sender's display name when the profile is loaded, otherwise the sender's Matrix id.
+  /// - Own: a local event (still in the send queue) is always the user's; its state is the queue's.
   /// - Date: the event's timestamp, which the SDK gives in milliseconds since 1970.
   static func summary(id: String, displayName: String?, latestEvent: LatestEventValue)
     -> RoomSummary
@@ -37,11 +41,20 @@ enum RoomSummaryMapper {
     case .none:
       return RoomSummary(
         id: id, name: name, lastMessageText: nil, lastMessageSender: nil, lastActivity: nil)
-    case .remote(let timestamp, let sender, _, let profile, let content),
-      .local(let timestamp, let sender, let profile, let content, _):
+    case .remote(let timestamp, let sender, let isOwn, let profile, let content):
+      let message = message(of: content)
       return RoomSummary(
-        id: id, name: name, lastMessageText: text(of: content),
-        lastMessageSender: senderName(sender, profile), lastActivity: date(timestamp))
+        id: id, name: name, lastMessageText: message?.text,
+        lastMessageSender: senderName(sender, profile), lastActivity: date(timestamp),
+        lastMessageKind: message?.kind, isLastMessageOwn: isOwn,
+        lastMessageSendState: isOwn ? .sent : nil)
+    case .local(let timestamp, let sender, let profile, let content, let state):
+      let message = message(of: content)
+      return RoomSummary(
+        id: id, name: name, lastMessageText: message?.text,
+        lastMessageSender: senderName(sender, profile), lastActivity: date(timestamp),
+        lastMessageKind: message?.kind, isLastMessageOwn: true,
+        lastMessageSendState: sendState(state))
     case .remoteInvite(let timestamp, _, _):
       return RoomSummary(
         id: id, name: name, lastMessageText: nil, lastMessageSender: nil,
@@ -49,11 +62,70 @@ enum RoomSummaryMapper {
     }
   }
 
-  private static func text(of content: TimelineItemContent) -> String? {
-    guard case .msgLike(let msgLike) = content, case .message(let message) = msgLike.kind else {
-      return nil
+  static func sendState(_ state: LatestEventValueLocalState) -> RoomSummary.SendState {
+    switch state {
+    case .isSending: .sending
+    case .hasBeenSent: .sent
+    case .cannotBeSent: .failed
     }
-    return message.body
+  }
+
+  /// What a message-like event is and the text the row shows with it; `nil` for any other event.
+  static func message(of content: TimelineItemContent) -> (
+    kind: RoomSummary.MessageKind, text: String?
+  )? {
+    guard case .msgLike(let msgLike) = content else { return nil }
+    guard let message = message(ofKind: msgLike.kind) else { return nil }
+    // A reply sent by an older client starts with the quoted message (the spec's reply fallback), which Flutter and the
+    // web leave out of the row.
+    // The SDK does not always name the replied-to event (seen on a row that showed "> <@user:server> …"), so a body
+    // that opens with the fallback's own first line is treated the same.
+    guard let text = message.text, msgLike.inReplyTo != nil || opensWithReplyFallback(text) else {
+      return message
+    }
+    return (message.kind, withoutReplyFallback(text))
+  }
+
+  /// The body opens as the spec's reply fallback does: a quote line naming the sender, "> <@user:server> …".
+  static func opensWithReplyFallback(_ body: String) -> Bool {
+    body.hasPrefix("> <@") && body.prefix(while: { $0 != "\n" }).contains(/^> <@[^\s>]+:[^\s>]+>/)
+  }
+
+  /// The body of a reply without its fallback: the leading "> " lines and the empty line after them. A body that is
+  /// nothing but the fallback stays as it is.
+  static func withoutReplyFallback(_ body: String) -> String {
+    var lines = body.split(separator: "\n", omittingEmptySubsequences: false)[...]
+    guard lines.first?.hasPrefix("> ") == true else { return body }
+    while let first = lines.first, first.hasPrefix(">") { lines = lines.dropFirst() }
+    if lines.first?.isEmpty == true { lines = lines.dropFirst() }
+    let rest = lines.joined(separator: "\n")
+    return rest.isEmpty ? body : rest
+  }
+
+  /// The body of a text, the caption of a picture or a video, the name of a file and the question of a poll; never
+  /// the body of an event that could not be decrypted (web `roomRowText.ts`).
+  static func message(ofKind kind: MsgLikeKind) -> (kind: RoomSummary.MessageKind, text: String?)? {
+    switch kind {
+    case .message(let content):
+      return switch content.msgType {
+      case .text(let text): (.text, text.body)
+      case .emote(let emote): (.emote, emote.body)
+      case .notice(let notice): (.notice, notice.body)
+      case .image(let image): (.picture, image.caption?.nilIfEmpty)
+      case .gallery(let gallery): (.picture, gallery.body.nilIfEmpty)
+      case .video(let video): (.video, video.caption?.nilIfEmpty)
+      case .audio(let audio): (audio.voice == nil ? .audio : .voice, nil)
+      case .file(let file): (.file, file.filename.nilIfEmpty)
+      case .location: (.location, nil)
+      case .other(_, let body): (.text, body)
+      }
+    case .sticker: return (.sticker, nil)
+    case .poll(let question, _, _, _, _, _, _): return (.poll, question.nilIfEmpty)
+    case .redacted: return (.deleted, nil)
+    case .unableToDecrypt: return (.encrypted, nil)
+    case .liveLocation: return (.location, nil)
+    case .other: return nil
+    }
   }
 
   private static func senderName(_ sender: String, _ profile: ProfileDetails) -> String {

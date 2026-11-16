@@ -67,6 +67,29 @@ public actor PeopleProxy: PeopleRepository {
     }
   }
 
+  public func existingDirectChat(with userId: String) async -> String? {
+    guard let client = try? await client() else { return nil }
+    return (try? client.client.getDmRoom(userId: userId))?.id()
+  }
+
+  public func startDirectChat(with userId: String, firstMessage: String) async throws(PeopleError)
+    -> String
+  {
+    let roomId = try await directChat(with: userId)
+    let client = try await client()
+    do {
+      // The message goes to the room's send queue, which the SDK keeps and sends, so nothing here needs to stay
+      // alive once it is queued.
+      guard let room = try client.client.getRoom(roomId: roomId) else {
+        throw PeopleError.requestFailed
+      }
+      _ = try await room.timeline().send(msg: TimelineProxy.content(firstMessage))
+    } catch {
+      throw .requestFailed
+    }
+    return roomId
+  }
+
   public func createGroup(name: String, inviting userIds: [String]) async throws(PeopleError)
     -> String
   {

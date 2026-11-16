@@ -59,7 +59,8 @@ public struct HomeserverPickerScreen: View {
             Text("Continue").textStyle(TextStyles.labelLarge)
           }
         }
-        .frame(maxWidth: .infinity, minHeight: 40)
+        // The style pads by 16 on each side: 24 here makes the button 56 high, as the welcome screen's buttons.
+        .frame(maxWidth: .infinity, minHeight: 24)
       }
       .buttonStyle(.twakePrimary)
       .padding(16)

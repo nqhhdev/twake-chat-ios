@@ -1,5 +1,6 @@
 import DesignSystem
 import Domain
+import MapKit
 import SwiftUI
 
 /// A chat, laid out as the Flutter app's chat page: the timeline, newest at the bottom, with Twake bubbles (own
@@ -195,8 +196,16 @@ public struct RoomScreen: View {
                   { @Sendable [viewModel] in await viewModel.picture(reference) }
                 })
               VStack(alignment: .leading, spacing: 0) {
-                Text(viewModel.roomName).textStyle(TextStyles.titleMedium).lineLimit(1)
-                if let presence = viewModel.presenceLine {
+                HStack(spacing: 4) {
+                  Text(viewModel.roomName).textStyle(TextStyles.titleMedium).lineLimit(1)
+                  if viewModel.isEncrypted {
+                    Image(systemName: "lock.fill")
+                      .font(.caption2)
+                      .foregroundStyle(SysColors.textSecondary)
+                      .accessibilityLabel("Encrypted")
+                  }
+                }
+                if let presence = viewModel.headerSubtitle {
                   Text(presence)
                     .textStyle(TextStyles.labelSmall)
                     .foregroundStyle(
@@ -223,6 +232,9 @@ public struct RoomScreen: View {
               }
             }
             Button("Go to Date", systemImage: "calendar") { isPickingDate = true }
+            Button("Jump to Start", systemImage: "arrow.up.to.line") {
+              Task { await viewModel.jumpToStart() }
+            }
             Button("Select Messages", systemImage: "checkmark.circle") {
               if let last = viewModel.rows.reversed().lazy.compactMap(\.selectableMessage).first {
                 viewModel.startSelecting(last)
@@ -288,22 +300,30 @@ struct TimelineScroll: View {
 
   @State private var position = ScrollPosition(edge: .bottom)
   @State private var isAtBottom = true
+  /// The newest row when the user scrolled up; what arrives after it is counted on the scroll-down button.
+  @State private var lastSeenRowId: String?
 
   var body: some View {
     let rows = viewModel.rows
+    let newCount = ChatRow.incomingCount(after: lastSeenRowId, in: rows)
     ScrollView {
       LazyVStack(spacing: 0) {
         if !viewModel.reachedStart {
-          // While the spinner shows, keep loading pages: one page may not fill the screen or reach the start, and
-          // the spinner would otherwise stay with nothing asking for more.
-          ProgressView()
-            .padding()
-            .task { await viewModel.loadOlderWhileVisible() }
+          if viewModel.isHistoryPaused {
+            // Loading stopped by itself (many pages with nothing to show, or pages failing): the user asks for more.
+            Button("Load earlier messages") { viewModel.resumeHistory() }
+              .buttonStyle(.bordered)
+              .padding()
+          } else {
+            // While the spinner shows, keep loading pages: one page may not fill the screen or reach the start, and
+            // the spinner would otherwise stay with nothing asking for more.
+            ProgressView()
+              .padding()
+              .task { await viewModel.loadOlderWhileVisible() }
+          }
         }
         if viewModel.reachedStart, !rows.contains(where: Self.isMessage) {
-          Text("No message here yet")
-            .textStyle(TextStyles.bodyMedium)
-            .foregroundStyle(SysColors.textSecondary)
+          EmptyChatCardView(card: viewModel.emptyChatCard)
             .padding(.vertical, 24)
         }
         ForEach(rows) { row in
@@ -332,6 +352,7 @@ struct TimelineScroll: View {
       // The visible rect accounts for the insets (the composer, the safe area), unlike the bare content offset.
       geometry.visibleRect.maxY >= geometry.contentSize.height - 80
     } action: { _, atBottom in
+      lastSeenRowId = atBottom ? nil : viewModel.rows.last?.id
       withAnimation(.easeOut(duration: 0.2)) { isAtBottom = atBottom }
     }
     .overlay(alignment: .bottomTrailing) {
@@ -347,8 +368,25 @@ struct TimelineScroll: View {
             .frame(width: 40, height: 40)
             .background(SysColors.onPrimary, in: Circle())
             .shadow(color: .black.opacity(0.16), radius: 6, y: 2)
+            .overlay(alignment: .top) {
+              if newCount > 0 {
+                Text(newCount > 99 ? "99+" : "\(newCount)")
+                  .textStyle(TextStyles.labelSmall)
+                  .foregroundStyle(SysColors.onPrimary)
+                  .padding(.horizontal, 6)
+                  .frame(minWidth: 20, minHeight: 20)
+                  .background(SysColors.primary, in: Capsule())
+                  .offset(y: -10)
+                  .contentTransition(.numericText())
+                  .transition(.scale.combined(with: .opacity))
+              }
+            }
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: newCount)
         }
-        .accessibilityLabel("Scroll to the latest message")
+        .accessibilityLabel(
+          newCount > 0
+            ? "Scroll to the latest message, \(newCount) new" : "Scroll to the latest message"
+        )
         .padding(16)
         .transition(.scale(scale: 0.6).combined(with: .opacity))
       }
@@ -635,7 +673,9 @@ struct MessageRow: View {
           .lineLimit(1)
           .frame(maxWidth: .infinity, alignment: .leading)
       }
-      if let reply = message.reply {
+      // An album replies with its first picture, as Twake web sends and shows it.
+      let replying = album?.messages.first ?? message
+      if let reply = replying.reply {
         HStack(spacing: 6) {
           RoundedRectangle(cornerRadius: 1.5).fill(SysColors.primary).frame(width: 3)
           VStack(alignment: .leading, spacing: 0) {
@@ -653,11 +693,11 @@ struct MessageRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .onTapGesture {
-          guard !isPreview, let target = message.replyToEventId else { return }
+          guard !isPreview, let target = replying.replyToEventId else { return }
           Task { await viewModel.jump(toEvent: target) }
         }
-        .accessibilityAddTraits(message.replyToEventId == nil ? [] : .isButton)
-        .accessibilityHint(message.replyToEventId == nil ? "" : "Shows the original message")
+        .accessibilityAddTraits(replying.replyToEventId == nil ? [] : .isButton)
+        .accessibilityHint(replying.replyToEventId == nil ? "" : "Shows the original message")
       }
       if let album {
         AlbumGrid(album: album, width: contentWidth, viewModel: viewModel)
@@ -669,8 +709,11 @@ struct MessageRow: View {
         PollView(poll: poll, message: message, viewModel: viewModel)
           .frame(width: contentWidth)
       } else {
-        MessageBody(content: message.body, formatted: message.formatted)
-          .frame(maxWidth: .infinity, alignment: .leading)
+        MessageBody(
+          content: message.body, formatted: message.formatted,
+          isDeviceVerified: viewModel.sessionWarning == nil
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
         if case .text(let text) = message.body, let link = RoomViewModel.previewLink(in: text) {
           LinkPreviewCard(url: link, width: contentWidth, viewModel: viewModel)
         }
@@ -680,7 +723,7 @@ struct MessageRow: View {
         Text(message.date, format: .dateTime.hour().minute())
         if message.isOwn, message.sendState == .failed, !isPreview {
           Button {
-            Task { await viewModel.retryFailedSends() }
+            Task { await viewModel.retry(message) }
           } label: {
             Label("Not sent, tap to retry", systemImage: "arrow.clockwise")
               .foregroundStyle(SysColors.error)
@@ -839,6 +882,8 @@ struct PressScaleButtonStyle: ButtonStyle {
 struct MessageBody: View {
   let content: TimelineMessage.Body
   var formatted: AttributedString?
+  /// This device is verified, which decides the help under a message that cannot be decrypted.
+  var isDeviceVerified = true
   /// The reader tapped the message: its spoilers show.
   @State private var revealsSpoilers = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -903,18 +948,25 @@ struct MessageBody: View {
       case .video(let caption): Label(caption ?? "Video", systemImage: "video")
       case .audio(let caption): Label(caption ?? "Audio", systemImage: "waveform")
       case .file(let name): Label(name, systemImage: "doc")
-      case .location(let text): Label(text, systemImage: "mappin.and.ellipse")
+      case .location(let text, let place):
+        if let place {
+          LocationCard(text: text, place: place)
+        } else {
+          Label(text, systemImage: "mappin.and.ellipse")
+        }
       case .sticker(let text): Text(text)
       case .poll(let question): Label(question, systemImage: "chart.bar")
       case .redacted:
         Label("This message has been deleted", systemImage: "trash").foregroundStyle(
           SysColors.textSecondary)
-      case .unableToDecrypt:
-        // As Element X says it: the keys may still arrive, or come back with the recovery key in Settings.
-        Label("Waiting for this message", systemImage: "lock.badge.clock").foregroundStyle(
-          SysColors.textSecondary
-        )
-        .accessibilityHint("The keys to read it have not arrived yet")
+      case .unableToDecrypt(let reason):
+        // The web's wording: the line, then why the key is missing or what brings it back.
+        VStack(alignment: .leading, spacing: 2) {
+          Label("This message cannot be read on this device yet.", systemImage: "lock.badge.clock")
+          Text(reason.help(isDeviceVerified: isDeviceVerified))
+            .textStyle(TextStyles.labelSmall)
+        }
+        .foregroundStyle(SysColors.textSecondary)
       case .unsupported:
         Text("Unknown event").foregroundStyle(SysColors.textSecondary)
       }
@@ -1180,5 +1232,76 @@ struct LinkPreviewCard: View {
     }
     .accessibilityElement(children: .combine)
     .accessibilityHint("Opens the link")
+  }
+}
+
+/// The card a chat with no message shows: a title, an optional line and what the chat offers.
+private struct EmptyChatCardView: View {
+  let card: EmptyChatCard
+
+  var body: some View {
+    VStack(spacing: 8) {
+      Text(card.title)
+        .textStyle(TextStyles.titleMedium)
+        .foregroundStyle(SysColors.onSurface)
+        .multilineTextAlignment(.center)
+      if let description = card.description {
+        Text(description)
+          .textStyle(TextStyles.bodyMedium)
+          .foregroundStyle(SysColors.textSecondary)
+          .multilineTextAlignment(.center)
+      }
+      if !card.points.isEmpty {
+        VStack(alignment: .leading, spacing: 6) {
+          ForEach(card.points, id: \.self) { point in
+            Label(point, systemImage: "checkmark.circle.fill")
+              .textStyle(TextStyles.bodyMedium)
+              .foregroundStyle(SysColors.textSecondary)
+          }
+        }
+        .padding(.top, 4)
+      }
+    }
+    .padding(16)
+    .frame(maxWidth: 320)
+    .background(SysColors.surface, in: RoundedRectangle(cornerRadius: 16))
+    .frame(maxWidth: .infinity)
+  }
+}
+
+/// A location message: a still map with a pin, and the sender's text. A tap opens the place in Apple Maps.
+private struct LocationCard: View {
+  let text: String
+  let place: GeoPoint
+  @Environment(\.openURL) private var openURL
+
+  private var coordinate: CLLocationCoordinate2D {
+    CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
+  }
+
+  var body: some View {
+    Button {
+      if let url = place.appleMapsURL { openURL(url) }
+    } label: {
+      VStack(alignment: .leading, spacing: 6) {
+        Map(
+          initialPosition: .region(
+            MKCoordinateRegion(center: coordinate, latitudinalMeters: 800, longitudinalMeters: 800)),
+          interactionModes: []
+        ) {
+          Marker("", coordinate: coordinate)
+        }
+        .frame(height: 140)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .allowsHitTesting(false)
+        Label(text, systemImage: "mappin.and.ellipse")
+          .multilineTextAlignment(.leading)
+        Text("Open in Maps")
+          .textStyle(TextStyles.bodyMedium)
+          .foregroundStyle(SysColors.textSecondary)
+      }
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel("Location: \(text). Open in Maps")
   }
 }

@@ -74,6 +74,8 @@ enum TimelineItemMapper {
   ) -> TimelineMessage {
     let eventId: String? =
       if case .eventId(let value) = event.eventOrTransactionId { value } else { nil }
+    let transactionId: String? =
+      if case .transactionId(let value) = event.eventOrTransactionId { value } else { nil }
     var isEdited = false
     var media: MediaReference?
     var formatted: AttributedString?
@@ -98,7 +100,7 @@ enum TimelineItemMapper {
         answers: answers.map { ($0.id, $0.text) }, votes: votes, isEnded: endTime != nil,
         ownUserId: ownUserId)
     case .redacted: body = .redacted
-    case .unableToDecrypt: body = .unableToDecrypt
+    case .unableToDecrypt(let encrypted): body = .unableToDecrypt(undecryptableReason(encrypted))
     default: body = .unsupported
     }
     let reactions = content.reactions.map { reaction in
@@ -116,7 +118,15 @@ enum TimelineItemMapper {
       readerIds: event.readReceipts.keys.filter { $0 != ownUserId }.sorted(),
       replyToEventId: content.inReplyTo?.eventId(), formatted: formatted,
       uploadProgress: uploadProgress(event.localSendState), poll: poll,
-      thread: content.threadSummary.map(thread), threadRootId: content.threadRoot)
+      thread: content.threadSummary.map(thread), threadRootId: content.threadRoot,
+      batchId: batchId(body, event), transactionId: transactionId)
+  }
+
+  /// The album key of a picture (`MediaBatch`), read from the event's original JSON; only pictures form albums, so
+  /// other messages skip the parse.
+  private static func batchId(_ body: TimelineMessage.Body, _ event: EventTimelineItem) -> String? {
+    guard case .image = body else { return nil }
+    return MediaBatch.id(inOriginalJSON: event.lazyProvider.debugInfo().originalJson)
   }
 
   private static func thread(_ summary: ThreadSummary) -> TimelineMessage.ThreadPreview {
@@ -169,7 +179,7 @@ enum TimelineItemMapper {
     case .video(let content): .video(caption: content.caption)
     case .audio(let content): .audio(caption: content.caption)
     case .file(let content): .file(name: content.filename)
-    case .location(let content): .location(content.body)
+    case .location(let content): .location(content.body, place: GeoPoint(geoUri: content.geoUri))
     case .other(_, let body): .text(body)
     default: .unsupported
     }
@@ -181,13 +191,15 @@ enum TimelineItemMapper {
     case .image(let content):
       let info = content.info
       return reference(
-        content.source, info?.thumbnailSource, info?.mimetype, info?.size, info?.width, info?.height
-      )
+        content.source, info?.thumbnailSource, info?.mimetype, info?.size, info?.width,
+        info?.height,
+        blurhash: info?.blurhash)
     case .video(let content):
       let info = content.info
       return reference(
-        content.source, info?.thumbnailSource, info?.mimetype, info?.size, info?.width, info?.height
-      )
+        content.source, info?.thumbnailSource, info?.mimetype, info?.size, info?.width,
+        info?.height,
+        blurhash: info?.blurhash)
     case .audio(let content):
       return reference(content.source, nil, content.info?.mimetype, content.info?.size, nil, nil)
     case .file(let content):
@@ -201,12 +213,13 @@ enum TimelineItemMapper {
   private static func reference(
     _ source: MediaSource, _ thumbnail: MediaSource?, _ mimeType: String?, _ size: UInt64?,
     _ width: UInt64?,
-    _ height: UInt64?
+    _ height: UInt64?, blurhash: String? = nil
   ) -> MediaReference {
     MediaReference(
       source: source.toJson(), thumbnailSource: thumbnail?.toJson(), mimeType: mimeType,
       size: size.map { Int(clamping: $0) }, width: width.map { Int(clamping: $0) },
-      height: height.map { Int(clamping: $0) })
+      height: height.map { Int(clamping: $0) }, blurhash: blurhash.flatMap { $0.isEmpty ? nil : $0 }
+    )
   }
 
   private static func reply(_ details: InReplyToDetails) -> TimelineMessage.Reply {
@@ -244,7 +257,7 @@ enum TimelineItemMapper {
   /// One line for a message body, as reply previews show it.
   static func preview(_ body: TimelineMessage.Body) -> String {
     switch body {
-    case .text(let text), .emote(let text), .notice(let text), .location(let text),
+    case .text(let text), .emote(let text), .notice(let text), .location(let text, _),
       .sticker(let text):
       text
     case .image(let caption): caption ?? "🖼️ Picture"
@@ -334,6 +347,19 @@ enum TimelineItemMapper {
   static func name(_ userId: String, _ profile: ProfileDetails) -> String {
     if case .ready(let displayName?, _, _) = profile, !displayName.isEmpty { return displayName }
     return userId
+  }
+
+  /// Why the SDK could not decrypt the message; only a Megolm message carries a cause.
+  static func undecryptableReason(_ message: EncryptedMessage) -> UndecryptableReason {
+    guard case .megolmV1AesSha2(_, let cause) = message else { return .unknown }
+    return switch cause {
+    case .sentBeforeWeJoined: .sentBeforeJoining
+    case .withheldBySender, .withheldForUnverifiedOrInsecureDevice: .withheld
+    case .verificationViolation, .unsignedDevice, .unknownDevice: .untrustedSender
+    case .historicalMessageAndBackupIsDisabled: .historical
+    case .historicalMessageAndDeviceIsUnverified: .historicalUnverified
+    case .unknown: .unknown
+    }
   }
 
   private static func sendState(_ state: EventSendState?) -> TimelineMessage.SendState {

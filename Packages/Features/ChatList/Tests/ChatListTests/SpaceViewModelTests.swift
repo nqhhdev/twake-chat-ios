@@ -81,6 +81,21 @@ struct SpaceViewModelTests {
     #expect(viewModel.children?.first?.isJoined == true)
   }
 
+  @Test func aSubSpaceTheUserIsNotInIsJoinedWithoutOpeningIt() async {
+    var opened: [String] = []
+    let spaces = Spaces()
+    let sub = child("!sub", "Design", joined: false, space: true)
+    await spaces.set([sub])
+    let viewModel = SpaceViewModel(
+      space: space, repository: spaces, picture: { _ in nil }, onOpen: { opened.append($0.id) })
+    await viewModel.load()
+    await viewModel.join(subspace: sub)
+    #expect(await spaces.joined == ["!sub"])
+    #expect(opened.isEmpty)
+    #expect(viewModel.children?.first?.isJoined == true)
+    #expect(viewModel.children?.first?.isSpace == true)
+  }
+
   @Test func aRoomThatCannotBeJoinedSaysWhy() async {
     let spaces = Spaces()
     await spaces.failJoins()

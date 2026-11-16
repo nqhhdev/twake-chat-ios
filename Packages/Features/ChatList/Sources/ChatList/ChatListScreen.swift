@@ -69,13 +69,14 @@ public struct ChatListScreen: View {
               ActivityScreen(viewModel: viewModel, onSelect: onSelect)
                 .ignoresSafeArea(.container, edges: isBesideChat ? .trailing : [])
             } label: {
-              Image(systemName: viewModel.mentionTotal > 0 ? "bell.badge.fill" : "bell")
+              Image(systemName: viewModel.hasActivity ? "bell.badge.fill" : "bell")
                 .symbolEffect(.bounce, value: viewModel.mentionTotal)
                 .contentTransition(.symbolEffect(.replace))
             }
             .accessibilityLabel(
               viewModel.mentionTotal > 0
-                ? "Activity, \(viewModel.mentionTotal) mentions" : "Activity")
+                ? "Activity, \(viewModel.mentionTotal) mentions"
+                : viewModel.hasActivity ? "Activity, unread chats" : "Activity")
           }
           if let onCompose {
             ToolbarItem(placement: .topBarTrailing) {
@@ -115,7 +116,7 @@ public struct ChatListScreen: View {
       ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
     case .empty:
       ContentUnavailableView(
-        "No chats yet", systemImage: "bubble.left.and.bubble.right",
+        "Welcome to Twake 👋", systemImage: "bubble.left.and.bubble.right",
         description: Text("Start one with the New chat button."))
     case .failed(let message):
       ContentUnavailableView(message, systemImage: "exclamationmark.triangle")
@@ -233,6 +234,20 @@ public struct ChatListScreen: View {
     .animation(.spring(response: 0.35, dampingFraction: 0.85), value: viewModel.visibleRooms)
   }
 
+  /// A section title that stays at the top while its rows scroll. It fills its row with the screen's background: the
+  /// list's own background is hidden, and a clear header let the rows show through the title.
+  private func sectionHeader(_ title: String) -> some View {
+    Text(title)
+      .font(.subheadline.weight(.semibold))
+      .foregroundStyle(SysColors.textSecondary)
+      .lineLimit(1)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.horizontal, 16)
+      .padding(.vertical, 6)
+      .background(SysColors.background)
+      .listRowInsets(EdgeInsets())
+  }
+
   @ViewBuilder private var listContent: some View {
     let invites = viewModel.invites
     if !invites.isEmpty, viewModel.filter == .all {
@@ -250,19 +265,25 @@ public struct ChatListScreen: View {
     }
     let favourites = viewModel.favouriteRooms
     if !favourites.isEmpty, viewModel.filter != .favourites {
-      Section("Favourites") {
+      Section {
         ForEach(favourites) { room in row(room) }
+      } header: {
+        sectionHeader("Favourites")
       }
     }
-    Section(favourites.isEmpty || viewModel.filter == .favourites ? "" : "Chats") {
+    Section {
       ForEach(viewModel.filter == .favourites ? favourites : viewModel.otherRooms) { room in
         row(room)
       }
+    } header: {
+      if !favourites.isEmpty, viewModel.filter != .favourites { sectionHeader("Chats") }
     }
     let lowPriority = viewModel.lowPriorityRooms
     if !lowPriority.isEmpty, viewModel.filter != .favourites {
-      Section("Low priority") {
+      Section {
         ForEach(lowPriority) { room in row(room) }
+      } header: {
+        sectionHeader("Low priority")
       }
     }
     if !viewModel.query.trimmingCharacters(in: .whitespaces).isEmpty, !isSelecting {
@@ -368,7 +389,7 @@ public struct ChatListScreen: View {
   }
 
   private func readButton(_ room: RoomSummary) -> some View {
-    let isUnread = room.unreadCount > 0
+    let isUnread = room.isUnread
     return Button(
       isUnread ? "Read" : "Unread",
       systemImage: isUnread ? "envelope.open" : "envelope.badge"
@@ -407,9 +428,13 @@ struct ChatListRow: View {
       VStack(alignment: .leading, spacing: 2) {
         HStack(alignment: .firstTextBaseline) {
           Text(room.name)
-            .font(.headline.weight(room.unreadCount > 0 ? .bold : .semibold))
+            .font(.headline.weight(room.isUnread ? .bold : .semibold))
             .foregroundStyle(SysColors.onSurface)
             .lineLimit(1)
+          if room.isEncrypted {
+            Image(systemName: "lock.fill").font(.caption2).foregroundStyle(SysColors.textSecondary)
+              .accessibilityLabel("Encrypted")
+          }
           if room.isFavourite {
             Image(systemName: "star.fill").font(.caption2).foregroundStyle(.orange)
           }
@@ -423,13 +448,22 @@ struct ChatListRow: View {
           if let date = room.lastActivity {
             Text(ChatListViewModel.timeText(date))
               .font(.subheadline)
-              .foregroundStyle(room.unreadCount > 0 ? SysColors.primary : SysColors.textSecondary)
+              .foregroundStyle(room.isUnread ? SysColors.primary : SysColors.textSecondary)
           }
         }
         HStack(alignment: .top) {
           Group {
-            if let draft = room.draft, !room.isSpace {
+            // Who types comes first, then the draft (web `RoomList.tsx`).
+            if let typing = ChatListViewModel.typingLine(of: room) {
+              Text(typing).foregroundStyle(SysColors.primary)
+            } else if let draft = room.draft, !room.isSpace {
               Text("\(Text("Draft:").foregroundStyle(SysColors.error)) \(draft)")
+                .foregroundStyle(SysColors.textSecondary)
+            } else if !room.isSpace, let state = room.lastMessageSendState,
+              let preview = ChatListViewModel.preview(of: room)
+            {
+              // No mark beside an event the row cannot name: a tick stood alone on a blank line.
+              Text("\(SendStateMark(state: state).image) \(preview)")
                 .foregroundStyle(SysColors.textSecondary)
             } else {
               Text(room.isSpace ? "Space" : ChatListViewModel.preview(of: room) ?? " ")
@@ -441,7 +475,9 @@ struct ChatListRow: View {
           .contentTransition(.opacity)
           .animation(.easeInOut(duration: 0.25), value: room.draft)
           Spacer(minLength: 4)
-          UnreadBadge(unread: room.unreadCount, mentions: room.mentionCount, isMuted: room.isMuted)
+          UnreadBadge(
+            unread: room.unreadCount, mentions: room.mentionCount, isMuted: room.isMuted,
+            isMarkedUnread: room.isMarkedUnread)
         }
       }
       // The separator starts under the text, as in Messages.
@@ -459,6 +495,8 @@ struct UnreadBadge: View {
   let mentions: Int
   /// A muted room's count is grey, as in Messages and WhatsApp: it is unread, but nothing asks for attention.
   var isMuted = false
+  /// The user marked the room as unread: a dot when no message is unread, as the Flutter chat list shows it.
+  var isMarkedUnread = false
 
   private var fill: ColorToken { isMuted ? SysColors.textSecondary : SysColors.primary }
 
@@ -481,10 +519,31 @@ struct UnreadBadge: View {
           .frame(minWidth: 20, minHeight: 20)
           .background(fill, in: Capsule())
           .transition(.scale.combined(with: .opacity))
+      } else if isMarkedUnread, mentions == 0 {
+        Circle().fill(fill).frame(width: 12, height: 12)
+          .accessibilityLabel("Marked as unread")
+          .transition(.scale.combined(with: .opacity))
       }
     }
     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: unread)
     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: mentions)
+  }
+}
+
+/// The send state of the user's own last message before its text on the row: a clock while it is sent, a tick once
+/// sent, a red mark when it failed (Flutter `chat_list_item_subtitle.dart`). The SDK's latest event says nothing about
+/// who read it, so the row has no "read" mark.
+struct SendStateMark {
+  let state: RoomSummary.SendState
+
+  var image: Text {
+    switch state {
+    case .sending: Text(Image(systemName: "clock")).accessibilityLabel("Sending")
+    case .sent: Text(Image(systemName: "checkmark")).accessibilityLabel("Sent")
+    case .failed:
+      Text(Image(systemName: "exclamationmark.circle.fill")).foregroundStyle(SysColors.error)
+        .accessibilityLabel("Not sent")
+    }
   }
 }
 

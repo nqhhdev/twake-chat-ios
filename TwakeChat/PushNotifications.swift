@@ -12,6 +12,9 @@ final class PushCenter {
   /// A room the shell should open: a tapped notification's, or a direct chat started from a member's profile. The
   /// shell clears it once open.
   var pendingRoomId: String?
+  /// Someone the user wants to write to and has no direct chat with yet: the shell shows the draft chat, and the
+  /// first message creates the chat. The shell clears it once shown.
+  var pendingDraftUserId: String?
   /// The chat on screen: its notifications are not shown as banners, and opening it clears them.
   @ObservationIgnored var openRoomId: String? {
     didSet { if let openRoomId { clearNotifications(roomId: openRoomId) } }

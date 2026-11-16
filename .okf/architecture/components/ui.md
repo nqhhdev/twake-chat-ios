@@ -86,7 +86,10 @@ sends, replies to, edits, deletes and reacts to messages; `RoomScreen` shows Twa
 `primaryContainer`, others white with the sender's avatar and name), day dividers, room events as one-line notices,
 reply quotes and reactions, with the Flutter message menu as a context menu, then `ComposerView`. The timeline groups
 messages as Telegram and iMessage do (`TimelineRows`: one sender within 5 minutes; the name on the first bubble, the
-avatar and the tail on the last, `TwakeBubbleShape`), and pictures sent together within a minute form an album grid.
+avatar and the tail on the last, `TwakeBubbleShape`), and pictures sent together form an album grid with Twake web's rule (`groupAlbums`): one sender, the same batch key
+(`app.twake.chat.batch`) on both, at most a minute apart, sent, the caption only on the last and a reply only
+on the first. Pictures with no batch key stay single messages. The SDK cannot add the key to what this client sends
+yet, so pictures sent together from this client are not joined.
 It animates: new bubbles spring in from their sender's side, swipe-to-reply with a haptic, double-tap for ❤️ with a
 heart burst, reaction chips pop and roll their counts, the send button pops in and bounces, the reply/edit banner
 slides up, pictures fade in, and a button returns to the newest message. Pictures, videos and
@@ -109,7 +112,13 @@ encryption, visibility, the members with search, and Leave chat after a confirma
 ## Chat list (built, TWAK-66)
 `Packages/Features/ChatList/` (Domain and DesignSystem only) shows the joined rooms after sign-in, in the order the
 `RoomListRepository` gives them (the SDK's, most recent activity first, as the Flutter app's `lib/pages/chat_list`
-shows), each with its name and a "sender: text" preview of the last message, and keeps them up to date.
+shows), each with its name and a preview of the last message, and keeps them up to date. The preview follows the
+Flutter and web rows: "You:" on the user's own message, no name in a direct chat, an emote as a sentence, and a label
+for what has no text (Photo, Video, Voice message, a file's name, "Poll: …", Message deleted, Encrypted message; never
+the body of an undecryptable message). Who types replaces it, then the draft. The user's own last message shows its
+send state (a clock, a tick, a red mark; the SDK's latest event says nothing about who read it). An encrypted room has
+a lock; a room marked unread with nothing unread has a dot; the time is the hour today, the weekday this week, the day
+and month this year, the full date before.
 - `ChatListViewModel`: a `loading`, `loaded`, `empty` or `failed` state, started by the screen's `.task` and stopped
   when the screen goes away; Log out runs the closure the app passes in and shows an error when it fails.
 - `ChatListScreen`: the list, the empty and error states, and the Log out button.

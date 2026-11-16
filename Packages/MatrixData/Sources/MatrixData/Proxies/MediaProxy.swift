@@ -15,12 +15,52 @@ public actor MediaProxy: MediaRepository {
     thumbnails.totalCostLimit = 64 * 1024 * 1024
   }
 
+  /// The largest thumbnail a homeserver keeps ready (Synapse's default sizes end at 800 by 600). A larger request
+  /// made the server answer with a file of a megabyte or build a new picture, which took over a minute on staging.
+  static let largestThumbnail = (width: 800, height: 600)
+  /// Thumbnails loading at once. A screen of pictures asked for all of them together, and while they waited every
+  /// other request of the app (sync, history, sending) timed out behind them.
+  static let concurrentThumbnails = 2
+
+  /// The size asked of the server: the wanted size, scaled down to fit `largestThumbnail` with its shape kept.
+  static func serverSize(width: Int, height: Int) -> (width: Int, height: Int) {
+    guard width > 0, height > 0 else { return largestThumbnail }
+    let largest = largestThumbnail
+    let ratio = min(
+      1, Double(largest.width) / Double(width), Double(largest.height) / Double(height))
+    return (max(1, Int(Double(width) * ratio)), max(1, Int(Double(height) * ratio)))
+  }
+
+  private var loadingThumbnails = 0
+  private var waitingThumbnails: [CheckedContinuation<Void, Never>] = []
+
+  private func beginThumbnail() async {
+    if loadingThumbnails < Self.concurrentThumbnails {
+      loadingThumbnails += 1
+      return
+    }
+    // The slot is handed over by `endThumbnail`, which leaves the count as it is.
+    await withCheckedContinuation { waitingThumbnails.append($0) }
+  }
+
+  private func endThumbnail() {
+    if waitingThumbnails.isEmpty {
+      loadingThumbnails -= 1
+    } else {
+      waitingThumbnails.removeFirst().resume()
+    }
+  }
+
   public func thumbnail(_ media: MediaReference, width: Int, height: Int) async throws(MediaError)
     -> Data
   {
+    let (width, height) = Self.serverSize(width: width, height: height)
     let key = "\(media.source)|\(width)x\(height)" as NSString
     if let cached = thumbnails.object(forKey: key) { return cached as Data }
     let client = try await client()
+    await beginThumbnail()
+    defer { endThumbnail() }
+    if let cached = thumbnails.object(forKey: key) { return cached as Data }
     do {
       let data: Data
       if let thumbnailSource = media.thumbnailSource {

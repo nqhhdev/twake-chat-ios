@@ -37,6 +37,13 @@ struct MessageMediaView: View {
     return CGSize(width: min(width, height / ratio), height: height)
   }
 
+  /// The user's own picture, sent in the last minutes. The SDK keeps what it uploaded, so the picture shows from that
+  /// copy at once; the server's thumbnail of a new upload took over a minute on a slow server, with a blank tile.
+  static func wasJustSent(_ message: TimelineMessage, now: Date = Date()) -> Bool {
+    guard message.isOwn, case .image = message.body else { return false }
+    return now.timeIntervalSince(message.date) < 600
+  }
+
   /// A button rather than a tap gesture, so a long press still reaches the bubble's message menu.
   private var thumbnail: some View {
     let size = thumbnailSize
@@ -49,23 +56,26 @@ struct MessageMediaView: View {
         isViewerShown = true
       }
     } label: {
-      RemoteImage(media: media, size: size, repository: viewModel.media)
-        .frame(width: size.width, height: size.height)
-        .clipShape(.rect(cornerRadius: 12))
-        .overlay {
-          if message.sendState == .sending {
-            UploadProgressRing(progress: message.uploadProgress)
-          } else if case .video = message.body {
-            if isDownloading {
-              ProgressView().tint(.white).controlSize(.large)
-            } else {
-              Image(systemName: "play.circle.fill")
-                .font(.system(size: 44))
-                .foregroundStyle(.white.opacity(0.9))
-            }
+      RemoteImage(
+        media: media, size: size, repository: viewModel.media,
+        prefersOriginal: Self.wasJustSent(message)
+      )
+      .frame(width: size.width, height: size.height)
+      .clipShape(.rect(cornerRadius: 12))
+      .overlay {
+        if message.sendState == .sending {
+          UploadProgressRing(progress: message.uploadProgress)
+        } else if case .video = message.body {
+          if isDownloading {
+            ProgressView().tint(.white).controlSize(.large)
+          } else {
+            Image(systemName: "play.circle.fill")
+              .font(.system(size: 44))
+              .foregroundStyle(.white.opacity(0.9))
           }
         }
-        .contentShape(Rectangle())
+      }
+      .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
     .fullScreenCover(item: $video) { file in VideoPlayerScreen(url: file.url) }
@@ -208,9 +218,13 @@ struct RemoteImage: View {
   let media: MediaReference
   let size: CGSize
   let repository: any MediaRepository
+  /// Loads the whole file first (kept on the device for a picture just sent), scaled down to `size`, and falls back
+  /// to the thumbnail.
+  var prefersOriginal = false
 
   @State private var image: UIImage?
   @State private var failed = false
+  @State private var placeholder: UIImage?
   @Environment(\.displayScale) private var scale
 
   var body: some View {
@@ -219,7 +233,12 @@ struct RemoteImage: View {
         Image(uiImage: image).resizable().scaledToFill()
           .transition(.opacity)
       } else {
-        Rectangle().fill(SysColors.surface)
+        if let placeholder {
+          // The sender's blurred colours hold the place while the picture loads.
+          Image(uiImage: placeholder).resizable().scaledToFill()
+        } else {
+          Rectangle().fill(SysColors.surface)
+        }
         if failed {
           Image(systemName: "photo").foregroundStyle(SysColors.textSecondary)
         } else {
@@ -228,15 +247,34 @@ struct RemoteImage: View {
       }
     }
     .task(id: media.source) {
+      if image == nil { placeholder = media.blurhash.flatMap { BlurHashImage.image(from: $0) } }
+      let pixels = CGSize(width: size.width * scale, height: size.height * scale)
+      if prefersOriginal, let data = try? await repository.content(media),
+        let original = UIImage(data: data)
+      {
+        let scaled = await original.byPreparingThumbnail(ofSize: Self.fill(original.size, pixels))
+        withAnimation(.easeIn(duration: 0.25)) { image = scaled ?? original }
+        failed = false
+        return
+      }
       do {
         let data = try await repository.thumbnail(
-          media, width: Int(size.width * scale), height: Int(size.height * scale))
+          media, width: Int(pixels.width), height: Int(pixels.height))
         withAnimation(.easeIn(duration: 0.25)) { image = UIImage(data: data) }
         failed = image == nil
       } catch {
         failed = true
       }
     }
+  }
+}
+
+extension RemoteImage {
+  /// The size that keeps `original`'s shape and covers `target`, never larger than the original.
+  static func fill(_ original: CGSize, _ target: CGSize) -> CGSize {
+    guard original.width > 0, original.height > 0 else { return target }
+    let ratio = min(1, max(target.width / original.width, target.height / original.height))
+    return CGSize(width: original.width * ratio, height: original.height * ratio)
   }
 }
 

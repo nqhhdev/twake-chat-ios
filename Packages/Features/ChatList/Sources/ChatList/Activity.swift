@@ -5,7 +5,7 @@ import SwiftUI
 extension ChatListViewModel {
   /// The rooms with something unread, the most recent first: the activity's inbox (web D57).
   public var inbox: [RoomSummary] {
-    joinedRooms.filter { $0.unreadCount > 0 && !$0.isSpace }
+    joinedRooms.filter { $0.isUnread && !$0.isSpace }
   }
 
   /// The rooms where someone mentioned the user and it is not read yet.
@@ -13,7 +13,10 @@ extension ChatListViewModel {
     joinedRooms.filter { $0.mentionCount > 0 }
   }
 
-  /// The mentions not read yet, for the bell's badge.
+  /// Something waits in the activity's inbox: the bell shows its badge, also without a mention.
+  public var hasActivity: Bool { !inbox.isEmpty }
+
+  /// The mentions not read yet, read out with the bell.
   public var mentionTotal: Int {
     joinedRooms.reduce(0) { $0 + $1.mentionCount }
   }
@@ -40,7 +43,9 @@ struct ActivityScreen: View {
             .foregroundStyle(SysColors.textSecondary)
             .transition(.opacity)
         }
-        ForEach(inbox) { room in row(room, badge: "\(room.unreadCount)") }
+        ForEach(inbox) { room in
+          row(room, badge: room.unreadCount > 0 ? "\(room.unreadCount)" : "•")
+        }
       }
       if let saved = viewModel.saved {
         Section {

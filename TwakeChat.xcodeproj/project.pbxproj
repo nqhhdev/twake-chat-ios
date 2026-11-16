@@ -609,6 +609,7 @@
 				CODE_SIGN_ENTITLEMENTS = TwakeChat/TwakeChat.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2331;
+				DEVELOPMENT_TEAM = KUT463DS29;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TwakeChat/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -641,6 +642,7 @@
 				CODE_SIGN_ENTITLEMENTS = TwakeChat/TwakeChat.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2331;
+				DEVELOPMENT_TEAM = KUT463DS29;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TwakeChat/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -671,6 +673,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = KUT463DS29;
 				GENERATE_INFOPLIST_FILE = YES;
 				LM_SKIP_METADATA_EXTRACTION = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = app.twake.ios.chat.tests;
@@ -686,6 +689,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = KUT463DS29;
 				GENERATE_INFOPLIST_FILE = YES;
 				LM_SKIP_METADATA_EXTRACTION = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = app.twake.ios.chat.tests;
@@ -700,6 +704,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = KUT463DS29;
 				GENERATE_INFOPLIST_FILE = YES;
 				LM_SKIP_METADATA_EXTRACTION = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = app.twake.ios.chat.tests.matrixdata;
@@ -713,6 +718,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = KUT463DS29;
 				GENERATE_INFOPLIST_FILE = YES;
 				LM_SKIP_METADATA_EXTRACTION = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = app.twake.ios.chat.tests.matrixdata;
@@ -728,6 +734,7 @@
 				CODE_SIGN_ENTITLEMENTS = TwakeChatNSE/TwakeChatNSE.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2331;
+				DEVELOPMENT_TEAM = KUT463DS29;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TwakeChatNSE/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = TwakeChatNSE;
@@ -752,6 +759,7 @@
 				CODE_SIGN_ENTITLEMENTS = TwakeChatNSE/TwakeChatNSE.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2331;
+				DEVELOPMENT_TEAM = KUT463DS29;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TwakeChatNSE/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = TwakeChatNSE;
@@ -776,6 +784,7 @@
 				CODE_SIGN_ENTITLEMENTS = TwakeChatShare/TwakeChatShare.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2331;
+				DEVELOPMENT_TEAM = KUT463DS29;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TwakeChatShare/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Twake Chat";
@@ -800,6 +809,7 @@
 				CODE_SIGN_ENTITLEMENTS = TwakeChatShare/TwakeChatShare.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2331;
+				DEVELOPMENT_TEAM = KUT463DS29;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TwakeChatShare/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Twake Chat";

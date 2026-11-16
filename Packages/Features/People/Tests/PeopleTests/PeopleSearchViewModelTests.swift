@@ -39,10 +39,57 @@ struct PeopleSearchViewModelTests {
     let repository = FakePeopleRepository()
     var opened: (String, String)?
     let viewModel = viewModel(repository) { opened = ($0, $1) }
+    repository.existingDirects = ["@alice:example.org": "!dm-@alice:example.org"]
     await viewModel.tap(alice)
-    #expect(repository.directs == ["@alice:example.org"])
+    #expect(repository.directs.isEmpty)
     #expect(opened?.0 == "!dm-@alice:example.org")
     #expect(opened?.1 == "Alice")
+    #expect(viewModel.draftChat == nil)
+  }
+
+  @Test func aTapOnSomeoneNewDraftsAChatAndTheFirstMessageCreatesIt() async {
+    let repository = FakePeopleRepository()
+    var opened: (String, String)?
+    let viewModel = viewModel(repository) { opened = ($0, $1) }
+
+    await viewModel.tap(alice)
+
+    #expect(viewModel.draftChat == alice)
+    #expect(repository.directs.isEmpty)
+    #expect(repository.startedDirects.isEmpty)
+    #expect(opened == nil)
+    #expect(!viewModel.canSendDraft)
+
+    viewModel.draftText = "  Hello Alice  "
+    await viewModel.sendDraft()
+
+    #expect(repository.startedDirects.map(\.userId) == ["@alice:example.org"])
+    #expect(repository.startedDirects.map(\.message) == ["Hello Alice"])
+    #expect(opened?.0 == "!dm-@alice:example.org")
+    #expect(viewModel.draftChat == nil)
+  }
+
+  @Test func aDraftStartedElsewhereCreatesTheChatWithItsFirstMessage() async {
+    let repository = FakePeopleRepository()
+    var opened: (String, String)?
+    let viewModel = viewModel(repository) { opened = ($0, $1) }
+    viewModel.draft(with: alice)
+    #expect(viewModel.draftChat == alice)
+    viewModel.draftText = "Hi"
+    await viewModel.sendDraft()
+    #expect(repository.startedDirects.map(\.message) == ["Hi"])
+    #expect(opened?.0 == "!dm-@alice:example.org")
+  }
+
+  @Test func leavingADraftChatCreatesNothing() async {
+    let repository = FakePeopleRepository()
+    let viewModel = viewModel(repository)
+    await viewModel.tap(alice)
+    viewModel.draftText = "Hello"
+    viewModel.discardDraft()
+    #expect(viewModel.draftChat == nil)
+    #expect(repository.startedDirects.isEmpty)
+    #expect(repository.directs.isEmpty)
   }
 
   @Test func aGroupNeedsPeopleAndANameThenOpens() async {
@@ -74,7 +121,10 @@ struct PeopleSearchViewModelTests {
     repository.fails = true
     let viewModel = viewModel(repository)
     await viewModel.tap(alice)
+    viewModel.draftText = "Hello"
+    await viewModel.sendDraft()
     #expect(viewModel.errorMessage == "Could not start the chat. Please try again.")
+    #expect(viewModel.draftChat == alice)
   }
 
   @Test func inviteModePicksPeopleAndInvitesThem() async {

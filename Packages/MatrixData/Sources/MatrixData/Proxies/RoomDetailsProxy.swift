@@ -38,7 +38,12 @@ public actor RoomDetailsProxy: RoomDetailsRepository {
         canRedactOthers: powerLevels?.canOwnUserRedactOther() ?? false,
         successorRoomId: info.successorRoom?.roomId,
         directUserId: info.isDirect && info.heroes.count == 1 ? info.heroes.first?.userId : nil,
-        canSendMessages: powerLevels?.canOwnUserSendMessage(message: .roomMessage) ?? true)
+        canSendMessages: powerLevels?.canOwnUserSendMessage(message: .roomMessage) ?? true,
+        canNotifyRoom: !info.isDirect
+          && (powerLevels?.canOwnUserTriggerRoomNotification() ?? false),
+        isBroadcast: !info.isDirect && !info.isSpace
+          && (powerLevels?.values().eventsDefault ?? 0) >= 50
+      )
     } catch {
       throw .requestFailed
     }

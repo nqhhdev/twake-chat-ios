@@ -15,4 +15,11 @@ struct MentionContentTests {
     #expect(TimelineProxy.mentionedUserIds(in: "hello @alice").isEmpty)
     #expect(TimelineProxy.mentionedUserIds(in: "see https://matrix.to/#/!room:example.org").isEmpty)
   }
+
+  @Test func roomAsAWordOfItsOwnNamesEveryone() {
+    #expect(TimelineProxy.mentionsRoom("@room lunch?"))
+    #expect(TimelineProxy.mentionsRoom("lunch @room"))
+    #expect(!TimelineProxy.mentionsRoom("mail me at me@room.org"))
+    #expect(!TimelineProxy.mentionsRoom("@roommate"))
+  }
 }

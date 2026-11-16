@@ -53,6 +53,26 @@ public final class SpaceViewModel {
     }
   }
 
+  /// Joins a sub-space the user is not in, so it reaches the chat list (Flutter's joinable sub-space row). It stays
+  /// on this screen; opening it is a tap on the row.
+  public func join(subspace child: SpaceChild) async {
+    guard child.isSpace, !child.isJoined, !joining.contains(child.id) else { return }
+    joining.insert(child.id)
+    defer { joining.remove(child.id) }
+    errorMessage = nil
+    do {
+      _ = try await repository.join(child)
+    } catch {
+      errorMessage = "Could not join \(child.name). It may need an invitation."
+      return
+    }
+    if let index = children?.firstIndex(where: { $0.id == child.id }) {
+      children?[index] = SpaceChild(
+        id: child.id, name: child.name, topic: child.topic, avatar: child.avatar,
+        memberCount: child.memberCount, isJoined: true, isSpace: true, via: child.via)
+    }
+  }
+
   /// Opens a room of the space, joining it first when the user is not in it.
   public func open(_ child: SpaceChild) async {
     guard !child.isSpace, !joining.contains(child.id) else { return }
@@ -249,7 +269,13 @@ struct SpaceScreen: View {
       Spacer(minLength: 8)
       if viewModel.joining.contains(child.id) {
         ProgressView()
-      } else if !child.isJoined, !child.isSpace {
+      } else if !child.isJoined, child.isSpace {
+        // Its own button: the row opens the sub-space to look inside, Join makes the user a member.
+        Button("Join") { Task { await viewModel.join(subspace: child) } }
+          .font(.subheadline.weight(.semibold))
+          .foregroundStyle(SysColors.primary)
+          .buttonStyle(.borderless)
+      } else if !child.isJoined {
         Text("Join")
           .font(.subheadline.weight(.semibold))
           .foregroundStyle(SysColors.primary)

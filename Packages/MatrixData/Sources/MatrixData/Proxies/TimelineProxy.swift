@@ -63,13 +63,16 @@ public actor TimelineProxy: TimelineRepository {
     let (diffs, diffsContinuation) = AsyncStream<[TimelineDiff]>.makeStream()
     // The listener is called on an SDK thread; diffs are applied in order by one task, which keeps the client alive
     // until it ends.
+    let sendHandles = SendHandles()
     let applying = Task { [client] in
       var mapped: [Domain.TimelineItem?] = []
       for await batch in diffs {
         guard !Task.isCancelled else { continue }
         for diff in batch {
-          await ListDiff(diff).map { TimelineItemMapper.item($0, ownUserId: ownUserId) }.apply(
-            to: &mapped)
+          await ListDiff(diff).map { item in
+            sendHandles.note(item)
+            return TimelineItemMapper.item(item, ownUserId: ownUserId)
+          }.apply(to: &mapped)
         }
         itemsContinuation.yield(mapped.compactMap { $0 })
       }
@@ -80,7 +83,7 @@ public actor TimelineProxy: TimelineRepository {
     let objects = SyncBoundObjects(entries: handle, objects: [room, timeline])
     let kept = await client.keepWhileSyncing(objects)
     guard kept else {
-      handle.cancel()
+      await objects.cancelEntries()
       diffsContinuation.finish()
       applying.cancel()
       throw .unavailable
@@ -90,7 +93,7 @@ public actor TimelineProxy: TimelineRepository {
     Task { [timeline] in await timeline.fetchMembers() }
     opened = Opened(
       client: client, objects: objects, room: room, timeline: timeline, diffs: diffsContinuation,
-      applying: applying)
+      applying: applying, sendHandles: sendHandles)
     itemsContinuation.onTermination = { _ in diffsContinuation.finish() }
     return items
   }
@@ -133,6 +136,15 @@ public actor TimelineProxy: TimelineRepository {
     let timeline = try openedTimeline()
     do {
       _ = try await timeline.send(msg: Self.content(text))
+    } catch {
+      throw .requestFailed
+    }
+  }
+
+  public func send(emote text: String) async throws(TimelineError) {
+    let timeline = try openedTimeline()
+    do {
+      _ = try await timeline.send(msg: Self.content(text, isEmote: true))
     } catch {
       throw .requestFailed
     }
@@ -469,6 +481,7 @@ public actor TimelineProxy: TimelineRepository {
       else { throw TimelineError.requestFailed }
       content["m.relates_to"] = nil
       content["m.new_content"] = nil
+      MediaBatch.remove(from: &content)
       let body = try JSONSerialization.data(withJSONObject: content)
       try await target.sendRaw(eventType: type, content: String(decoding: body, as: UTF8.self))
     } catch {
@@ -495,8 +508,20 @@ public actor TimelineProxy: TimelineRepository {
     }
   }
 
-  public func retryFailedSends() async {
-    opened?.room.enableSendQueue(enable: true)
+  public func retrySend(transactionId: String) async {
+    guard let opened else { return }
+    if !opened.room.isSendQueueEnabled() { opened.room.enableSendQueue(enable: true) }
+    try? await opened.sendHandles.handle(of: transactionId)?.tryResend()
+  }
+
+  public func discardUnsent(transactionId: String) async throws(TimelineError) {
+    let timeline = try openedTimeline()
+    do {
+      try await timeline.redactEvent(
+        eventOrTransactionId: .transactionId(transactionId: transactionId), reason: nil)
+    } catch {
+      throw .requestFailed
+    }
   }
 
   public func report(eventId: String, reason: String?) async throws(TimelineError) {
@@ -513,11 +538,22 @@ public actor TimelineProxy: TimelineRepository {
 
   /// The message content of a Markdown text. A link to a user (`[Name](https://matrix.to/#/@user:server)`, as the
   /// composer writes a mention) also lists that user in the intentional mentions, so they are notified.
-  static func content(_ text: String) -> RoomMessageEventContentWithoutRelation {
-    let content = messageEventContentFromMarkdown(md: text)
+  static func content(_ text: String, isEmote: Bool = false)
+    -> RoomMessageEventContentWithoutRelation
+  {
+    let content =
+      isEmote
+      ? messageEventContentFromMarkdownAsEmote(md: text) : messageEventContentFromMarkdown(md: text)
     let userIds = mentionedUserIds(in: text)
-    return userIds.isEmpty
-      ? content : content.withMentions(mentions: Mentions(userIds: userIds, room: false))
+    let room = mentionsRoom(text)
+    return userIds.isEmpty && !room
+      ? content : content.withMentions(mentions: Mentions(userIds: userIds, room: room))
+  }
+
+  /// The text names everyone: « @room » as a word of its own. The composer offers it only to those whose power level
+  /// allows it; typed by someone else, servers ignore the mention (the push rule checks the sender's power level).
+  static func mentionsRoom(_ text: String) -> Bool {
+    text.contains(/(^|\s)@room\b/)
   }
 
   /// The Matrix ids of the users linked with matrix.to in `text`, once each, in order.
@@ -542,7 +578,7 @@ public actor TimelineProxy: TimelineRepository {
     self.opened = nil
     opened.diffs.finish()
     opened.applying.cancel()
-    await opened.client.release(opened.objects)
+    await opened.client.release(opened.objects.id)
   }
 
   private func openedState() throws(TimelineError) -> Opened {
@@ -562,6 +598,27 @@ public actor TimelineProxy: TimelineRepository {
     let timeline: Timeline
     let diffs: AsyncStream<[TimelineDiff]>.Continuation
     let applying: Task<Void, Never>
+    let sendHandles: SendHandles
+  }
+}
+
+/// The SDK send handles of the messages that failed to send, by transaction id, so one of them can be sent again
+/// (`SendHandle.tryResend`). The timeline's applying task fills it; the proxy reads it.
+private final class SendHandles: @unchecked Sendable {
+  private let lock = NSLock()
+  private var handles: [String: SendHandle] = [:]
+
+  func note(_ item: MatrixRustSDK.TimelineItem) {
+    guard let event = item.asEvent(), event.isOwn,
+      case .transactionId(let id) = event.eventOrTransactionId,
+      case .sendingFailed = event.localSendState,
+      let handle = event.lazyProvider.getSendHandle()
+    else { return }
+    lock.withLock { handles[id] = handle }
+  }
+
+  func handle(of transactionId: String) -> SendHandle? {
+    lock.withLock { handles[transactionId] }
   }
 }
 
@@ -607,7 +664,8 @@ private final class IdentityListener: IdentityStatusChangeListener {
   }
 }
 
-private final class TypingListener: TypingNotificationsListener {
+/// Calls back with the ids of the people typing in a room; the room screen and the room list use it.
+final class TypingListener: TypingNotificationsListener {
   private let onChange: @Sendable ([String]) -> Void
 
   init(_ onChange: @escaping @Sendable ([String]) -> Void) {

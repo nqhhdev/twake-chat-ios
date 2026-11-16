@@ -48,6 +48,8 @@ struct ChatShell: View {
   @State private var room: RoomViewModel?
   @State private var isRoomPushed = false
   @State private var newChat: PeopleSearchViewModel?
+  /// The draft chat with someone picked on a member's profile or in the chat list search.
+  @State private var draftChat: PeopleSearchViewModel?
   @State private var contacts: PeopleSearchViewModel?
   @State private var settingsPage: SettingsPage? = .security
   /// Privacy & Security over the chat, from the banner that warns encrypted messages may not show.
@@ -91,6 +93,29 @@ struct ChatShell: View {
             ?? RoomSummary(
               id: roomId, name: "Chat", lastMessageText: nil, lastMessageSender: nil,
               lastActivity: nil))
+      }
+      .onChange(of: push.pendingDraftUserId, initial: true) { _, userId in
+        guard let userId else { return }
+        push.pendingDraftUserId = nil
+        let search = makePeopleSearch(.direct) { roomId, name in
+          draftChat = nil
+          open(
+            RoomSummary(
+              id: roomId, name: name, lastMessageText: nil, lastMessageSender: nil,
+              lastActivity: nil))
+        }
+        search.draft(with: Person(id: userId, displayName: nil))
+        // A member's profile is a sheet that closes as this arrives; a sheet shown while another closes is
+        // dropped.
+        Task {
+          try? await Task.sleep(for: .milliseconds(500))
+          draftChat = search
+        }
+      }
+      .sheet(item: $draftChat) { search in
+        if let person = search.draftChat {
+          DraftChatScreen(person: person, viewModel: search)
+        }
       }
       .onChange(of: links.opening) { _, opening in
         guard let opening else { return }

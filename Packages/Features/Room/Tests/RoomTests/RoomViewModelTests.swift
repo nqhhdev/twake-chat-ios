@@ -224,6 +224,32 @@ struct RoomViewModelTests {
     await task.value
   }
 
+  @Test func jumpingToTheStartLoadsOlderPagesAndScrollsToTheFirstMessage() async {
+    let repository = FakeTimelineRepository()
+    repository.reachesStart = true
+    let viewModel = viewModel(repository)
+    let task = Task { await viewModel.start() }
+    while !repository.calls.contains(.markAsRead) { await Task.yield() }
+    let first = TimelineMessage(
+      eventId: "$first", senderId: "@bob:example.org", senderName: "Bob", isOwn: false,
+      date: date.addingTimeInterval(-86_400), body: .text("first"))
+    let last = TimelineMessage(
+      eventId: "$last", senderId: "@bob:example.org", senderName: "Bob", isOwn: false,
+      date: date, body: .text("last"))
+    let items = [
+      TimelineItem(id: "1", kind: .message(first)), TimelineItem(id: "2", kind: .message(last)),
+    ]
+    repository.publish(items)
+    while viewModel.state != .loaded(items) { await Task.yield() }
+
+    await viewModel.jumpToStart()
+
+    #expect(repository.calls.contains(.loadOlder))
+    #expect(viewModel.highlightedEventId == "$first")
+    repository.finish()
+    await task.value
+  }
+
   @Test func acceptingAnIdentityChangeAsksTheRepository() async {
     let repository = FakeTimelineRepository()
     let viewModel = viewModel(repository)
@@ -259,7 +285,12 @@ struct RoomViewModelTests {
       roomId: "!room:example.org", roomName: "News", repository: FakeTimelineRepository(),
       media: FakeMediaRepository(), details: details)
     #expect(viewModel.canSendMessages)
+    #expect(viewModel.headerSubtitle == nil)
     await viewModel.loadRoomState()
+    #expect(viewModel.headerSubtitle == "40 members")
+    viewModel.draft = "@ro"
+    #expect(viewModel.mentionSuggestions.isEmpty)
+    #expect(!viewModel.isEncrypted)
     #expect(!viewModel.canSendMessages)
   }
 
@@ -376,6 +407,45 @@ struct RoomViewModelTests {
     #expect(viewModel.reachedStart)
   }
 
+  @Test func loadingPausesAfterManyPagesAndGoesOnWhenAsked() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = viewModel(repository)
+    viewModel.historyLoading = HistoryLoading(maxAutomaticPages: 3, pause: .zero)
+
+    await viewModel.loadOlderWhileVisible()
+
+    #expect(repository.calls.filter { $0 == .loadOlder }.count == 3)
+    #expect(viewModel.isHistoryPaused)
+    #expect(!viewModel.reachedStart)
+    viewModel.resumeHistory()
+    #expect(!viewModel.isHistoryPaused)
+  }
+
+  @Test func aTimelineTheSDKResetIsNoLongerAtTheStart() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = viewModel(repository)
+    let task = Task { await viewModel.start() }
+    while !repository.calls.contains(.markAsRead) { await Task.yield() }
+    let message = TimelineMessage(
+      eventId: "$1", senderId: "@bob:example.org", senderName: "Bob", isOwn: false, date: date,
+      body: .text("hello"))
+    let whole = [
+      TimelineItem(id: "start", kind: .timelineStart),
+      TimelineItem(id: "1", kind: .message(message)),
+    ]
+    repository.publish(whole)
+    while viewModel.state != .loaded(whole) { await Task.yield() }
+    #expect(viewModel.reachedStart)
+
+    let refilled = [TimelineItem(id: "1", kind: .message(message))]
+    repository.publish(refilled)
+    while viewModel.state != .loaded(refilled) { await Task.yield() }
+
+    #expect(!viewModel.reachedStart)
+    repository.finish()
+    await task.value
+  }
+
   @Test func jumpingToALoadedMessageScrollsAndFlashesIt() async {
     let repository = FakeTimelineRepository()
     let viewModel = viewModel(repository)
@@ -428,8 +498,65 @@ struct RoomViewModelTests {
   @Test func retryingAskstheRepositoryToSendAgain() async {
     let repository = FakeTimelineRepository()
     let viewModel = viewModel(repository)
-    await viewModel.retryFailedSends()
-    #expect(repository.calls.contains(.retry))
+    let failed = TimelineMessage(
+      eventId: nil, senderId: "@me:server", senderName: "Me", isOwn: true, date: .now,
+      body: .text("Hi"), sendState: .failed, transactionId: "txn1")
+    await viewModel.retry(failed)
+    #expect(repository.calls.contains(.retry("txn1")))
+  }
+
+  @Test func meSendsAnEmoteAndAnUnknownCommandStaysInTheComposer() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = viewModel(repository)
+    viewModel.draft = "/me waves"
+    await viewModel.send()
+    #expect(repository.calls.contains(.emote("waves")))
+    viewModel.draft = "/nope"
+    await viewModel.send()
+    #expect(viewModel.draft == "/nope")
+    #expect(viewModel.errorMessage != nil)
+    #expect(!repository.calls.contains(.send("/nope")))
+  }
+
+  @Test func someoneWhoMayNotifyTheRoomIsOfferedEveryone() async {
+    let details = FakeRoomDetailsRepository()
+    details.detailsResult = .success(
+      RoomDetails(
+        id: "!room:example.org", name: "Team", topic: nil, alias: nil, isDirect: false,
+        isEncrypted: true, isPublic: false, joinedMemberCount: 3, canNotifyRoom: true))
+    let viewModel = RoomViewModel(
+      roomId: "!room:example.org", roomName: "Team", repository: FakeTimelineRepository(),
+      media: FakeMediaRepository(), details: details)
+    await viewModel.loadRoomState()
+    #expect(viewModel.isEncrypted)
+    viewModel.draft = "hi @ro"
+    #expect(viewModel.mentionSuggestions.first == .everyone)
+    viewModel.pickMention(.everyone)
+    #expect(viewModel.draft == "hi @room ")
+    viewModel.draft = "@"
+    #expect(viewModel.mentionSuggestions.last == .everyone)
+  }
+
+  @Test func aMessageThatIsSentIsNotSentAgain() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = viewModel(repository)
+    let sent = TimelineMessage(
+      eventId: "$1", senderId: "@me:server", senderName: "Me", isOwn: true, date: .now,
+      body: .text("Hi"))
+    await viewModel.retry(sent)
+    #expect(repository.calls.isEmpty)
+  }
+
+  @Test func deletingAnUnsentMessageDiscardsItsLocalEcho() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = viewModel(repository)
+    let failed = TimelineMessage(
+      eventId: nil, senderId: "@me:server", senderName: "Me", isOwn: true, date: .now,
+      body: .text("Hi"), sendState: .failed, transactionId: "txn1")
+    #expect(viewModel.canDelete(failed))
+    await viewModel.delete(failed)
+    #expect(repository.calls.contains(.discard("txn1")))
+    #expect(!repository.calls.contains { if case .redact = $0 { true } else { false } })
   }
 
   @Test func reactorsAndReadersOpenThePeopleSheet() {

@@ -7,6 +7,18 @@ struct PeopleSearchList: View {
   @Bindable var viewModel: PeopleSearchViewModel
 
   var body: some View {
+    list
+      .sheet(
+        isPresented: Binding(
+          get: { viewModel.draftChat != nil }, set: { if !$0 { viewModel.discardDraft() } })
+      ) {
+        if let person = viewModel.draftChat {
+          DraftChatScreen(person: person, viewModel: viewModel)
+        }
+      }
+  }
+
+  private var list: some View {
     List {
       if viewModel.mode != .direct, !viewModel.selected.isEmpty {
         Section("Selected users") {
@@ -258,6 +270,78 @@ struct BroadcastForm: View {
     case .open: return "\(posting) Listed in the server's directory; anyone can read it."
     case .approval: return "\(posting) Listed in the directory; you approve who follows."
     case .invitation: return "\(posting) Only the people you invite follow it."
+    }
+  }
+}
+
+/// A chat with someone new, before it exists (Flutter `chat_draft`): the person, an invitation to write, and a
+/// composer. Sending the first message creates the chat; Cancel creates nothing.
+public struct DraftChatScreen: View {
+  let person: Person
+  @Bindable var viewModel: PeopleSearchViewModel
+  @FocusState private var isWriting: Bool
+  @Environment(\.dismiss) private var dismiss
+
+  public init(person: Person, viewModel: PeopleSearchViewModel) {
+    self.person = person
+    self.viewModel = viewModel
+  }
+
+  public var body: some View {
+    NavigationStack {
+      VStack(spacing: 0) {
+        Spacer()
+        VStack(spacing: 8) {
+          TwakeAvatar(name: person.name, size: 72)
+          Text(person.name).textStyle(TextStyles.titleMedium).lineLimit(1)
+          Text("No message here yet").textStyle(TextStyles.bodyMedium)
+          Text("Send a message to start the conversation")
+            .textStyle(TextStyles.bodyMedium)
+            .foregroundStyle(SysColors.textSecondary)
+            .multilineTextAlignment(.center)
+        }
+        .padding(24)
+        Spacer()
+        if let message = viewModel.errorMessage {
+          Text(message)
+            .textStyle(TextStyles.bodySmall)
+            .foregroundStyle(.red)
+            .padding(.horizontal, 16)
+        }
+        HStack(alignment: .bottom, spacing: 8) {
+          TextField("Type a message", text: $viewModel.draftText, axis: .vertical)
+            .lineLimit(1...5)
+            .focused($isWriting)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(SysColors.surface, in: .rect(cornerRadius: 20))
+          Button {
+            Task { await viewModel.sendDraft() }
+          } label: {
+            if viewModel.isCreating {
+              ProgressView()
+            } else {
+              Image(systemName: "paperplane.fill")
+            }
+          }
+          .frame(width: 40, height: 40)
+          .disabled(!viewModel.canSendDraft)
+          .accessibilityLabel("Send")
+        }
+        .padding(12)
+      }
+      .background(SysColors.background)
+      .navigationTitle(person.name)
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Cancel") {
+            viewModel.discardDraft()
+            dismiss()
+          }
+        }
+      }
+      .onAppear { isWriting = true }
     }
   }
 }
