@@ -3,8 +3,10 @@ import Foundation
 
 /// The rows the room screen draws, built from the timeline items as Telegram and iMessage group them: consecutive
 /// messages of one sender within `groupInterval` form a group (the name on the first bubble, the avatar and the tail on
-/// the last, tighter spacing inside), and consecutive pictures of one sender within `albumInterval` form an album, as
-/// the Flutter app's `images_builder` shows several pictures sent together.
+/// the last, tighter spacing inside), and the pictures one person sent together form an album, with the rules of
+/// Twake web (`groupAlbums`) but stricter: one sender, the same batch key (`TimelineMessage.batchId`; pictures without a
+/// key were not sent together and stay single messages), each within
+/// `albumInterval` of the previous one, the caption only on the last and a reply only on the first.
 public enum ChatRow: Identifiable, Equatable {
   case message(MessageRowModel)
   case album(AlbumRowModel)
@@ -18,6 +20,21 @@ public enum ChatRow: Identifiable, Equatable {
     case .album(let row): row.id
     case .other(let item): item.id
     case .notices(let row): row.id
+    }
+  }
+}
+
+extension ChatRow {
+  /// How many messages from other people sit below the row `id`: what arrived since the user scrolled up from it,
+  /// shown on the scroll-down button as Flutter and the web do. `0` when the row is no longer in the list.
+  public static func incomingCount(after id: String?, in rows: [ChatRow]) -> Int {
+    guard let id, let index = rows.firstIndex(where: { $0.id == id }) else { return 0 }
+    return rows[(index + 1)...].reduce(0) { count, row in
+      switch row {
+      case .message(let row): count + (row.message.isOwn ? 0 : 1)
+      case .album(let row): count + (row.messages.first?.isOwn == false ? row.messages.count : 0)
+      case .other, .notices: count
+      }
     }
   }
 }
@@ -74,13 +91,13 @@ public struct AlbumRowModel: Equatable, Identifiable {
 public enum TimelineRows {
   /// Messages of one sender closer than this stay in one group.
   public static let groupInterval: TimeInterval = 5 * 60
-  /// Pictures of one sender closer than this form one album.
+  /// Pictures further apart than this do not join.
   public static let albumInterval: TimeInterval = 60
   /// The most pictures one album holds; more start a new album.
   public static let albumLimit = 10
 
   public static func rows(from items: [TimelineItem]) -> [ChatRow] {
-    // 1. Albums: runs of at least two pictures from one sender, each close to the previous one.
+    // 1. Albums: runs of at least two pictures sent together.
     var units: [Unit] = []
     for item in items {
       guard case .message(let message) = item.kind else {
@@ -88,8 +105,7 @@ public enum TimelineRows {
         continue
       }
       if isAlbumPicture(message), case .pictures(let id, var run)? = units.last,
-        let previous = run.last, previous.senderId == message.senderId,
-        message.date.timeIntervalSince(previous.date) < albumInterval, run.count < albumLimit
+        let previous = run.last, canJoin(message, after: previous, runCount: run.count)
       {
         run.append(message)
         units[units.count - 1] = .pictures(id: id, run)
@@ -199,11 +215,31 @@ public enum TimelineRows {
       && current.date.timeIntervalSince(before.date) < groupInterval
   }
 
-  /// A picture that can sit in an album: sent, with its media, and not a reply.
+  /// Whether `message` continues the album of `runCount` pictures that `previous` ends, as Twake web joins them:
+  /// `previous` has no caption (a send puts it on its last picture) and is a reply only as the first picture,
+  /// `message` is no reply, both carry the same batch key, one sender, close in time. Two pictures without a key are
+  /// not joined: only a key says they were picked and sent together. Day dividers and the
+  /// read marker sit between the pictures as other rows, so they end the album as web's day and unread breaks do.
+  private static func canJoin(
+    _ message: TimelineMessage, after previous: TimelineMessage, runCount: Int
+  ) -> Bool {
+    runCount < albumLimit && !hasCaption(previous) && (previous.reply == nil || runCount == 1)
+      && message.reply == nil && message.batchId != nil && message.batchId == previous.batchId
+      && message.senderId == previous.senderId
+      && message.date.timeIntervalSince(previous.date) <= albumInterval
+  }
+
+  private static func hasCaption(_ message: TimelineMessage) -> Bool {
+    guard case .image(let caption) = message.body else { return false }
+    return caption?.isEmpty == false
+  }
+
+  /// A picture that can sit in an album, as on web: sent (one still sending shows alone), with its media, and in the
+  /// room's main timeline.
   private static func isAlbumPicture(_ message: TimelineMessage) -> Bool {
-    guard case .image = message.body, message.media != nil, message.reply == nil else {
-      return false
-    }
+    guard case .image = message.body, message.media != nil, message.sendState == .sent,
+      message.threadRootId == nil
+    else { return false }
     return true
   }
 }

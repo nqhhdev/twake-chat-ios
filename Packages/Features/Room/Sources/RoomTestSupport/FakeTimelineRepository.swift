@@ -7,6 +7,7 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
   public enum Call: Equatable, Sendable {
     case open, loadOlder
     case send(String)
+    case emote(String)
     case reply(String, String)
     case edit(String, String)
     case redact(String)
@@ -17,7 +18,8 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
     case pin(Bool, String)
     case forward(String, String)
     case report(String, String?)
-    case retry
+    case retry(String)
+    case discard(String)
     case ignore(String)
     case createPoll(PollDraft)
     case vote([String], String)
@@ -184,7 +186,17 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
     try actionResult.get()
   }
 
-  public func retryFailedSends() async { record(.retry) }
+  public func send(emote text: String) async throws(TimelineError) {
+    record(.emote(text))
+    try actionResult.get()
+  }
+
+  public func retrySend(transactionId: String) async { record(.retry(transactionId)) }
+
+  public func discardUnsent(transactionId: String) async throws(TimelineError) {
+    record(.discard(transactionId))
+    try actionResult.get()
+  }
 
   public func createPoll(_ draft: PollDraft) async throws(TimelineError) {
     record(.createPoll(draft))

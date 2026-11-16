@@ -228,13 +228,17 @@ final class RootCoordinator {
     }
   }
 
-  /// Message on a member's profile: finds or creates the direct chat, then has the shell open it as it opens a tapped
-  /// notification's room (the app joins the features, ADR 0005).
+  /// Message on a member's profile, or a person found in the chat list search: the shell opens the direct chat when
+  /// there is one, as it opens a tapped notification's room, and otherwise a draft chat that creates the chat with
+  /// its first message (the app joins the features, ADR 0005).
   private func openDirectChat() -> (@MainActor (String) async -> Bool)? {
     guard let people else { return nil }
     return { [push] userId in
-      guard let roomId = try? await people.directChat(with: userId) else { return false }
-      push.pendingRoomId = roomId
+      if let roomId = await people.existingDirectChat(with: userId) {
+        push.pendingRoomId = roomId
+      } else {
+        push.pendingDraftUserId = userId
+      }
       return true
     }
   }
@@ -385,6 +389,7 @@ struct UnavailableTimeline: TimelineRepository {
   func open() async throws(TimelineError) -> AsyncStream<[TimelineItem]> { throw .unavailable }
   func loadOlder() async throws(TimelineError) -> Bool { throw .unavailable }
   func send(text: String) async throws(TimelineError) { throw .unavailable }
+  func send(emote text: String) async throws(TimelineError) { throw .unavailable }
   func sendAttachment(_ attachment: OutgoingAttachment) async throws(TimelineError) {
     throw .unavailable
   }
@@ -398,7 +403,8 @@ struct UnavailableTimeline: TimelineRepository {
   func pinnedMessages() async -> [TimelineMessage] { [] }
   func loadDraft() async -> String? { nil }
   func report(eventId: String, reason: String?) async throws(TimelineError) { throw .unavailable }
-  func retryFailedSends() async {}
+  func retrySend(transactionId: String) async {}
+  func discardUnsent(transactionId: String) async throws(TimelineError) { throw .unavailable }
   func ignore(userId: String) async throws(TimelineError) { throw .unavailable }
   func saveDraft(_ text: String) async {}
   func forward(eventId: String, to roomId: String) async throws(TimelineError) {

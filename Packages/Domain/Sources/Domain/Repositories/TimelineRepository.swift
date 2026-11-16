@@ -13,6 +13,9 @@ public protocol TimelineRepository: Sendable {
   /// Sends a text message, written in Markdown as the Flutter app's composer sends it.
   func send(text: String) async throws(TimelineError)
 
+  /// Sends `text` as an emote (`m.emote`), which reads as a sentence about the sender: « Alice waves ».
+  func send(emote text: String) async throws(TimelineError)
+
   /// Uploads and sends a picture, video, voice message or file; the timeline shows it as sending until it is done.
   func sendAttachment(_ attachment: OutgoingAttachment) async throws(TimelineError)
 
@@ -58,8 +61,12 @@ public protocol TimelineRepository: Sendable {
   /// Keeps the composer's text for the next visit, or clears it when empty.
   func saveDraft(_ text: String) async
 
-  /// Sends again the messages that failed to send (the SDK pauses a room's send queue after a failure).
-  func retryFailedSends() async
+  /// Sends again the message of the local echo `transactionId` that failed to send. When the SDK paused the room's
+  /// send queue (it does after a network failure), the queue starts again, which also sends what waits behind it.
+  func retrySend(transactionId: String) async
+
+  /// Removes the local echo `transactionId` of a message that is not sent yet, so it is never sent.
+  func discardUnsent(transactionId: String) async throws(TimelineError)
 
   /// Reports the message `eventId` to the server's moderators, with an optional reason.
   func report(eventId: String, reason: String?) async throws(TimelineError)
@@ -174,6 +181,7 @@ extension TimelineRepository {
   public func send(command: BotCommand, text: String) async throws(TimelineError) {
     throw .requestFailed
   }
+  public func send(emote text: String) async throws(TimelineError) { throw .requestFailed }
 
   public func recentReactions() async -> [String] { [] }
   public func addRecentReaction(_ key: String) async {}

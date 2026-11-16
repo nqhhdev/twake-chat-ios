@@ -42,7 +42,7 @@ public final class ChatListViewModel {
     func includes(_ room: RoomSummary) -> Bool {
       switch self {
       case .all: true
-      case .unread: room.unreadCount > 0 || room.mentionCount > 0
+      case .unread: room.isUnread || room.mentionCount > 0
       case .favourites: room.isFavourite
       case .people: room.isDirect
       case .groups: !room.isDirect
@@ -386,19 +386,60 @@ public final class ChatListViewModel {
 
   /// The row's preview: "sender: text", or the text alone when the sender is unknown; `nil` without a text message.
   public static func preview(of room: RoomSummary) -> String? {
-    guard let text = room.lastMessageText else { return nil }
-    guard let sender = room.lastMessageSender else { return text }
-    return "\(sender): \(text)"
+    guard let body = body(of: room) else { return nil }
+    // An emote reads as a sentence: "Alice waves" (web `roomRowText.ts`).
+    if room.lastMessageKind == .emote {
+      let name = room.isLastMessageOwn ? "You" : room.lastMessageSender
+      return name.map { "\($0) \(body)" } ?? body
+    }
+    // "You:" on the user's own message; no name in a direct chat, where only one person writes to the user.
+    if room.isLastMessageOwn { return "You: \(body)" }
+    guard !room.isDirect, let sender = room.lastMessageSender else { return body }
+    return "\(sender): \(body)"
   }
 
-  /// The time beside a room: the hour today, the weekday this week, the date before, as the Flutter chat list writes it.
+  /// Who types in the room, in place of its last message: "typing…" in a direct chat, where only one person can, and
+  /// the names in a group.
+  public static func typingLine(of room: RoomSummary) -> String? {
+    guard !room.typingNames.isEmpty else { return nil }
+    return room.isDirect ? "typing…" : TypingText.line(for: room.typingNames)
+  }
+
+  /// The last message as the row names it: its text, or what it is when it has none to show (a picture without a
+  /// caption, a voice message, a poll, a deleted or undecryptable message), as the Flutter and web chat lists do.
+  static func body(of room: RoomSummary) -> String? {
+    let text = room.lastMessageText
+    return switch room.lastMessageKind {
+    case nil, .text, .emote, .notice: text
+    case .picture: text ?? "Photo"
+    case .video: text ?? "Video"
+    case .audio: "Audio"
+    case .voice: "Voice message"
+    case .file: text ?? "File"
+    case .location: "Location"
+    case .sticker: "Sticker"
+    case .poll: text.map { "Poll: \($0)" } ?? "Poll"
+    case .deleted: "Message deleted"
+    case .encrypted: "Encrypted message"
+    }
+  }
+
+  /// The time beside a room, as the Flutter chat list writes it (`localizedTimeShort`): the hour today, the weekday
+  /// this week, the day and month this year, the full date before.
   public static func timeText(_ date: Date, now: Date = .now, calendar: Calendar = .current)
     -> String
   {
-    if calendar.isDate(date, inSameDayAs: now) { return date.formatted(.dateTime.hour().minute()) }
+    var style = Date.FormatStyle.dateTime
+    style.calendar = calendar
+    style.timeZone = calendar.timeZone
+    style.locale = calendar.locale ?? .autoupdatingCurrent
+    if calendar.isDate(date, inSameDayAs: now) { return date.formatted(style.hour().minute()) }
     if let days = calendar.dateComponents([.day], from: date, to: now).day, days < 7 {
-      return date.formatted(.dateTime.weekday(.abbreviated))
+      return date.formatted(style.weekday(.abbreviated))
     }
-    return date.formatted(.dateTime.day().month(.twoDigits).year(.twoDigits))
+    if calendar.isDate(date, equalTo: now, toGranularity: .year) {
+      return date.formatted(style.day().month(.abbreviated))
+    }
+    return date.formatted(style.day().month(.twoDigits).year(.twoDigits))
   }
 }

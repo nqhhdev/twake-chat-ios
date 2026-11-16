@@ -22,26 +22,46 @@ public actor RoomListProxy: RoomListRepository {
     await stop()
     guard let client = await clientProxy() else { throw .notSignedIn }
     let roomList: RoomList
+    let service: RoomListService
     do {
-      roomList = try await client.startSync().allRooms()
+      service = try await client.startSync()
+      roomList = try await service.allRooms()
     } catch {
       throw .syncUnavailable
     }
     let (rooms, roomsContinuation) = AsyncStream<[RoomSummary]>.makeStream(
       bufferingPolicy: .bufferingNewest(1))
-    let (updates, updatesContinuation) = AsyncStream<[RoomListEntriesUpdate]>.makeStream()
-    // The listener is called on an SDK thread and mapping awaits each room's latest event, so updates are queued and
-    // applied in order by one task. The task keeps the client alive until it ends, so no SDK room it holds outlives the
-    // client.
-    let applying = Task { [client] in
+    let (updates, updatesContinuation) = AsyncStream<RoomListEvent>.makeStream()
+    // The listeners are called on SDK threads and mapping awaits each room's latest event, so updates and typing are
+    // queued and applied in order by one task. The task keeps the client alive until it ends, so no SDK room it holds
+    // outlives the client; it cancels the typing subscriptions before it ends.
+    let applying = Task { [client, service] in
       var summaries: [RoomSummary] = []
-      for await batch in updates {
+      var askedPreviews: Set<String> = []
+      var typing = RoomListTyping(client: client, events: updatesContinuation)
+      for await event in updates {
         guard !Task.isCancelled else { continue }
-        for update in batch {
-          await ListDiff(update).map(RoomSummaryMapper.summary(for:)).apply(to: &summaries)
+        switch event {
+        case .entries(let batch):
+          for update in batch {
+            await ListDiff(update).map(RoomSummaryMapper.summary(for:)).apply(to: &summaries)
+          }
+          typing.follow(summaries)
+          // The list syncs one event per room. When that event is nothing a row can show (a reaction, an edit, a
+          // room event), the row stayed blank until the chat was opened. A room subscription syncs more of its
+          // timeline, from which the SDK finds and stores the latest message (Element X subscribes to the rooms
+          // on screen for the same reason).
+          let missing = Self.roomsMissingPreview(in: summaries, alreadyAsked: askedPreviews)
+          if !missing.isEmpty {
+            askedPreviews.formUnion(missing)
+            try? await service.subscribeToRooms(roomIds: missing)
+          }
+        case .typing(let roomId, let names):
+          typing.names[roomId] = names
         }
-        roomsContinuation.yield(summaries)
+        roomsContinuation.yield(typing.applied(to: summaries))
       }
+      typing.stopAll()
       roomsContinuation.finish()
       withExtendedLifetime(client) {}
     }
@@ -54,20 +74,38 @@ public actor RoomListProxy: RoomListRepository {
     let entries = result.entriesStream()
     // The client keeps the SDK list, controller and handle and releases them when sync stops, on logout before the
     // client signs out: freed after the client, they abort the process.
-    let kept = await client.keepWhileSyncing(
-      SyncBoundObjects(entries: entries, objects: [roomList, controller]))
+    // `result` is kept too, as Element X keeps it: it owns the entries task and the list it borrows.
+    let objects = SyncBoundObjects(entries: entries, objects: [roomList, controller, result])
+    let kept = await client.keepWhileSyncing(objects)
     guard kept else {
-      entries.cancel()
+      await objects.cancelEntries()
       updatesContinuation.finish()
       applying.cancel()
       throw .syncUnavailable
     }
-    subscription = Subscription(client: client, updates: updatesContinuation, applying: applying)
+    subscription = Subscription(
+      client: client, kept: objects.id, updates: updatesContinuation, applying: applying)
     roomsContinuation.onTermination = { _ in updatesContinuation.finish() }
     return rooms
   }
 
-  /// Stops following the room list and stops sync, which releases the SDK list. Safe after logout and when not started.
+  /// The most rooms asked for a preview in one pass and over the life of a list, so an account full of empty rooms
+  /// does not subscribe to all of them.
+  static let previewBatch = 20
+  static let previewLimit = 200
+
+  /// The joined chats whose row has no message to show and that were not asked for yet, in list order.
+  static func roomsMissingPreview(in rooms: [RoomSummary], alreadyAsked: Set<String>) -> [String] {
+    let room = max(0, min(previewBatch, previewLimit - alreadyAsked.count))
+    return Array(
+      rooms.lazy
+        .filter { !$0.isInvite && !$0.isArchived && !$0.isSpace }
+        .filter { $0.lastMessageText == nil && $0.lastMessageKind == nil }
+        .map(\.id)
+        .filter { !alreadyAsked.contains($0) }
+        .prefix(room))
+  }
+
   public func accept(roomId: String) async throws(Domain.RoomListError) {
     guard let room = try? await clientProxy()?.client.getRoom(roomId: roomId) else {
       throw .requestFailed
@@ -147,33 +185,100 @@ public actor RoomListProxy: RoomListRepository {
     do { try await room.leave() } catch { throw .requestFailed }
   }
 
+  /// Stops following the room list and releases the SDK list. Sync keeps running: a chat opened over the chat list
+  /// lives on it, and only sign-out stops it. Safe after logout and when not started.
   public func stop() async {
     guard let subscription else { return }
     self.subscription = nil
     subscription.updates.finish()
     subscription.applying.cancel()
-    await subscription.client.stopSync()
+    await subscription.client.release(subscription.kept)
   }
 
   /// What a started room list holds; the SDK list, its controller and the entries `TaskHandle` are kept by the client
-  /// while sync runs (`ClientProxy.keepWhileSyncing`).
+  /// while sync runs (`ClientProxy.keepWhileSyncing`). Only their id is held here: a room list freed after its client
+  /// aborts the process, and `stop()` may come after logout.
   private struct Subscription {
     let client: ClientProxy
-    let updates: AsyncStream<[RoomListEntriesUpdate]>.Continuation
+    let kept: UUID
+    let updates: AsyncStream<RoomListEvent>.Continuation
     let applying: Task<Void, Never>
+  }
+}
+
+/// What the room list applies, in the order it arrives: the SDK's list updates and who types in a room.
+enum RoomListEvent {
+  case entries([RoomListEntriesUpdate])
+  case typing(roomId: String, names: [String])
+}
+
+/// Who types in each joined room of the list, for its row (Flutter `chat_list_item_title.dart`, web `RoomList.tsx`).
+/// The room list's sliding sync carries typing for every room in the list. One subscription per joined room; a room
+/// that leaves the list is dropped. Names are the members' display names, or their ids.
+struct RoomListTyping {
+  let client: ClientProxy
+  let events: AsyncStream<RoomListEvent>.Continuation
+  private var handles: [String: TaskHandle] = [:]
+  /// The people typing in each room, other than the user.
+  var names: [String: [String]] = [:]
+
+  init(client: ClientProxy, events: AsyncStream<RoomListEvent>.Continuation) {
+    self.client = client
+    self.events = events
+  }
+
+  /// Subscribes to typing in the joined rooms of `rooms` not followed yet, and stops following the others.
+  mutating func follow(_ rooms: [RoomSummary]) {
+    let followed = Set(
+      rooms.filter { !$0.isSpace && !$0.isInvite && !$0.isArchived }.map(\.id))
+    for id in handles.keys where !followed.contains(id) {
+      handles.removeValue(forKey: id)?.cancel()
+      names[id] = nil
+    }
+    let ownUserId = try? client.userId
+    for id in followed where handles[id] == nil {
+      guard let room = try? client.client.getRoom(roomId: id) else { continue }
+      let events = events
+      handles[id] = room.subscribeToTypingNotifications(
+        listener: TypingListener { userIds in
+          Task {
+            var result: [String] = []
+            for userId in userIds where userId != ownUserId {
+              let name = (try? await room.memberDisplayName(userId: userId)) ?? nil
+              result.append(name.flatMap { $0.isEmpty ? nil : $0 } ?? userId)
+            }
+            events.yield(.typing(roomId: id, names: result))
+          }
+        })
+    }
+  }
+
+  /// `rooms` with who types in each.
+  func applied(to rooms: [RoomSummary]) -> [RoomSummary] {
+    rooms.map { room in
+      var room = room
+      room.typingNames = names[room.id] ?? []
+      return room
+    }
+  }
+
+  mutating func stopAll() {
+    for handle in handles.values { handle.cancel() }
+    handles = [:]
+    names = [:]
   }
 }
 
 /// Queues the SDK's room list updates for `RoomListProxy`, in the order they arrive.
 private final class EntriesListener: RoomListEntriesListener {
-  private let updates: AsyncStream<[RoomListEntriesUpdate]>.Continuation
+  private let updates: AsyncStream<RoomListEvent>.Continuation
 
-  init(_ updates: AsyncStream<[RoomListEntriesUpdate]>.Continuation) {
+  init(_ updates: AsyncStream<RoomListEvent>.Continuation) {
     self.updates = updates
   }
 
   func onUpdate(roomEntriesUpdate: [RoomListEntriesUpdate]) {
-    updates.yield(roomEntriesUpdate)
+    updates.yield(.entries(roomEntriesUpdate))
   }
 }
 

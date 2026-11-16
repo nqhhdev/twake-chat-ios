@@ -10,6 +10,8 @@ public final class FakePeopleRepository: PeopleRepository, @unchecked Sendable {
   private var _directs: [String] = []
   private var _broadcasts: [(draft: BroadcastDraft, userIds: [String])] = []
   private var _fails = false
+  private var _existing: [String: String] = [:]
+  private var _started: [(userId: String, message: String)] = []
 
   public init() {}
 
@@ -21,6 +23,12 @@ public final class FakePeopleRepository: PeopleRepository, @unchecked Sendable {
     get { lock.withLock { _fails } }
     set { lock.withLock { _fails = newValue } }
   }
+  /// The direct chats that exist already, by user id.
+  public var existingDirects: [String: String] {
+    get { lock.withLock { _existing } }
+    set { lock.withLock { _existing = newValue } }
+  }
+  public var startedDirects: [(userId: String, message: String)] { lock.withLock { _started } }
   public var searches: [String] { lock.withLock { _searches } }
   public var directs: [String] { lock.withLock { _directs } }
   public var createdGroups: [(name: String, userIds: [String])] { lock.withLock { _created } }
@@ -45,6 +53,18 @@ public final class FakePeopleRepository: PeopleRepository, @unchecked Sendable {
   public func directChat(with userId: String) async throws(PeopleError) -> String {
     if fails { throw .requestFailed }
     lock.withLock { _directs.append(userId) }
+    return "!dm-\(userId)"
+  }
+
+  public func existingDirectChat(with userId: String) async -> String? {
+    existingDirects[userId]
+  }
+
+  public func startDirectChat(with userId: String, firstMessage: String) async throws(PeopleError)
+    -> String
+  {
+    if fails { throw .requestFailed }
+    lock.withLock { _started.append((userId, firstMessage)) }
     return "!dm-\(userId)"
   }
 

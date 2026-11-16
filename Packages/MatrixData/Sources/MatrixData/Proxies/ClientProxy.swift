@@ -97,10 +97,10 @@ public final class ClientProxy: Sendable {
     await sync.keep(objects)
   }
 
-  /// Cancels and releases objects kept with `keepWhileSyncing` before sync stops, while the client is alive (a room's
-  /// timeline when its screen closes). Does nothing when they are no longer kept.
-  func release(_ objects: SyncBoundObjects) async {
-    await sync.release(objects.id)
+  /// Cancels and releases the objects kept with `keepWhileSyncing` under this `SyncBoundObjects.id` before sync stops,
+  /// while the client is alive (a room's timeline when its screen closes). Does nothing when they are no longer kept.
+  func release(_ id: UUID) async {
+    await sync.release(id)
   }
 
   /// Stops the running sync service without releasing what it feeds, for the app in the background. Does nothing when
@@ -118,11 +118,6 @@ public final class ClientProxy: Sendable {
   /// Starts the paused sync service again. Does nothing when sync was never started or was stopped for good.
   func resumeSync() async {
     await sync.resume()
-  }
-
-  /// Stops the sync service, after releasing what `keepWhileSyncing` kept. Does nothing when it is not running.
-  func stopSync() async {
-    await sync.stop()
   }
 
   /// Stops sync for good, then signs this device out on the server. Removing the local store is the caller's job, so it
@@ -173,6 +168,18 @@ struct SyncBoundObjects: Sendable {
   let objects: [any Sendable]
   /// Names these objects for `ClientProxy.release(_:)`.
   let id = UUID()
+
+  /// Cancels `entries` and waits until its task has ended. The SDK's room list entries task borrows the room list, and
+  /// cancelling only asks it to stop: a list freed while the task still ran crashed inside the SDK. Call this before
+  /// dropping `objects`. It gives up after a second, as a task that never ends must not block sign-out.
+  func cancelEntries() async {
+    entries.cancel()
+    let deadline = ContinuousClock.now + .seconds(1)
+    while !entries.isFinished(), ContinuousClock.now < deadline {
+      try? await Task.sleep(for: .milliseconds(2))
+      await Task.yield()
+    }
+  }
 }
 
 /// Builds and starts at most one `SyncService` per client, also when two callers start it together, and stops it.
@@ -190,9 +197,10 @@ private actor SyncServiceHolder {
     return true
   }
 
-  func release(_ id: UUID) {
+  func release(_ id: UUID) async {
     guard let index = kept.firstIndex(where: { $0.id == id }) else { return }
-    kept.remove(at: index).entries.cancel()
+    let objects = kept.remove(at: index)
+    await objects.cancelEntries()
   }
 
   func start(client: Client) async throws -> SyncService {
@@ -231,8 +239,9 @@ private actor SyncServiceHolder {
   }
 
   func stop() async {
-    for objects in kept { objects.entries.cancel() }
+    let released = kept
     kept = []
+    for objects in released { await objects.cancelEntries() }
     guard let task = running else { return }
     running = nil
     if let service = try? await task.value { await service.stop() }

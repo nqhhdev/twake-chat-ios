@@ -36,6 +36,10 @@ public final class PeopleSearchViewModel {
   public private(set) var isSearching = false
   public private(set) var isCreating = false
   public private(set) var errorMessage: String?
+  /// The person a chat is being drafted with: no room exists yet, and the first message creates it.
+  public private(set) var draftChat: Person?
+  /// The first message of the draft chat.
+  public var draftText = ""
 
   @ObservationIgnored private let repository: any PeopleRepository
   @ObservationIgnored private let onOpen: @MainActor (_ roomId: String, _ name: String) -> Void
@@ -121,13 +125,51 @@ public final class PeopleSearchViewModel {
       guard !isCreating else { return }
       isCreating = true
       defer { isCreating = false }
-      do {
-        let roomId = try await repository.directChat(with: person.id)
+      errorMessage = nil
+      if let roomId = await repository.existingDirectChat(with: person.id) {
         onOpen(roomId, person.name)
-      } catch {
-        errorMessage = "Could not start the chat. Please try again."
+      } else {
+        // Nobody is invited and no room is made by a tap: the chat is a draft until its first message.
+        draftText = ""
+        draftChat = person
       }
     }
+  }
+
+  /// Starts a draft chat with someone picked elsewhere (a member's profile, the chat list search).
+  public func draft(with person: Person) {
+    errorMessage = nil
+    draftText = ""
+    draftChat = person
+  }
+
+  public var canSendDraft: Bool {
+    draftChat != nil && !isCreating
+      && !draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  /// Sends the first message of the draft chat: creates the chat, sends the message and opens the chat.
+  public func sendDraft() async {
+    guard canSendDraft, let person = draftChat else { return }
+    isCreating = true
+    defer { isCreating = false }
+    errorMessage = nil
+    let text = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
+    do {
+      let roomId = try await repository.startDirectChat(with: person.id, firstMessage: text)
+      draftChat = nil
+      draftText = ""
+      onOpen(roomId, person.name)
+    } catch {
+      errorMessage = "Could not start the chat. Please try again."
+    }
+  }
+
+  /// Leaves the draft chat without creating anything.
+  public func discardDraft() {
+    draftChat = nil
+    draftText = ""
+    errorMessage = nil
   }
 
   public var canCreateGroup: Bool {

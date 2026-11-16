@@ -196,6 +196,89 @@ struct ChatListViewModelTests {
     #expect(ChatListViewModel.preview(of: Self.room("!a:b", "A", text: nil)) == nil)
   }
 
+  private static func message(
+    _ kind: RoomSummary.MessageKind, text: String? = nil, own: Bool = false, direct: Bool = false
+  ) -> RoomSummary {
+    RoomSummary(
+      id: "!a:b", name: "A", lastMessageText: text, lastMessageSender: "Alice", lastActivity: nil,
+      lastMessageKind: kind, isLastMessageOwn: own, lastMessageSendState: own ? .sent : nil,
+      isDirect: direct)
+  }
+
+  /// Flutter and web name what has no text to show; an undecryptable message never shows a body.
+  @Test func aMessageWithoutTextIsNamed() {
+    let cases: [(RoomSummary, String)] = [
+      (Self.message(.picture), "Alice: Photo"),
+      (Self.message(.picture, text: "Beach"), "Alice: Beach"),
+      (Self.message(.video), "Alice: Video"),
+      (Self.message(.voice), "Alice: Voice message"),
+      (Self.message(.audio), "Alice: Audio"),
+      (Self.message(.file, text: "plan.pdf"), "Alice: plan.pdf"),
+      (Self.message(.location), "Alice: Location"),
+      (Self.message(.sticker), "Alice: Sticker"),
+      (Self.message(.poll, text: "Lunch?"), "Alice: Poll: Lunch?"),
+      (Self.message(.deleted), "Alice: Message deleted"),
+      (Self.message(.encrypted, text: "secret"), "Alice: Encrypted message"),
+    ]
+    for (room, expected) in cases {
+      #expect(ChatListViewModel.preview(of: room) == expected)
+    }
+  }
+
+  /// "You:" on the user's own message; no name in a direct chat; an emote reads as a sentence (web `roomRowText.ts`).
+  @Test func theSenderPrefixFollowsWhoWrote() {
+    #expect(ChatListViewModel.preview(of: Self.message(.text, text: "Hi", own: true)) == "You: Hi")
+    #expect(
+      ChatListViewModel.preview(of: Self.message(.text, text: "Hi", own: true, direct: true))
+        == "You: Hi")
+    #expect(ChatListViewModel.preview(of: Self.message(.text, text: "Hi", direct: true)) == "Hi")
+    #expect(ChatListViewModel.preview(of: Self.message(.emote, text: "waves")) == "Alice waves")
+    #expect(
+      ChatListViewModel.preview(of: Self.message(.emote, text: "waves", own: true)) == "You waves")
+  }
+
+  /// Flutter `localizedTimeShort`: the hour today, the weekday this week, the day and month this year, the full date
+  /// before.
+  @Test func theRowTimeShortensWithAge() throws {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = try #require(TimeZone(identifier: "UTC"))
+    calendar.locale = Locale(identifier: "en_GB")
+    let now = try #require(
+      calendar.date(from: DateComponents(year: 2026, month: 11, day: 16, hour: 12)))
+    func text(daysAgo: Int) throws -> String {
+      let date = try #require(calendar.date(byAdding: .day, value: -daysAgo, to: now))
+      return ChatListViewModel.timeText(date, now: now, calendar: calendar)
+    }
+    #expect(try text(daysAgo: 0).contains("12"))
+    let weekday = try text(daysAgo: 2)
+    #expect(weekday.count <= 4 && !weekday.contains("/"))
+    let thisYear = try text(daysAgo: 30)
+    #expect(thisYear.contains("Oct") && !thisYear.contains("26"))
+    #expect(try text(daysAgo: 400).contains("/"))
+  }
+
+  @Test func theRowSaysWhoTypes() {
+    var group = Self.message(.text, text: "Hi")
+    #expect(ChatListViewModel.typingLine(of: group) == nil)
+    group.typingNames = ["Bob"]
+    #expect(ChatListViewModel.typingLine(of: group) == "Bob is typing…")
+    group.typingNames = ["Bob", "Carol", "Dan"]
+    #expect(ChatListViewModel.typingLine(of: group) == "Bob and 2 others are typing…")
+    var direct = Self.message(.text, text: "Hi", direct: true)
+    direct.typingNames = ["Bob"]
+    #expect(ChatListViewModel.typingLine(of: direct) == "typing…")
+  }
+
+  /// A room marked unread without unread messages counts as unread: the Unread filter, bold, the app badge.
+  @Test func aRoomMarkedUnreadIsUnread() {
+    let marked = RoomSummary(
+      id: "!m:b", name: "M", lastMessageText: nil, lastMessageSender: nil, lastActivity: nil,
+      isMarkedUnread: true)
+    #expect(marked.isUnread)
+    #expect(marked.badgeCount == 1)
+    #expect(ChatListViewModel.Filter.unread.includes(marked))
+  }
+
   @Test func favouritesComeFirstAndInvitesStayApart() async {
     let repository = FakeRoomListRepository()
     let viewModel = ChatListViewModel(repository: repository, logOut: { true })
@@ -253,6 +336,24 @@ struct ChatListViewModelTests {
     await viewModel.turnOffDoNotDisturb()
     #expect(!viewModel.isDoNotDisturbOn)
     #expect(viewModel.actionErrorMessage == nil)
+  }
+
+  @Test func theBellShowsItsBadgeForAnUnreadChatWithoutAMention() async {
+    let repository = FakeRoomListRepository()
+    let viewModel = ChatListViewModel(repository: repository, logOut: { true })
+    let unread = RoomSummary(
+      id: "!u:example.org", name: "U", lastMessageText: nil, lastMessageSender: nil,
+      lastActivity: nil, unreadCount: 1)
+    let task = Task { await viewModel.start() }
+    await waitUntil { repository.isStarted }
+    repository.send([team])
+    await waitUntil { viewModel.state != .loading }
+    #expect(!viewModel.hasActivity)
+    repository.send([unread, team])
+    await waitUntil { viewModel.hasActivity }
+    #expect(viewModel.mentionTotal == 0)
+    task.cancel()
+    repository.finish()
   }
 
   @Test func activityListsUnreadAndMentionedRooms() async {

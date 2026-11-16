@@ -28,6 +28,15 @@ public protocol PeopleRepository: Sendable {
   /// The direct chat with `userId`: the existing one, or a new encrypted one inviting them. Returns the room id.
   func directChat(with userId: String) async throws(PeopleError) -> String
 
+  /// The direct chat with `userId` when there is one already. Never creates a room: a chat with someone new stays a
+  /// draft until its first message (Flutter `chat_draft`).
+  func existingDirectChat(with userId: String) async -> String?
+
+  /// Creates the direct chat with `userId` (or takes the existing one) and sends `firstMessage` in it. Returns the
+  /// room id.
+  func startDirectChat(with userId: String, firstMessage: String) async throws(PeopleError)
+    -> String
+
   /// A new private, encrypted group named `name` that invites `userIds`. Returns the room id.
   func createGroup(name: String, inviting userIds: [String]) async throws(PeopleError) -> String
 
@@ -38,6 +47,14 @@ public protocol PeopleRepository: Sendable {
 }
 
 extension PeopleRepository {
+  public func existingDirectChat(with userId: String) async -> String? { nil }
+
+  public func startDirectChat(with userId: String, firstMessage: String) async throws(PeopleError)
+    -> String
+  {
+    throw .requestFailed
+  }
+
   public func createBroadcast(_ draft: BroadcastDraft, inviting userIds: [String])
     async throws(PeopleError) -> String
   {

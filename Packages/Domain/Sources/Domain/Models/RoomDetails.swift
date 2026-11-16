@@ -33,6 +33,10 @@ public struct RoomDetails: Sendable, Equatable {
   public let directUserId: String?
   /// The user's power level lets them post messages (not so in a Broadcast, where only moderators post, web D90).
   public let canSendMessages: Bool
+  /// The user's power level lets them notify everyone in the room (`@room`).
+  public let canNotifyRoom: Bool
+  /// Only moderators and administrators post (`events_default` 50 or more): a Broadcast, as `RoomSummary.isBroadcast`.
+  public let isBroadcast: Bool
 
   /// Who can join a room.
   public enum JoinRule: Sendable, Equatable, CaseIterable {
@@ -50,8 +54,11 @@ public struct RoomDetails: Sendable, Equatable {
     joinedMemberCount: Int, canEdit: Bool = false, canInvite: Bool = false,
     avatar: MediaReference? = nil, joinRule: JoinRule? = nil, canChangeAccess: Bool = false,
     canEnableEncryption: Bool = false, canBan: Bool = false, canRedactOthers: Bool = false,
-    successorRoomId: String? = nil, directUserId: String? = nil, canSendMessages: Bool = true
+    successorRoomId: String? = nil, directUserId: String? = nil, canSendMessages: Bool = true,
+    canNotifyRoom: Bool = false, isBroadcast: Bool = false
   ) {
+    self.canNotifyRoom = canNotifyRoom
+    self.isBroadcast = isBroadcast
     self.canSendMessages = canSendMessages
     self.successorRoomId = successorRoomId
     self.directUserId = directUserId
@@ -120,6 +127,16 @@ public struct RoomMember: Sendable, Equatable, Identifiable {
     self.role = role
     self.isOwn = isOwn
     self.canBeRemoved = canBeRemoved
+  }
+
+  /// The entry of the mention list that notifies everyone in the room (`@room`), as the web's `EVERYONE_MENTION`.
+  public static let everyone = RoomMember(id: "@room", displayName: "room", membership: .joined)
+
+  /// A mention query offers `everyone` first when it starts « room », « all » or « everyone », the names other apps
+  /// give it; a bare « @ » offers it last, so a quick pick never notifies everyone by mistake (web `offersEveryone`).
+  public static func offersEveryoneFirst(for query: String) -> Bool {
+    let wanted = query.lowercased()
+    return !wanted.isEmpty && ["room", "all", "everyone"].contains { $0.hasPrefix(wanted) }
   }
 
   /// The display name, or the Matrix id when the member has none.

@@ -85,6 +85,35 @@ struct RoomListProxyTests {
     await #expect(throws: RoomListError.notSignedIn) { _ = try await roomList.start() }
   }
 
+  /// On an iPhone the chat list goes away when a chat opens over it, and its view model stops the room list. Sync must
+  /// keep running: the open chat's timeline lives on it, and showed no new message, nor its own sent ones, until the
+  /// chat was opened again. The fake server answers sync at once, so a running sync loop keeps asking.
+  @Test(.timeLimit(.minutes(1)))
+  func stoppingTheRoomListKeepsSyncRunning() async throws {
+    defer { cleanUp() }
+    let server = try FakeHomeserver(responses: [
+      "/logout": (status: "200 OK", body: "{}"),
+      "/sync": (status: "200 OK", body: #"{"pos":"0","lists":{},"rooms":{},"extensions":{}}"#),
+    ])
+    defer { server.stop() }
+    try sessionStore.save(
+      StoredSession(
+        userId: "@alice:example.org", deviceId: "DEVICE", homeserverURL: server.url,
+        accessToken: "access-token", refreshToken: nil, slidingSyncVersion: "native"))
+    let repository = repository()
+    _ = try #require(try await repository.restoreSession())
+    let roomList = RoomListProxy(authentication: repository)
+
+    _ = try await roomList.start()
+    await roomList.stop()
+    let syncCountAtStop = server.requests.filter { $0.contains("/sync") }.count
+    try await Task.sleep(for: .seconds(1))
+
+    let syncCount = server.requests.filter { $0.contains("/sync") }.count
+    #expect(syncCount > syncCountAtStop, "no sync request after the room list stopped")
+    try await repository.logout()
+  }
+
   // MARK: Tester (TWAK-66, round 2): the `RoomListRepository` contract on the proxy itself.
 
   /// `RoomListRepository`: the stream finishes when `stop()` is called, and a second `start()` finishes the stream of
@@ -107,6 +136,29 @@ struct RoomListProxyTests {
     for await _ in first {}
     await roomList.stop()
     for await _ in second {}
+
+    try await repository.logout()
+  }
+
+  /// The SDK's entries task borrows the room list. `stop()` right after `start()` cancels that task while it is still
+  /// setting up its stream; the list must not be freed before the task has ended (it crashed in the SDK otherwise).
+  @Test(.timeLimit(.minutes(1)))
+  func stoppingRightAfterStartingManyTimesDoesNotCrash() async throws {
+    defer { cleanUp() }
+    let server = try FakeHomeserver(responses: ["/logout": (status: "200 OK", body: "{}")])
+    defer { server.stop() }
+    try sessionStore.save(
+      StoredSession(
+        userId: "@alice:example.org", deviceId: "DEVICE", homeserverURL: server.url,
+        accessToken: "access-token", refreshToken: nil, slidingSyncVersion: "native"))
+    let repository = repository()
+    _ = try #require(try await repository.restoreSession())
+    let roomList = RoomListProxy(authentication: repository)
+
+    for _ in 0..<200 {
+      _ = try await roomList.start()
+      await roomList.stop()
+    }
 
     try await repository.logout()
   }

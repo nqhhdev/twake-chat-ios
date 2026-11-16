@@ -10,12 +10,15 @@ public struct MediaReference: Sendable, Equatable, Hashable {
   public let size: Int?
   public let width: Int?
   public let height: Int?
+  /// The sender's BlurHash of the picture (blurha.sh): a few colours to draw blurred while the media loads.
+  public let blurhash: String?
 
   public init(
     source: String, thumbnailSource: String? = nil, mimeType: String? = nil, size: Int? = nil,
     width: Int? = nil,
-    height: Int? = nil
+    height: Int? = nil, blurhash: String? = nil
   ) {
+    self.blurhash = blurhash
     self.source = source
     self.thumbnailSource = thumbnailSource
     self.mimeType = mimeType

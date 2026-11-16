@@ -81,9 +81,72 @@ struct RoomSummaryMapperTests {
   @Test func anInviteHasADateButNoMessage() {
     let summary = RoomSummaryMapper.summary(
       id: id, displayName: "Team",
-      latestEvent: .remoteInvite(timestamp: millis, inviter: "@bob:example.org", inviterProfile: .pending))
+      latestEvent: .remoteInvite(
+        timestamp: millis, inviter: "@bob:example.org", inviterProfile: .pending))
     #expect(summary.lastMessageText == nil)
     #expect(summary.lastMessageSender == nil)
     #expect(summary.lastActivity == date)
+  }
+
+  // MARK: The row's own-message mark and the kinds that need no SDK struct.
+
+  /// A local event is still in the send queue: it is the user's, and its state is the queue's.
+  @Test func aLocalEventIsOwnWithTheQueueState() {
+    func ownState(_ summary: RoomSummary) -> (Bool, RoomSummary.SendState?) {
+      (summary.isLastMessageOwn, summary.lastMessageSendState)
+    }
+    let sending = RoomSummaryMapper.summary(
+      id: id, displayName: "Team",
+      latestEvent: .local(
+        timestamp: millis, sender: "@me:example.org", profile: .pending, content: .callInvite,
+        state: .isSending))
+    let sent = RoomSummaryMapper.summary(
+      id: id, displayName: "Team",
+      latestEvent: .local(
+        timestamp: millis, sender: "@me:example.org", profile: .pending, content: .callInvite,
+        state: .hasBeenSent))
+    let failed = RoomSummaryMapper.summary(
+      id: id, displayName: "Team",
+      latestEvent: .local(
+        timestamp: millis, sender: "@me:example.org", profile: .pending, content: .callInvite,
+        state: .cannotBeSent))
+    #expect(ownState(sending) == (true, .sending))
+    #expect(ownState(sent) == (true, .sent))
+    #expect(ownState(failed) == (true, .failed))
+  }
+
+  /// A remote event of the user's is sent; someone else's has no send state.
+  @Test(arguments: [false, true])
+  func aRemoteEventIsSentOnlyWhenOwn(isOwn: Bool) {
+    let summary = RoomSummaryMapper.summary(
+      id: id, displayName: "Team",
+      latestEvent: .remote(
+        timestamp: millis, sender: "@bob:example.org", isOwn: isOwn, profile: .pending,
+        content: .callInvite))
+    #expect(summary.isLastMessageOwn == isOwn)
+    #expect(summary.lastMessageSendState == (isOwn ? .sent : nil))
+  }
+
+  /// A poll cannot be built here: `PollAnswer` is an SDK struct this bundle does not link.
+  @Test func aDeletedMessageIsNamed() {
+    #expect(RoomSummaryMapper.message(ofKind: .redacted)?.kind == .deleted)
+    #expect(RoomSummaryMapper.message(ofKind: .redacted)?.text == nil)
+  }
+
+  @Test func anEventThatIsNotAMessageHasNoKind() {
+    #expect(RoomSummaryMapper.message(of: .callInvite) == nil)
+  }
+
+  @Test func aBodyThatOpensWithTheFallbackQuoteIsRecognised() {
+    #expect(RoomSummaryMapper.opensWithReplyFallback("> <@bob:example.org> When?\n\nAt noon"))
+    #expect(!RoomSummaryMapper.opensWithReplyFallback("> a quote I typed\n\nmy answer"))
+    #expect(!RoomSummaryMapper.opensWithReplyFallback("At noon"))
+  }
+
+  @Test func aReplyFallbackIsLeftOut() {
+    let reply = "> <@bob:example.org> Lunch?\n> Where?\n\nAt noon"
+    #expect(RoomSummaryMapper.withoutReplyFallback(reply) == "At noon")
+    #expect(RoomSummaryMapper.withoutReplyFallback("At noon") == "At noon")
+    #expect(RoomSummaryMapper.withoutReplyFallback("> only a quote") == "> only a quote")
   }
 }

@@ -240,13 +240,19 @@ struct MentionSuggestions: View {
           pick(member)
         } label: {
           HStack(spacing: 10) {
-            TwakeAvatar(
-              name: member.name, size: 32, pictureID: member.avatar?.source,
-              load: member.avatar.map { reference in
-                { @Sendable [viewModel] in await viewModel.picture(reference) }
-              })
+            if member == .everyone {
+              Image(systemName: "megaphone.fill")
+                .foregroundStyle(SysColors.primary)
+                .frame(width: 32, height: 32)
+            } else {
+              TwakeAvatar(
+                name: member.name, size: 32, pictureID: member.avatar?.source,
+                load: member.avatar.map { reference in
+                  { @Sendable [viewModel] in await viewModel.picture(reference) }
+                })
+            }
             VStack(alignment: .leading, spacing: 0) {
-              Text(member.name)
+              Text(member == .everyone ? "Notify everyone" : member.name)
                 .textStyle(TextStyles.bodyMedium)
                 .foregroundStyle(SysColors.onSurface)
                 .lineLimit(1)
@@ -262,7 +268,7 @@ struct MentionSuggestions: View {
           .contentShape(Rectangle())
         }
         .buttonStyle(MenuRowButtonStyle())
-        .accessibilityLabel("Mention \(member.name)")
+        .accessibilityLabel(member == .everyone ? "Notify everyone" : "Mention \(member.name)")
       }
     }
     .background(.regularMaterial, in: .rect(cornerRadius: 14))

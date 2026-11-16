@@ -47,13 +47,14 @@ public struct TimelineMessage: Sendable, Equatable {
     case video(caption: String?)
     case audio(caption: String?)
     case file(name: String)
-    case location(String)
+    /// The sender's text and the place, when its `geo:` URI can be read.
+    case location(String, place: GeoPoint? = nil)
     case sticker(String)
     case poll(question: String)
     /// The message was deleted.
     case redacted
-    /// The keys to decrypt the message are missing.
-    case unableToDecrypt
+    /// The keys to decrypt the message are missing, with what is known of why.
+    case unableToDecrypt(UndecryptableReason)
     case unsupported
   }
 
@@ -139,6 +140,12 @@ public struct TimelineMessage: Sendable, Equatable {
   public let thread: ThreadPreview?
   /// The root of the thread this message is a reply in, or `nil` when it is in the room's main timeline.
   public let threadRootId: String?
+  /// The id Twake web and Flutter put on every picture of one send (`app.twake.chat.batch`), which ties them into one
+  /// album; `nil` when the event has none (a single picture, another client, or a local echo).
+  public let batchId: String?
+  /// The id of the local echo while the message has no server event id yet; it names a message that is still
+  /// sending or failed to send, to send it again or to discard it. `nil` once the server has the event.
+  public let transactionId: String?
 
   public init(
     eventId: String?, senderId: String, senderName: String, isOwn: Bool, date: Date, body: Body,
@@ -147,8 +154,10 @@ public struct TimelineMessage: Sendable, Equatable {
     senderAvatar: MediaReference? = nil, readCount: Int = 0, readerIds: [String] = [],
     replyToEventId: String? = nil, formatted: AttributedString? = nil,
     uploadProgress: Double? = nil, poll: Poll? = nil, thread: ThreadPreview? = nil,
-    threadRootId: String? = nil
+    threadRootId: String? = nil, batchId: String? = nil, transactionId: String? = nil
   ) {
+    self.transactionId = transactionId
+    self.batchId = batchId
     self.thread = thread
     self.threadRootId = threadRootId
     self.poll = poll

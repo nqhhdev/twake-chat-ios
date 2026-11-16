@@ -40,6 +40,12 @@ public final class RoomViewModel {
   public private(set) var composerMode: ComposerMode = .new
   public private(set) var isLoadingOlder = false
   public private(set) var reachedStart = false
+  /// How far the timeline loads older pages by itself.
+  public var historyLoading = HistoryLoading()
+  /// Loading by itself stopped (`HistoryLoading`): the top of the timeline offers "Load earlier messages".
+  public private(set) var isHistoryPaused = false
+  /// A list of this timeline held the start of the room; a later list without it means the SDK reset the timeline.
+  @ObservationIgnored private var sawTimelineStart = false
   public private(set) var errorMessage: String?
   /// The other members typing now, by name.
   public private(set) var typingNames: [String] = []
@@ -390,7 +396,7 @@ public final class RoomViewModel {
     defer { extras.cancel() }
     for await list in items where thisStart == startCount {
       state = .loaded(list)
-      if list.contains(where: { $0.kind == .timelineStart }) { reachedStart = true }
+      noteStart(in: list)
       if let target = pendingEventId, !list.isEmpty {
         pendingEventId = nil
         Task { await jump(toEvent: target, maxPages: 50) }
@@ -429,12 +435,44 @@ public final class RoomViewModel {
     }
   }
 
-  /// Loads older pages until the start of the room, while the calling task runs (the top spinner is on screen). A
-  /// failed page waits longer before the next try.
+  /// Loads older pages while the calling task runs (the top spinner is on screen), until the start of the room or
+  /// the limits of `historyLoading`. A room whose pages hold nothing to show (only hidden room events), or whose
+  /// pages keep failing, would otherwise load forever: it pauses, and the user asks for more (`resumeHistory`).
   public func loadOlderWhileVisible() async {
+    var pages = 0
+    var failures = 0
     while !reachedStart, !Task.isCancelled {
-      let loaded = await loadOlder()
-      try? await Task.sleep(for: loaded ? .milliseconds(250) : .seconds(3))
+      guard pages < historyLoading.maxAutomaticPages, failures < historyLoading.maxFailures else {
+        isHistoryPaused = true
+        return
+      }
+      if await loadOlder() {
+        pages += 1
+        failures = 0
+      } else {
+        failures += 1
+      }
+      try? await Task.sleep(
+        for: failures == 0 ? historyLoading.pause : historyLoading.pauseAfterFailure)
+    }
+  }
+
+  /// The user asked for earlier messages after loading paused.
+  public func resumeHistory() {
+    isHistoryPaused = false
+  }
+
+  /// Keeps `reachedStart` true to the list on screen. The SDK empties and refills a timeline after a gap in sync; the
+  /// refilled list no longer holds the start of the room, and without this the room stayed empty with nothing asking
+  /// for older messages.
+  private func noteStart(in list: [TimelineItem]) {
+    if list.contains(where: { $0.kind == .timelineStart }) {
+      reachedStart = true
+      sawTimelineStart = true
+    } else if sawTimelineStart {
+      sawTimelineStart = false
+      reachedStart = false
+      isHistoryPaused = false
     }
   }
 
@@ -525,6 +563,11 @@ public final class RoomViewModel {
     await jump(toEvent: eventId, maxPages: 0)
   }
 
+  /// Scrolls to the room's first message, loading older pages until the start of the room (web: "Jump to start").
+  public func jumpToStart() async {
+    await jump(toDate: .distantPast)
+  }
+
   /// The date of the oldest loaded message.
   var oldestMessageDate: Date? {
     guard case .loaded(let items) = state else { return nil }
@@ -557,9 +600,10 @@ public final class RoomViewModel {
     return nil
   }
 
-  /// Sends again what failed to send.
-  public func retryFailedSends() async {
-    await repository.retryFailedSends()
+  /// Sends again the message that failed to send.
+  public func retry(_ message: TimelineMessage) async {
+    guard message.sendState == .failed, let transactionId = message.transactionId else { return }
+    await repository.retrySend(transactionId: transactionId)
     showToast("Sending again")
   }
 
@@ -697,14 +741,7 @@ public final class RoomViewModel {
   }
 
   /// "Alice is typing…", "Alice and Bob are typing…", "Alice and 2 others are typing…", or `nil`.
-  public var typingText: String? {
-    switch typingNames.count {
-    case 0: nil
-    case 1: "\(typingNames[0]) is typing…"
-    case 2: "\(typingNames[0]) and \(typingNames[1]) are typing…"
-    default: "\(typingNames[0]) and \(typingNames.count - 1) others are typing…"
-    }
-  }
+  public var typingText: String? { TypingText.line(for: typingNames) }
 
   /// Tells the room the user is typing while the draft has text, and stopped once it is empty.
   public func draftDidChange(from old: String, to new: String) async {
@@ -784,14 +821,17 @@ public final class RoomViewModel {
     return String(query)
   }
 
-  /// The members whose name or Matrix id contains the mention query, at most six.
+  /// The members whose name or Matrix id contains the mention query, at most six. Someone who may notify the room
+  /// is also offered « Notify everyone » (`@room`).
   public var mentionSuggestions: [RoomMember] {
     guard let query = mentionQuery?.lowercased() else { return [] }
     let found = members.filter { member in
       query.isEmpty || member.name.lowercased().contains(query)
         || member.id.lowercased().contains(query)
     }
-    return Array(found.prefix(6))
+    guard canNotifyRoom else { return Array(found.prefix(6)) }
+    if RoomMember.offersEveryoneFirst(for: query) { return [.everyone] + found.prefix(5) }
+    return query.isEmpty ? Array(found.prefix(5)) + [.everyone] : Array(found.prefix(6))
   }
 
   /// Loads the members for the @ suggestions, once, when the user starts a mention.
@@ -806,7 +846,8 @@ public final class RoomViewModel {
     guard let at = draft.lastIndex(of: "@") else { return }
     let name = Self.mentionName(member)
     draft = String(draft[..<at]) + "@" + name + " "
-    if !mentions.contains(member) { mentions.append(member) }
+    // « @room » stays as text: the data layer reads it there, it is no link to a person.
+    if member != .everyone, !mentions.contains(member) { mentions.append(member) }
   }
 
   /// The name a mention shows, without the characters Markdown links use.
@@ -828,10 +869,20 @@ public final class RoomViewModel {
   public func send() async {
     let typed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !typed.isEmpty else { return }
-    let text = Self.applyingMentions(mentions, to: typed)
+    let mode = composerMode
+    // A new message that starts with « / » is a bot's command, a client command (`/me`, `/shrug`), or a mistake
+    // that is not sent, as on the web.
+    var prepared = ComposerCommand.message(typed)
+    if case .new = mode, BotCommand.command(for: typed, in: botCommands) == nil {
+      prepared = ComposerCommand.prepare(typed)
+    }
+    if case .unknown = prepared {
+      errorMessage =
+        "This command does not exist. Start with “//” to send a text that starts with “/”."
+      return
+    }
     let picked = mentions
     mentions = []
-    let mode = composerMode
     sendCount += 1
     draft = ""
     await repository.setTyping(false)
@@ -842,11 +893,15 @@ public final class RoomViewModel {
       case .new:
         if let command = BotCommand.command(for: typed, in: botCommands) {
           try await repository.send(command: command, text: typed)
-        } else {
-          try await repository.send(text: text)
+        } else if case .emote(let action) = prepared {
+          try await repository.send(emote: Self.applyingMentions(picked, to: action))
+        } else if case .message(let body) = prepared {
+          try await repository.send(text: Self.applyingMentions(picked, to: body))
         }
-      case .reply(let eventId, _): try await repository.reply(text: text, to: eventId)
-      case .edit(let eventId): try await repository.edit(eventId: eventId, text: text)
+      case .reply(let eventId, _):
+        try await repository.reply(text: Self.applyingMentions(picked, to: typed), to: eventId)
+      case .edit(let eventId):
+        try await repository.edit(eventId: eventId, text: Self.applyingMentions(picked, to: typed))
       }
     } catch {
       draft = typed
@@ -912,6 +967,11 @@ public final class RoomViewModel {
     canRedactOthers = details.canRedactOthers
     canSendMessages = details.canSendMessages
     directUserId = details.directUserId
+    isEncrypted = details.isEncrypted
+    canNotifyRoom = details.canNotifyRoom
+    isDirect = details.isDirect
+    isBroadcast = details.isBroadcast
+    memberCount = details.isDirect ? nil : details.joinedMemberCount
     var blocked: String?
     if let userId = details.directUserId, let blocking, await blocking.isBlocked(userId) {
       blocked = userId
@@ -924,6 +984,34 @@ public final class RoomViewModel {
 
   /// The other person's presence in a direct chat, under the name in the header; `nil` elsewhere or when unknown.
   public private(set) var presenceLine: String?
+
+  /// The user may notify everyone in the room, so the mention list offers `@room`.
+  public private(set) var canNotifyRoom = false
+
+  /// A direct chat and a Broadcast each have their own empty-chat card.
+  private var isDirect = false
+  private var isBroadcast = false
+
+  /// What the timeline shows while the room has no message.
+  public var emptyChatCard: EmptyChatCard {
+    .card(
+      roomName: roomName, isDirect: isDirect, isBroadcast: isBroadcast, isEncrypted: isEncrypted,
+      canPost: canSendMessages)
+  }
+
+  /// The room is encrypted: the header shows a lock beside the name, as the Flutter app does.
+  public private(set) var isEncrypted = false
+
+  /// How many people are in a group; `nil` in a direct chat or before the room's details load.
+  public private(set) var memberCount: Int?
+
+  /// The line under the name in the header: the other person's presence in a direct chat, the number of members in
+  /// a group, as the Flutter and web headers show.
+  public var headerSubtitle: String? {
+    if let presenceLine { return presenceLine }
+    guard let memberCount, memberCount > 0 else { return nil }
+    return memberCount == 1 ? "1 member" : "\(memberCount) members"
+  }
 
   /// Reads the other person's presence now and every `interval` while the chat shows, as the web reads the presence
   /// of the people shown (D80); it ends when the task is cancelled.
@@ -1004,9 +1092,11 @@ public final class RoomViewModel {
     }
   }
 
-  /// The user may delete this message: their own, or anyone's as a moderator.
+  /// The user may delete this message: their own, or anyone's as a moderator. Their own message that is not sent
+  /// yet (still sending, or failed) is discarded instead, so it never leaves the device.
   public func canDelete(_ message: TimelineMessage) -> Bool {
-    guard message.eventId != nil, message.body != .redacted else { return false }
+    if message.eventId == nil { return message.isOwn && message.transactionId != nil }
+    guard message.body != .redacted else { return false }
     return message.isOwn || canRedactOthers
   }
 
@@ -1025,9 +1115,13 @@ public final class RoomViewModel {
   }
 
   public func delete(_ message: TimelineMessage) async {
-    guard canDelete(message), let eventId = message.eventId else { return }
+    guard canDelete(message) else { return }
     do {
-      try await repository.redact(eventId: eventId)
+      if let eventId = message.eventId {
+        try await repository.redact(eventId: eventId)
+      } else if let transactionId = message.transactionId {
+        try await repository.discardUnsent(transactionId: transactionId)
+      }
     } catch {
       errorMessage = "Could not delete the message."
     }
@@ -1096,7 +1190,7 @@ public final class RoomViewModel {
   /// The text a message's Copy action copies, or `nil` for a message without text.
   public static func text(of body: TimelineMessage.Body) -> String? {
     switch body {
-    case .text(let text), .emote(let text), .notice(let text), .location(let text): text
+    case .text(let text), .emote(let text), .notice(let text), .location(let text, _): text
     case .image(let caption), .video(let caption), .audio(let caption): caption
     case .file(let name): name
     case .poll(let question): question
