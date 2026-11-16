@@ -113,6 +113,12 @@ struct MessageActionsOverlay: View {
     }
     if message.eventId != nil {
       list.append(.init(title: "Forward", icon: "arrowshape.turn.up.right") { onForward(message) })
+      if message.media != nil {
+        list.append(
+          .init(title: "Share", icon: "square.and.arrow.up") {
+            Task { await viewModel.share(focus.album?.messages ?? [message]) }
+          })
+      }
       list.append(.init(title: "Copy Link", icon: "link") { viewModel.copyLink(to: message) })
       if viewModel.canSave {
         let saved = viewModel.isSaved(message)

@@ -56,6 +56,10 @@ public final class RoomViewModel {
 
   /// The message whose edit history the sheet shows.
   public var historyMessage: TimelineMessage?
+  /// The files a message menu's Share downloaded; the share sheet also saves them to Photos or Files.
+  var sharedFiles: DownloadedFiles?
+  /// Share is downloading; the screen shows a spinner until the sheet opens.
+  private(set) var isPreparingShare = false
 
   /// The versions of an edited message, the original first; `nil` in an encrypted chat.
   func editHistory(of message: TimelineMessage) async -> [MessageVersion]? {
@@ -1052,6 +1056,25 @@ public final class RoomViewModel {
       errorMessage = "Could not download the file."
       return nil
     }
+  }
+
+  /// Downloads the messages' pictures, videos or files (every picture of an album) for the share sheet, as the Flutter
+  /// message menu's Share and Save do. They download together and keep the album's order. Nothing is offered if one
+  /// download fails; the error says so.
+  func share(_ messages: [TimelineMessage]) async {
+    guard !messages.isEmpty, !isPreparingShare else { return }
+    isPreparingShare = true
+    defer { isPreparingShare = false }
+    let found = await withTaskGroup(of: (Int, URL?).self) { group in
+      for (index, message) in messages.enumerated() {
+        group.addTask { (index, await self.file(of: message)) }
+      }
+      var urls = [URL?](repeating: nil, count: messages.count)
+      for await (index, url) in group { urls[index] = url }
+      return urls
+    }
+    let urls = found.compactMap { $0 }
+    if urls.count == messages.count { sharedFiles = DownloadedFiles(urls: urls) }
   }
 
   /// The name a message's file is saved under.

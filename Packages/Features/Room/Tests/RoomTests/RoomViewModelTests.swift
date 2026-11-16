@@ -475,6 +475,35 @@ struct RoomMediaTests {
     #expect(viewModel.errorMessage == "Could not download the file.")
   }
 
+  @Test func shareDownloadsTheFileForTheShareSheet() async {
+    let viewModel = RoomViewModel(
+      roomId: "!r", roomName: "Team", repository: FakeTimelineRepository(),
+      media: FakeMediaRepository())
+    await viewModel.share([message(.file(name: "report.pdf"))])
+    #expect(viewModel.sharedFiles?.urls.map(\.lastPathComponent) == ["report.pdf"])
+  }
+
+  @Test func sharingAnAlbumDownloadsEveryPicture() async {
+    let media = FakeMediaRepository()
+    let viewModel = RoomViewModel(
+      roomId: "!r", roomName: "Team", repository: FakeTimelineRepository(), media: media)
+    let picture = message(.image(caption: nil))
+    await viewModel.share([picture, picture, picture])
+    #expect(viewModel.sharedFiles?.urls.count == 3)
+    #expect(media.fileNames == ["image", "image", "image"])
+    #expect(!viewModel.isPreparingShare)
+  }
+
+  @Test func aFailedShareOpensNoSheet() async {
+    let media = FakeMediaRepository()
+    media.result = .failure(.downloadFailed)
+    let viewModel = RoomViewModel(
+      roomId: "!r", roomName: "Team", repository: FakeTimelineRepository(), media: media)
+    await viewModel.share([message(.file(name: "report.pdf"))])
+    #expect(viewModel.sharedFiles == nil)
+    #expect(viewModel.errorMessage == "Could not download the file.")
+  }
+
   @Test func emptyCaptionsAreNotShown() {
     #expect(MessageRow.caption(of: .image(caption: "")) == nil)
     #expect(MessageRow.caption(of: .image(caption: "Holiday")) == "Holiday")

@@ -4,8 +4,9 @@ import SwiftUI
 
 /// The chats, as a native iOS list: the large "Chats" title, the system search field (it filters by name), the
 /// invitations folded into one row, favourites first, then the other chats by latest activity. Swipe a chat right to
-/// mark it read or unread, left to favourite it or leave it; a long press offers the same. The compose button floats at
-/// the bottom corner, under the thumb. The open room is highlighted when the list sits beside it. It holds no logic.
+/// mark it read or unread, left to favourite it or leave it; a long press offers the same. Activity and New chat are
+/// toolbar buttons, so iOS places them: in the navigation bar on a phone, in the side rail on the unfolded Duo, as
+/// Photos and Mail do. The open room is highlighted when the list sits beside it. It holds no logic.
 public struct ChatListScreen: View {
   @Bindable var viewModel: ChatListViewModel
   let selectedRoomId: String?
@@ -76,15 +77,14 @@ public struct ChatListScreen: View {
               viewModel.mentionTotal > 0
                 ? "Activity, \(viewModel.mentionTotal) mentions" : "Activity")
           }
+          if let onCompose {
+            ToolbarItem(placement: .topBarTrailing) {
+              Button("New chat", systemImage: "square.and.pencil", action: onCompose)
+            }
+          }
         }
       }
       .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
-      .overlay(alignment: .bottomTrailing) {
-        if let onCompose, !isSelecting {
-          TwakeFloatingButton("New chat", systemImage: "square.and.pencil", action: onCompose)
-            .transition(.scale.combined(with: .opacity))
-        }
-      }
       .safeAreaInset(edge: .bottom) {
         if isSelecting { selectionBar.transition(.move(edge: .bottom).combined(with: .opacity)) }
       }
@@ -116,7 +116,7 @@ public struct ChatListScreen: View {
     case .empty:
       ContentUnavailableView(
         "No chats yet", systemImage: "bubble.left.and.bubble.right",
-        description: Text("Start one with the compose button."))
+        description: Text("Start one with the New chat button."))
     case .failed(let message):
       ContentUnavailableView(message, systemImage: "exclamationmark.triangle")
     case .loaded:
@@ -228,8 +228,6 @@ public struct ChatListScreen: View {
         List { listContent }
           .listStyle(.plain)
           .scrollContentBackground(.hidden)
-          // The last chat scrolls clear of the floating compose button.
-          .contentMargins(.bottom, onCompose == nil ? 0 : 80, for: .scrollContent)
       }
     }
     .animation(.spring(response: 0.35, dampingFraction: 0.85), value: viewModel.visibleRooms)

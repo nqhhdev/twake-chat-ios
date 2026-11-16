@@ -103,6 +103,18 @@ public struct RoomScreen: View {
         EditHistorySheet(message: message, viewModel: viewModel)
       }
     }
+    .overlay {
+      if viewModel.isPreparingShare {
+        ProgressView()
+          .controlSize(.large)
+          .padding(24)
+          .background(.regularMaterial, in: .rect(cornerRadius: 16))
+          .accessibilityLabel("Preparing to share")
+          .transition(.opacity)
+      }
+    }
+    .animation(.easeOut(duration: 0.2), value: viewModel.isPreparingShare)
+    .sheet(item: $viewModel.sharedFiles) { files in ShareSheetLink(urls: files.urls) }
     .sheet(item: $viewModel.peopleSheet) { sheet in
       PeopleListSheet(sheet: sheet, viewModel: viewModel)
     }

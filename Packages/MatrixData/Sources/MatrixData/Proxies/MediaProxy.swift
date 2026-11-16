@@ -1,6 +1,7 @@
 import Domain
 import Foundation
 import MatrixRustSDK
+import UniformTypeIdentifiers
 
 /// `MediaRepository` on the SDK client (ADR 0006): thumbnails and content come from the homeserver's media repository
 /// and are decrypted by the SDK in encrypted rooms. Thumbnails are kept in memory for the session; nothing is written
@@ -61,7 +62,7 @@ public actor MediaProxy: MediaRepository {
     let data = try await content(media)
     let folder = FileManager.default.temporaryDirectory.appending(
       path: UUID().uuidString, directoryHint: .isDirectory)
-    let name = filename.isEmpty ? "file" : (filename as NSString).lastPathComponent
+    let name = Self.fileName(filename, mimeType: media.mimeType)
     do {
       try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
       let url = folder.appending(path: name)
@@ -70,6 +71,16 @@ public actor MediaProxy: MediaRepository {
     } catch {
       throw .downloadFailed
     }
+  }
+
+  /// The name a downloaded file gets: the last part of the one given, with the extension its MIME type calls for when
+  /// it has none ("image" becomes "image.jpeg"), so Quick Look and the share sheet know it and offer Save Image.
+  static func fileName(_ filename: String, mimeType: String?) -> String {
+    let name = filename.isEmpty ? "file" : (filename as NSString).lastPathComponent
+    guard (name as NSString).pathExtension.isEmpty,
+      let ext = mimeType.flatMap({ UTType(mimeType: $0) })?.preferredFilenameExtension
+    else { return name }
+    return "\(name).\(ext)"
   }
 
   private func client() async throws(MediaError) -> ClientProxy {

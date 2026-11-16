@@ -174,15 +174,26 @@ struct DownloadedFile: Identifiable {
   var id: URL { url }
 }
 
-/// A sheet that offers to open or share a downloaded file.
+/// Files downloaded for the share sheet: one, or every picture of an album.
+struct DownloadedFiles: Identifiable {
+  let urls: [URL]
+  let id = UUID()
+}
+
+/// A sheet that offers to open or share downloaded files.
 struct ShareSheetLink: View {
-  let url: URL
+  let urls: [URL]
+
+  init(url: URL) { urls = [url] }
+  init(urls: [URL]) { self.urls = urls }
 
   var body: some View {
     VStack(spacing: 16) {
-      Image(systemName: "doc.fill").font(.system(size: 44)).foregroundStyle(SysColors.primary)
-      Text(url.lastPathComponent).textStyle(TextStyles.titleMedium).multilineTextAlignment(.center)
-      ShareLink(item: url) {
+      Image(systemName: urls.count > 1 ? "doc.on.doc.fill" : "doc.fill")
+        .font(.system(size: 44)).foregroundStyle(SysColors.primary)
+      Text(urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) files")
+        .textStyle(TextStyles.titleMedium).multilineTextAlignment(.center)
+      ShareLink(items: urls) {
         Label("Share", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
       }
       .buttonStyle(.twakePrimary)
@@ -230,7 +241,8 @@ struct RemoteImage: View {
 }
 
 /// Pictures full screen, as the Flutter image viewer: swipe between the pictures of an album, pinch or double-tap to
-/// zoom, Close and Share.
+/// zoom, Close and Share. Both are toolbar buttons, so iOS places them: Close in the navigation bar and Share in the
+/// bottom bar on a phone, both in the side rail on the unfolded Duo, as Photos does.
 struct ImageViewer: View {
   let pictures: [MediaReference]
   let repository: any MediaRepository
@@ -280,12 +292,14 @@ struct ImageViewer: View {
       .navigationBarTitleDisplayMode(.inline)
       .toolbarBackground(.black, for: .navigationBar)
       .toolbarColorScheme(.dark, for: .navigationBar)
+      .toolbarBackground(.black, for: .bottomBar)
+      .toolbarColorScheme(.dark, for: .bottomBar)
       .toolbar {
         ToolbarItem(placement: .topBarLeading) {
           Button("Close", systemImage: "xmark") { dismiss() }
         }
         if let image = images[currentIndex] {
-          ToolbarItem(placement: .topBarTrailing) {
+          ToolbarItem(placement: .bottomBar) {
             ShareLink(
               item: Image(uiImage: image),
               preview: SharePreview(title, image: Image(uiImage: image))
