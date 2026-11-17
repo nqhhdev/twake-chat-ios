@@ -361,6 +361,19 @@ struct TimelineScroll: View {
       lastSeenRowId = atBottom ? nil : viewModel.rows.last?.id
       withAnimation(.easeOut(duration: 0.2)) { isAtBottom = atBottom }
     }
+    // The SDK empties and refills a timeline after a gap in sync, and the keyboard resizes the view: either can leave
+    // the scroll offset outside the new content, which shows as an empty screen until the user drags. Come back to
+    // the newest message when nothing of the content is in view.
+    .onScrollGeometryChange(for: Bool.self) { geometry in
+      TimelineScroll.showsNothing(
+        visible: geometry.visibleRect, contentHeight: geometry.contentSize.height)
+    } action: { _, showsNothing in
+      if showsNothing { position.scrollTo(edge: .bottom) }
+    }
+    // A list replaced as a whole while the user is on the newest message stays on the newest message.
+    .onChange(of: rows.first?.id) {
+      if isAtBottom { position.scrollTo(edge: .bottom) }
+    }
     .overlay(alignment: .bottomTrailing) {
       if !isAtBottom {
         Button {
@@ -397,6 +410,11 @@ struct TimelineScroll: View {
         .transition(.scale(scale: 0.6).combined(with: .opacity))
       }
     }
+  }
+
+  /// Whether the viewport lies wholly above or below the content, so no row is in view.
+  static func showsNothing(visible: CGRect, contentHeight: CGFloat) -> Bool {
+    contentHeight > 0 && (visible.minY >= contentHeight || visible.maxY <= 0)
   }
 
   private static func isMessage(_ row: ChatRow) -> Bool {

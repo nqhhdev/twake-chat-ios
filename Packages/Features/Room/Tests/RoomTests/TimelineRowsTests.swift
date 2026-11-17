@@ -268,4 +268,18 @@ struct TimelineRowsTests {
       RemoteImage.fill(CGSize(width: 100, height: 100), CGSize(width: 400, height: 400)).width
         == 100)
   }
+
+  /// A scroll offset left outside the content (after the SDK refilled the list, or the keyboard resized the view)
+  /// shows an empty screen; the timeline then returns to the newest message.
+  @Test func aViewportOutsideTheContentShowsNothing() {
+    func visible(from y: CGFloat) -> CGRect { CGRect(x: 0, y: y, width: 400, height: 600) }
+    #expect(TimelineScroll.showsNothing(visible: visible(from: 900), contentHeight: 800))
+    #expect(TimelineScroll.showsNothing(visible: visible(from: -700), contentHeight: 800))
+    #expect(!TimelineScroll.showsNothing(visible: visible(from: 200), contentHeight: 800))
+    // Pulled past the end, some content still shows.
+    #expect(!TimelineScroll.showsNothing(visible: visible(from: 260), contentHeight: 800))
+    // Content shorter than the screen, and no content at all.
+    #expect(!TimelineScroll.showsNothing(visible: visible(from: 0), contentHeight: 120))
+    #expect(!TimelineScroll.showsNothing(visible: visible(from: 0), contentHeight: 0))
+  }
 }
