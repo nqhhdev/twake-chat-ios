@@ -52,9 +52,29 @@ struct PushCenterTests {
   @Test func withoutARepositoryNothingIsAsked() async {
     var asked = 0
     let center = PushCenter(
-      repository: nil, requestAuthorization: { asked += 1; return true })
+      repository: nil,
+      requestAuthorization: {
+        asked += 1
+        return true
+      })
     await center.start()
     #expect(asked == 0)
     #expect(center.isAllowed == nil)
+  }
+
+  /// A build signed for development has a sandbox token, whatever its build configuration.
+  @Test func theSigningProfileDecidesTheApnsServer() {
+    func profile(_ entitlements: String) -> Data {
+      Data(
+        "\u{30}\u{82}signed<plist><dict><key>Entitlements</key><dict>\(entitlements)</dict></dict></plist>"
+          .utf8)
+    }
+    let development = profile("<key>aps-environment</key>\n\t<string>development</string>")
+    let production = profile("<key>aps-environment</key><string>production</string>")
+    #expect(!ApnsEnvironment.isProduction(profile: development, isSimulator: false))
+    #expect(ApnsEnvironment.isProduction(profile: production, isSimulator: false))
+    #expect(ApnsEnvironment.isProduction(profile: profile(""), isSimulator: false))
+    #expect(ApnsEnvironment.isProduction(profile: nil, isSimulator: false))
+    #expect(!ApnsEnvironment.isProduction(profile: nil, isSimulator: true))
   }
 }

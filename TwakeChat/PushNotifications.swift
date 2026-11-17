@@ -77,14 +77,10 @@ final class PushCenter {
     roomId == nil || roomId != openRoomId
   }
 
-  /// Apple gave a device token: register it with the homeserver. Debug builds use the APNs sandbox.
+  /// Apple gave a device token: register it with the homeserver, for the APNs server the app is signed for.
   func didReceive(deviceToken: Data) async {
-    #if DEBUG
-      let isProduction = false
-    #else
-      let isProduction = true
-    #endif
-    try? await repository?.register(deviceToken: deviceToken, isProduction: isProduction)
+    try? await repository?.register(
+      deviceToken: deviceToken, isProduction: ApnsEnvironment.isProduction())
   }
 
   /// Stops pushing to this device, before logging out.
@@ -133,5 +129,41 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
   ) async {
     let roomId = response.notification.request.content.userInfo["room_id"] as? String
     await MainActor.run { Self.push?.pendingRoomId = roomId }
+  }
+}
+
+/// Which APNs server gave the device token. The signing profile decides, not the build configuration: a Release build
+/// installed from Xcode is signed for development and gets a sandbox token, which the production server refuses.
+enum ApnsEnvironment {
+  /// The profile Xcode embeds in a development, ad hoc or enterprise build. An App Store or TestFlight build has none.
+  static var embeddedProfile: Data? {
+    Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision").flatMap {
+      try? Data(contentsOf: $0)
+    }
+  }
+
+  static var isSimulator: Bool {
+    #if targetEnvironment(simulator)
+      true
+    #else
+      false
+    #endif
+  }
+
+  /// Production unless the profile says `aps-environment` is `development`. No profile (App Store, TestFlight) is
+  /// production, and so is a profile without the key.
+  static func isProduction(profile: Data? = embeddedProfile, isSimulator: Bool = isSimulator)
+    -> Bool
+  {
+    // A simulator has no profile and gets its token from the sandbox.
+    if isSimulator { return false }
+    guard let profile else { return true }
+    // The profile is a signed envelope around a property list; the list itself is plain text.
+    let text = String(decoding: profile, as: UTF8.self)
+    guard let key = text.range(of: "<key>aps-environment</key>"),
+      let open = text.range(of: "<string>", range: key.upperBound..<text.endIndex),
+      let close = text.range(of: "</string>", range: open.upperBound..<text.endIndex)
+    else { return true }
+    return text[open.upperBound..<close.lowerBound] != "development"
   }
 }
