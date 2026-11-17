@@ -308,7 +308,13 @@ struct TimelineScroll: View {
     let newCount = ChatRow.incomingCount(after: lastSeenRowId, in: rows)
     ScrollView {
       LazyVStack(spacing: 0) {
-        if !viewModel.reachedStart {
+        if let placeholder = viewModel.placeholder {
+          // No message to show yet: say so in the middle of the screen instead of a small spinner at its top.
+          TimelinePlaceholderView(placeholder: placeholder) { viewModel.resumeHistory() }
+            .task(id: placeholder) {
+              if placeholder == .loading { await viewModel.loadOlderWhileVisible() }
+            }
+        } else if !viewModel.reachedStart {
           if viewModel.isHistoryPaused {
             // Loading stopped by itself (many pages with nothing to show, or pages failing): the user asks for more.
             Button("Load earlier messages") { viewModel.resumeHistory() }
@@ -1236,6 +1242,36 @@ struct LinkPreviewCard: View {
 }
 
 /// The card a chat with no message shows: a title, an optional line and what the chat offers.
+/// Shown while a chat has no message on screen and its start is not reached.
+private struct TimelinePlaceholderView: View {
+  let placeholder: RoomViewModel.Placeholder
+  let onLoadMore: () -> Void
+
+  var body: some View {
+    VStack(spacing: 12) {
+      switch placeholder {
+      case .loading:
+        ProgressView()
+        Text("Loading messages…")
+          .textStyle(TextStyles.bodyMedium)
+          .foregroundStyle(SysColors.textSecondary)
+      case .paused:
+        Text("No messages to show yet")
+          .textStyle(TextStyles.titleMedium)
+          .foregroundStyle(SysColors.onSurface)
+        Text("Earlier messages may still be on the server.")
+          .textStyle(TextStyles.bodyMedium)
+          .foregroundStyle(SysColors.textSecondary)
+          .multilineTextAlignment(.center)
+        Button("Load earlier messages", action: onLoadMore)
+          .buttonStyle(.bordered)
+      }
+    }
+    .frame(maxWidth: .infinity, minHeight: 320)
+    .padding(.horizontal, 24)
+  }
+}
+
 private struct EmptyChatCardView: View {
   let card: EmptyChatCard
 

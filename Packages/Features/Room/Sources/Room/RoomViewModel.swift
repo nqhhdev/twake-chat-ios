@@ -446,6 +446,12 @@ public final class RoomViewModel {
         isHistoryPaused = true
         return
       }
+      if isLoadingOlder {
+        // A page is on its way (the one asked when the chat opened, or a jump): wait for it. Counting it as a page
+        // paused a slow room after a few seconds with nothing loaded.
+        try? await Task.sleep(for: historyLoading.pause)
+        continue
+      }
       if await loadOlder() {
         pages += 1
         failures = 0
@@ -455,6 +461,27 @@ public final class RoomViewModel {
       try? await Task.sleep(
         for: failures == 0 ? historyLoading.pause : historyLoading.pauseAfterFailure)
     }
+  }
+
+  /// What the timeline shows in place of messages while it has none, so the screen is never blank.
+  public enum Placeholder: Equatable, Sendable {
+    /// Older pages are loading.
+    case loading
+    /// Loading stopped by itself; the user asks for more.
+    case paused
+  }
+
+  /// `nil` once a message shows or the start of the room is reached (the empty-chat card takes over there).
+  public var placeholder: Placeholder? {
+    guard case .loaded = state, !reachedStart else { return nil }
+    let hasMessage = rows.contains { row in
+      switch row {
+      case .message, .album: true
+      case .other, .notices: false
+      }
+    }
+    if hasMessage { return nil }
+    return isHistoryPaused ? .paused : .loading
   }
 
   /// The user asked for earlier messages after loading paused.
