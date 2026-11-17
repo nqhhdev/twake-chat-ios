@@ -421,6 +421,50 @@ struct RoomViewModelTests {
     #expect(!viewModel.isHistoryPaused)
   }
 
+  /// A page already on its way is waited for, not counted: a slow room paused after a few seconds with nothing
+  /// loaded.
+  @Test func aPageInFlightIsNotCountedAsAPage() async {
+    let repository = FakeTimelineRepository()
+    repository.loadOlderDelay = .milliseconds(200)
+    let viewModel = viewModel(repository)
+    viewModel.historyLoading = HistoryLoading(maxAutomaticPages: 2, pause: .milliseconds(1))
+
+    let slow = Task { await viewModel.loadOlder() }
+    while !viewModel.isLoadingOlder { await Task.yield() }
+    let loop = Task { await viewModel.loadOlderWhileVisible() }
+    try? await Task.sleep(for: .milliseconds(100))
+    #expect(!viewModel.isHistoryPaused)
+    _ = await slow.value
+    await loop.value
+
+    // The page in flight, then the two the loop is allowed.
+    #expect(repository.calls.filter { $0 == .loadOlder }.count == 3)
+    #expect(viewModel.isHistoryPaused)
+  }
+
+  /// With no message on screen the timeline says what it is doing; it is never blank.
+  @Test func anEmptyTimelineShowsAPlaceholderUntilAMessageOrTheStart() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = viewModel(repository)
+    viewModel.historyLoading = HistoryLoading(maxAutomaticPages: 1, pause: .zero)
+    #expect(viewModel.placeholder == nil)
+
+    let task = Task { await viewModel.start() }
+    while !repository.calls.contains(.markAsRead) { await Task.yield() }
+    repository.publish([])
+    while viewModel.state != .loaded([]) { await Task.yield() }
+    #expect(viewModel.placeholder == .loading)
+
+    await viewModel.loadOlderWhileVisible()
+    #expect(viewModel.placeholder == .paused)
+
+    repository.publish([TimelineItem(id: "start", kind: .timelineStart)])
+    while !viewModel.reachedStart { await Task.yield() }
+    #expect(viewModel.placeholder == nil)
+    repository.finish()
+    await task.value
+  }
+
   @Test func aTimelineTheSDKResetIsNoLongerAtTheStart() async {
     let repository = FakeTimelineRepository()
     let viewModel = viewModel(repository)

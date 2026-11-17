@@ -73,6 +73,9 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
     set { lock.withLock { _actionResult = newValue } }
   }
 
+  /// How long a page takes, for a slow server.
+  public var loadOlderDelay: Duration = .zero
+
   /// What `loadOlder` returns.
   public var reachesStart: Bool {
     get { lock.withLock { _reachesStart } }
@@ -103,6 +106,8 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
 
   public func loadOlder() async throws(TimelineError) -> Bool {
     record(.loadOlder)
+    let delay = lock.withLock { loadOlderDelay }
+    if delay > .zero { try? await Task.sleep(for: delay) }
     return reachesStart
   }
 
