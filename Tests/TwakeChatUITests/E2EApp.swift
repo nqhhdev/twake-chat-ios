@@ -67,7 +67,7 @@ extension XCTestCase {
     app.buttons[A11yIdentifiers.passwordLogin.signIn].tap()
 
     let chats =
-      app.tabBars.buttons["Chats"].exists ? app.tabBars.buttons["Chats"] : app.buttons["Chats"]
+      app.tabBars.buttons["Chats"].exists ? app.tabBars.buttons["Chats"] : app.buttons.matching(identifier: "Chats").firstMatch
     XCTAssertTrue(
       chats.waitForExistence(timeout: Self.timeout), "Signed in", file: file, line: line)
     dismissSystemAlerts()
@@ -77,7 +77,9 @@ extension XCTestCase {
     dismissSystemAlerts()
     let tab =
       app.tabBars.buttons["Settings"].exists
-      ? app.tabBars.buttons["Settings"] : app.buttons["Settings"]
+      ? app.tabBars.buttons["Settings"]
+      // iPad (.sidebarAdaptable) shows Settings in both the tab bar and the sidebar.
+      : app.buttons.matching(identifier: "Settings").firstMatch
     XCTAssertTrue(tab.waitForExistence(timeout: Self.timeout))
     tab.tap()
   }
