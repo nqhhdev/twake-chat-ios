@@ -63,6 +63,7 @@ public struct HomeserverPickerScreen: View {
         .frame(maxWidth: .infinity, minHeight: 24)
       }
       .buttonStyle(.twakePrimary)
+      .accessibilityIdentifier(A11yIdentifiers.homeserverPicker.continue)
       .padding(16)
       Spacer()
     }
@@ -87,6 +88,7 @@ public struct HomeserverPickerScreen: View {
         .autocorrectionDisabled()
         .submitLabel(.continue)
         .focused($isFieldFocused)
+        .accessibilityIdentifier(A11yIdentifiers.homeserverPicker.server)
         .onSubmit { Task { await viewModel.continueTapped() } }
         .padding(16)
         .overlay(

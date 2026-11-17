@@ -93,6 +93,7 @@ struct ComposerView: View {
       .textStyle(TextStyles.bodyLarge)
       .lineLimit(1...6)
       .focused($isFocused)
+      .accessibilityIdentifier(A11yIdentifiers.room.composer)
       .padding(.horizontal, 16)
       .padding(.vertical, 10)
       .background(SysColors.surface, in: .rect(cornerRadius: 24))
@@ -112,6 +113,7 @@ struct ComposerView: View {
     }
     .buttonStyle(PressScaleButtonStyle())
     .accessibilityLabel(isEditing ? "Save the edit" : "Send message")
+    .accessibilityIdentifier(A11yIdentifiers.room.send)
     .transition(.scale(scale: 0.4).combined(with: .opacity))
   }
 

@@ -229,6 +229,7 @@ public struct ChatListScreen: View {
         List { listContent }
           .listStyle(.plain)
           .scrollContentBackground(.hidden)
+          .accessibilityIdentifier(A11yIdentifiers.chatList.list)
       }
     }
     .animation(.spring(response: 0.35, dampingFraction: 0.85), value: viewModel.visibleRooms)
@@ -349,6 +350,7 @@ public struct ChatListScreen: View {
       ChatListRow(room: room, viewModel: viewModel)
     }
     .buttonStyle(.plain)
+    .accessibilityIdentifier(A11yIdentifiers.chatList.room(room.name))
     .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
     .listRowBackground(
       Rectangle().fill(
