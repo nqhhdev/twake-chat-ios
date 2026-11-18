@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # End-to-end tests (XCUITest, test plan E2E) against a real Synapse.
 #
-#   scripts/e2e.sh up       boot Synapse (+ Postgres, Dex, LDAP, Mailpit) from twake-space-chat/e2e/docker,
-#                           check sliding sync, register the test users and seed the rooms
+#   scripts/e2e.sh up       boot Synapse, check sliding sync, register the test users and seed the rooms.
+#                           Uses twake-space-chat/e2e when that repo is checked out, otherwise e2e/ in this repo.
 #   scripts/e2e.sh test     run the E2E test plan on the simulator ($SIMULATOR_NAME, default "iPhone 16e")
 #   scripts/e2e.sh down     stop the stack and remove its volumes
 #   scripts/e2e.sh all      up, test, down (down runs even when a test fails)
@@ -14,7 +14,14 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT=$PWD
 
-WEB_E2E="${WEB_E2E:-$HOME/Documents/Linagora/twake-space-chat/e2e}"
+# Prefer the web e2e stack when it is checked out; otherwise the bundled Synapse in this repo (CI).
+if [ -z "${WEB_E2E:-}" ]; then
+  if [ -d "$HOME/Documents/Linagora/twake-space-chat/e2e/docker" ]; then
+    WEB_E2E="$HOME/Documents/Linagora/twake-space-chat/e2e"
+  else
+    WEB_E2E="$ROOT/e2e"
+  fi
+fi
 COMPOSE=(docker compose -p twake-ios-e2e -f "$WEB_E2E/docker/docker-compose.yaml")
 SYNAPSE_IMAGE=ghcr.io/element-hq/synapse:v1.162.0
 HS="${E2E_HOMESERVER:-http://localhost:8008}"
@@ -52,8 +59,8 @@ check_server() {
 }
 
 up() {
-  docker info >/dev/null 2>&1 || die "Docker is not running (open -a Docker)"
-  [ -d "$WEB_E2E/docker" ] || die "twake-space-chat e2e stack not found at $WEB_E2E (set WEB_E2E)"
+  docker info >/dev/null 2>&1 || die "Docker is not running (open -a Docker, or use the CI Colima setup)"
+  [ -f "$WEB_E2E/docker/docker-compose.yaml" ] || die "e2e compose not found at $WEB_E2E/docker (set WEB_E2E)"
   export E2E_UID="$(id -u)" E2E_GID="$(id -g)"
   local data="$WEB_E2E/.data/synapse"
   if [ ! -f "$data/localhost.signing.key" ]; then
@@ -61,17 +68,26 @@ up() {
     docker run --rm -v "$data:/data" -e UID="$E2E_UID" -e GID="$E2E_GID" \
       -e SYNAPSE_SERVER_NAME=localhost -e SYNAPSE_REPORT_STATS=no "$SYNAPSE_IMAGE" generate >/dev/null
   fi
-  if [ ! -f "$data/tls.crt" ]; then
-    openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=localhost" \
-      -addext "subjectAltName=DNS:localhost" -keyout "$data/tls.key" -out "$data/tls.crt" >/dev/null 2>&1
-    chmod 644 "$data/tls.key"
+  if [ -d "$WEB_E2E/docker/synapse" ]; then
+    if [ ! -f "$data/tls.crt" ]; then
+      openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=localhost" \
+        -addext "subjectAltName=DNS:localhost" -keyout "$data/tls.key" -out "$data/tls.crt" >/dev/null 2>&1
+      chmod 644 "$data/tls.key"
+    fi
+    cp "$WEB_E2E/docker/synapse/homeserver.yaml" "$data/"
+    for extra in side-service.yaml harness.yaml; do
+      [ -f "$WEB_E2E/docker/synapse/$extra" ] && cp "$WEB_E2E/docker/synapse/$extra" "$data/"
+    done
+    # No OIDC provider: the app then takes its password route (ADR 0021), so XCUITest signs in
+    # without the system web-authentication sheet.
+    strip_oidc "$data/homeserver.yaml"
+    log "starting Synapse (twake-space-chat stack at $WEB_E2E)"
+    "${COMPOSE[@]}" up -d --wait postgres mailpit dex ldap synapse
+  else
+    cp "$WEB_E2E/docker/homeserver.yaml" "$data/"
+    log "starting Synapse (bundled stack at $WEB_E2E)"
+    "${COMPOSE[@]}" up -d --wait
   fi
-  cp "$WEB_E2E"/docker/synapse/{homeserver,side-service,harness}.yaml "$data/"
-  # No OIDC provider: the app then takes its password route (ADR 0021: password when the server offers no SSO), so
-  # XCUITest signs in without the system web-authentication sheet.
-  strip_oidc "$data/homeserver.yaml"
-  log "starting Synapse"
-  "${COMPOSE[@]}" up -d --wait postgres mailpit dex ldap synapse
   check_server
   seed
 }
@@ -150,11 +166,32 @@ seed_room() { # token name -> room id (reuses a joined room of that name)
     sed -n 's/.*"room_id":"\([^"]*\)".*/\1/p'
 }
 
+pick_simulator() {
+  simulator_udid "$SIMULATOR_NAME" && return 0
+  local name
+  for name in "iPhone 17 Pro" "iPhone 17" "iPhone 16e" "iPhone 16" "iPhone 15"; do
+    if simulator_udid "$name"; then
+      SIMULATOR_NAME=$name
+      return 0
+    fi
+  done
+  name=$(xcrun simctl list devices available | sed -n 's/^ *\(iPhone [^()]*\) (\([0-9A-F-]\{36\}\)).*/\1/p' | head -1)
+  [ -n "$name" ] || return 1
+  SIMULATOR_NAME=$name
+}
+
+simulator_udid() { # name -> udid on stdout, or 1 if missing
+  local udid
+  udid=$(xcrun simctl list devices available | grep -F "    $1 (" | head -1 |
+    sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
+  [ -n "$udid" ] || return 1
+  printf '%s\n' "$udid"
+}
+
 run_tests() { # homeserver user password
   local udid
-  udid=$(xcrun simctl list devices available | grep -F "    $SIMULATOR_NAME (" | head -1 |
-    sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
-  [ -n "$udid" ] || die "no simulator named '$SIMULATOR_NAME'"
+  pick_simulator || die "no iPhone simulator available"
+  udid=$(simulator_udid "$SIMULATOR_NAME") || die "no simulator named '$SIMULATOR_NAME'"
   rm -rf "$RESULTS.xcresult" "$RESULTS.log"
   mkdir -p "$(dirname "$RESULTS")"
   log "testing on $SIMULATOR_NAME ($udid)"

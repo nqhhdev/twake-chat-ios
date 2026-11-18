@@ -1,0 +1,25 @@
+# Minimal Synapse for Twake Chat iOS E2E (no ToM, Dex, or LDAP). Used when
+# twake-space-chat/e2e is not checked out, including GitHub Actions.
+name: twake-ios-e2e
+
+services:
+  synapse:
+    image: ghcr.io/element-hq/synapse:v1.162.0
+    environment:
+      UID: ${E2E_UID:-1000}
+      GID: ${E2E_GID:-1000}
+    volumes:
+      - ../.data/synapse:/data
+    ports:
+      - "127.0.0.1:8008:8008"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8008/_matrix/client/versions')",
+        ]
+      interval: 3s
+      timeout: 5s
+      retries: 40

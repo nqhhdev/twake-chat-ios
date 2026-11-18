@@ -20,9 +20,10 @@ scripts/e2e.sh test         # xcodebuild test -testPlan E2E on "iPhone 16e"
 scripts/e2e.sh down         # docker compose down -v
 ```
 
-Needs Docker Desktop running and a clone of `twake-space-chat` (set `WEB_E2E` if it is not at
-`~/Documents/Linagora/twake-space-chat/e2e`). Results: `build/e2e.xcresult` (screenshots kept for every test) and
-`build/e2e.log`. `SIMULATOR_NAME` picks another simulator.
+Needs Docker (Docker Desktop locally, or Colima on GitHub Actions). When
+`~/Documents/Linagora/twake-space-chat/e2e` is present it is used (set `WEB_E2E` to override); otherwise the bundled
+Synapse in `e2e/` of this repo starts. Results: `build/e2e.xcresult` (screenshots kept for every test) and
+`build/e2e.log`. `SIMULATOR_NAME` picks another simulator; if that name is missing the script takes a present iPhone.
 
 ### What `up` does
 
@@ -76,7 +77,11 @@ password login answered `403 M_FORBIDDEN`, so this path is not usable yet.
   `scripts/seed-encryption.mjs`) and cross-sign it, then bootstrap recovery on iOS (#79, #81). Needs ToM for the
   recovery words.
 - Media: seed an `m.image` from ios-bob, add photos to the simulator library.
-- CI: a macOS job running `scripts/e2e.sh all` and uploading `build/e2e.xcresult`.
+- CI: `.github/workflows/e2e.yml` runs on pull requests and `workflow_dispatch`. It uses `macos-15-intel` with
+  Colima so Docker Synapse and the simulator share `http://localhost:8008`. GitHub-hosted `macos-26` (Apple Silicon)
+  cannot run Docker (no nested virtualization). The job selects Xcode 26.2, runs `scripts/e2e.sh all` against the
+  bundled stack in `e2e/`, and uploads `build/e2e.xcresult` and `build/e2e.log`. If the Intel image drops Xcode 26.2,
+  revisit a Linux Synapse plus tunnel (server_name vs public URL is the hard part).
 
 ## Borrowed from element-x-ios
 
