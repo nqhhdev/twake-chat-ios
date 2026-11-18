@@ -40,8 +40,22 @@ done < <(find "${roots[@]}" \
   -o -type f -name '*.swift' -print0)
 [ ${#files[@]} -eq 0 ] && exit 0
 
+# Xcode's swift-format on a Mac; the Swift 6 toolchain's `swift format` on Linux CI.
+run_swift_format() {
+  if command -v xcrun >/dev/null 2>&1 && xcrun --find swift-format >/dev/null 2>&1; then
+    xcrun swift-format "$@"
+  elif command -v swift-format >/dev/null 2>&1; then
+    swift-format "$@"
+  elif command -v swift >/dev/null 2>&1; then
+    swift format "$@"
+  else
+    echo "$0: swift-format not found (install Xcode or a Swift 6 toolchain)" >&2
+    exit 1
+  fi
+}
+
 if [ "$mode" = format ]; then
-  xcrun swift-format format --in-place --parallel -- "${files[@]}"
+  run_swift_format format --in-place --parallel -- "${files[@]}"
 else
-  xcrun swift-format lint --strict --parallel -- "${files[@]}"
+  run_swift_format lint --strict --parallel -- "${files[@]}"
 fi
