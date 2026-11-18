@@ -31,6 +31,7 @@ let package = Package(
       dependencies: [
         "Room", "RoomTestSupport",
         .product(name: "Domain", package: "Domain"),
+        .product(name: "DesignSystem", package: "DesignSystem"),
       ],
       swiftSettings: [.treatAllWarnings(as: .error)]
     ),

@@ -31,6 +31,7 @@ let package = Package(
       dependencies: [
         "Settings", "SettingsTestSupport",
         .product(name: "Domain", package: "Domain"),
+        .product(name: "DesignSystem", package: "DesignSystem"),
       ],
       swiftSettings: [.treatAllWarnings(as: .error)]
     ),

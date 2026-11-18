@@ -122,8 +122,8 @@ for form in 'branch: "main"' 'revision: "2916f3f9"' '"26.04.01"..<"27.0.0"' '"26
 )"
 done
 
-# Build output and the fixture trees are skipped; MatrixData may import the SDK; DesignSystem tests may check versions.
-for skipped in .build/checkouts/x .swiftpm/x DerivedData/x SourcePackages/x scripts/tests/architecture-fixtures/x; do
+# Build output, nested worktrees (.claude, worktrees) and the fixture trees are skipped; MatrixData may import the SDK; DesignSystem tests may check versions.
+for skipped in .build/checkouts/x .swiftpm/x DerivedData/x SourcePackages/x scripts/tests/architecture-fixtures/x .claude/worktrees/x worktrees/x build/x; do
   put edge-skipped "$skipped/TwakeChat/A.swift" '@preconcurrency import MatrixRustSDK
 func f() { if #available(iOS 26, *) {} }'
   put edge-skipped "$skipped/Package.swift" ".package(url: \"$sdk_url\", from: \"1.0.0\")"

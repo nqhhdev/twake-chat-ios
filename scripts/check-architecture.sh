@@ -7,7 +7,7 @@
 #     The Features index (Packages/Features/Package.swift, TWAK-65) may depend on feature packages only.
 #   Rule 4 (ADR 0005): Domain, AppShared and DesignSystem sources import only the system modules ADR 0005 allows.
 #   Rule 5 (ADR 0003): a Package.swift that declares the Matrix SDK pins it with exact:.
-# Scans *.swift and Package.swift files; skips build output and the test fixtures under scripts/tests.
+# Scans *.swift and Package.swift files; skips build output, nested worktrees (.claude, worktrees), and the test fixtures under scripts/tests.
 # Usage: scripts/check-architecture.sh [ROOT]    ROOT defaults to the repository root
 set -euo pipefail
 
@@ -161,7 +161,8 @@ swift_files=()
 while IFS= read -r file; do
   swift_files+=("${file#./}")
 done < <(find . \
-  \( -name .git -o -name .build -o -name .swiftpm -o -name DerivedData -o -name SourcePackages \) -prune \
+  \( -name .git -o -name .build -o -name .swiftpm -o -name DerivedData -o -name SourcePackages \
+     -o -name .claude -o -name worktrees -o -name build \) -prune \
   -o -path ./scripts/tests/architecture-fixtures -prune \
   -o -type f -name '*.swift' -print | LC_ALL=C sort)
 

@@ -1,4 +1,5 @@
 import DesignSystem
+import Room
 import Testing
 import UIKit
 

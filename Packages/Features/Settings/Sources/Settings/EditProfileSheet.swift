@@ -13,7 +13,7 @@ struct EditProfileSheet: View {
     NavigationStack {
       Form {
         Section {
-          AvatarPicker(
+          PhotosAvatarPicker(
             name: viewModel.displayName, pictureID: viewModel.avatar?.source,
             load: viewModel.avatar.map { reference in
               { @Sendable [viewModel] in await viewModel.picture(reference) }
