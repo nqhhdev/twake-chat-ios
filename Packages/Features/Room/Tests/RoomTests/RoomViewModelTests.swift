@@ -1143,4 +1143,28 @@ struct RoomThreadTests {
     #expect(!viewModel.canOpenThreads)
     #expect(viewModel.openedThread == nil)
   }
+
+  @Test func presenceInADirectChatShowsOnlineAndStopsWhenCancelled() async {
+    let details = FakeRoomDetailsRepository()
+    details.detailsResult = .success(
+      RoomDetails(
+        id: "!dm:example.org", name: "Bob", topic: nil, alias: nil, isDirect: true,
+        isEncrypted: true, isPublic: false, joinedMemberCount: 2,
+        directUserId: "@bob:example.org"))
+    details.presence = Presence(isOnline: true)
+    let viewModel = RoomViewModel(
+      roomId: "!dm:example.org", roomName: "Bob", repository: FakeTimelineRepository(),
+      media: FakeMediaRepository(), details: details)
+    await viewModel.loadRoomState()
+    let task = Task { await viewModel.watchPresence(every: .milliseconds(20)) }
+    while details.presenceCalls.count < 2 { await Task.yield() }
+    #expect(viewModel.headerSubtitle == "Online")
+    task.cancel()
+    _ = await task.result
+    let count = details.presenceCalls.count
+    try? await Task.sleep(for: .milliseconds(80))
+    #expect(details.presenceCalls.count == count)
+    #expect(details.presenceCalls.allSatisfy { $0 == "@bob:example.org" })
+  }
+
 }
