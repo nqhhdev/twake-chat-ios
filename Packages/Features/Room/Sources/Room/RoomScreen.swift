@@ -261,7 +261,11 @@ public struct RoomScreen: View {
       }
     }
     .task(id: viewModel.roomId) { await viewModel.start() }
-    .task(id: viewModel.roomId) { await viewModel.watchPresence() }
+    // Cancels the 15 s poll when the scene leaves the foreground (issue #111).
+    .task(id: "\(viewModel.roomId)-\(scenePhase == .active)") {
+      guard scenePhase == .active else { return }
+      await viewModel.watchPresence()
+    }
     .sheet(isPresented: $isPickingDate) {
       NavigationStack {
         DatePicker("Date", selection: $pickedDate, in: ...Date(), displayedComponents: .date)

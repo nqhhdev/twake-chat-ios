@@ -160,4 +160,21 @@ public final class FakeRoomDetailsRepository: RoomDetailsRepository, @unchecked 
     try changeResult.get()
     lock.withLock { _changes.append("encryption") }
   }
+
+  private var _presence: Presence?
+  private var _presenceCalls: [String] = []
+
+  /// What `presence(of:)` answers.
+  public var presence: Presence? {
+    get { lock.withLock { _presence } }
+    set { lock.withLock { _presence = newValue } }
+  }
+
+  /// User ids `presence(of:)` was called with, in order.
+  public var presenceCalls: [String] { lock.withLock { _presenceCalls } }
+
+  public func presence(of userId: String) async -> Presence? {
+    lock.withLock { _presenceCalls.append(userId) }
+    return presence
+  }
 }
