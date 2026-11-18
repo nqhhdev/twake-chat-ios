@@ -302,6 +302,14 @@ public struct RoomScreen: View {
   }
 }
 
+/// What the timeline's scroll geometry reports, so one change handler can both follow the bottom and page at the top.
+private struct TimelineScrollGeometry: Equatable {
+  var isAtBottom: Bool
+  var isNearTop: Bool
+  /// The loaded content is shorter than the viewport, so a few pages may load to fill it.
+  var isShort: Bool
+}
+
 /// The scrolling timeline. New messages spring in from the bottom and the view follows them while the user is at the
 /// bottom; scrolled up, a button brings the user back down, as in Telegram and iMessage.
 struct TimelineScroll: View {
@@ -312,6 +320,8 @@ struct TimelineScroll: View {
   @State private var isAtBottom = true
   /// The newest row when the user scrolled up; what arrives after it is counted on the scroll-down button.
   @State private var lastSeenRowId: String?
+  /// The row that was at the top when a page was asked for, so a prepend can keep it in place.
+  @State private var paginationAnchorId: String?
 
   var body: some View {
     let rows = viewModel.rows
@@ -320,22 +330,23 @@ struct TimelineScroll: View {
       LazyVStack(spacing: 0) {
         if let placeholder = viewModel.placeholder {
           // No message to show yet: say so in the middle of the screen instead of a small spinner at its top.
-          TimelinePlaceholderView(placeholder: placeholder) { viewModel.resumeHistory() }
-            .task(id: placeholder) {
-              if placeholder == .loading { await viewModel.loadOlderWhileVisible() }
-            }
+          TimelinePlaceholderView(placeholder: placeholder) {
+            Task { await viewModel.resumeHistory() }
+          }
+          .task(id: placeholder) {
+            if placeholder == .loading { await viewModel.loadOlderWhileVisible() }
+          }
         } else if !viewModel.reachedStart {
           if viewModel.isHistoryPaused {
             // Loading stopped by itself (many pages with nothing to show, or pages failing): the user asks for more.
-            Button("Load earlier messages") { viewModel.resumeHistory() }
+            Button("Load earlier messages") { Task { await viewModel.resumeHistory() } }
               .buttonStyle(.bordered)
               .padding()
           } else {
-            // While the spinner shows, keep loading pages: one page may not fill the screen or reach the start, and
-            // the spinner would otherwise stay with nothing asking for more.
+            // Visible only while a page the user asked for is in flight; it does not start further pages.
             ProgressView()
               .padding()
-              .task { await viewModel.loadOlderWhileVisible() }
+              .opacity(viewModel.isLoadingOlder ? 1 : 0)
           }
         }
         if viewModel.reachedStart, !rows.contains(where: Self.isMessage) {
@@ -351,6 +362,7 @@ struct TimelineScroll: View {
       .padding(.vertical, 8)
       // Only the newest row animates in; loading older messages at the top does not move the view.
       .animation(.spring(response: 0.38, dampingFraction: 0.78), value: rows.last?.id)
+      .scrollTargetLayout()
     }
     .scrollPosition($position)
     .onChange(of: viewModel.scrollTarget) { _, target in
@@ -364,12 +376,29 @@ struct TimelineScroll: View {
     .defaultScrollAnchor(.bottom)
     .defaultScrollAnchor(.bottom, for: .sizeChanges)
     .scrollDismissesKeyboard(.interactively)
-    .onScrollGeometryChange(for: Bool.self) { geometry in
+    .onScrollGeometryChange(for: TimelineScrollGeometry.self) { geometry in
       // The visible rect accounts for the insets (the composer, the safe area), unlike the bare content offset.
-      geometry.visibleRect.maxY >= geometry.contentSize.height - 80
-    } action: { _, atBottom in
-      lastSeenRowId = atBottom ? nil : viewModel.rows.last?.id
-      withAnimation(.easeOut(duration: 0.2)) { isAtBottom = atBottom }
+      TimelineScrollGeometry(
+        isAtBottom: geometry.visibleRect.maxY >= geometry.contentSize.height - 80,
+        isNearTop: geometry.contentOffset.y < 400,
+        isShort: geometry.contentSize.height > 0
+          && geometry.contentSize.height <= geometry.visibleRect.height + 8)
+    } action: { _, geometry in
+      lastSeenRowId = geometry.isAtBottom ? nil : viewModel.rows.last?.id
+      withAnimation(.easeOut(duration: 0.2)) { isAtBottom = geometry.isAtBottom }
+      if geometry.isShort, !viewModel.reachedStart, viewModel.placeholder == nil {
+        Task { await viewModel.loadOlderWhileVisible() }
+      } else if !geometry.isShort {
+        if geometry.isNearTop {
+          if paginationAnchorId == nil { paginationAnchorId = viewModel.rows.first?.id }
+        } else {
+          paginationAnchorId = nil
+        }
+        Task { await viewModel.topZoneChanged(isNearTop: geometry.isNearTop) }
+      }
+    }
+    .onChange(of: viewModel.rows) { old, new in
+      restorePaginationAnchor(from: old, to: new)
     }
     // The SDK empties and refills a timeline after a gap in sync, and the keyboard resizes the view: either can leave
     // the scroll offset outside the new content, which shows as an empty screen until the user drags. Come back to
@@ -425,6 +454,16 @@ struct TimelineScroll: View {
   /// Whether the viewport lies wholly above or below the content, so no row is in view.
   static func showsNothing(visible: CGRect, contentHeight: CGFloat) -> Bool {
     contentHeight > 0 && (visible.minY >= contentHeight || visible.maxY <= 0)
+  }
+
+  /// After older rows are prepended, put the message the user was looking at back at the top, without animation.
+  private func restorePaginationAnchor(from old: [ChatRow], to new: [ChatRow]) {
+    guard let id = paginationAnchorId, let oldIndex = old.firstIndex(where: { $0.id == id }),
+      let newIndex = new.firstIndex(where: { $0.id == id }), newIndex > oldIndex
+    else { return }
+    var transaction = Transaction()
+    transaction.disablesAnimations = true
+    withTransaction(transaction) { position.scrollTo(id: id, anchor: .top) }
   }
 
   private static func isMessage(_ row: ChatRow) -> Bool {

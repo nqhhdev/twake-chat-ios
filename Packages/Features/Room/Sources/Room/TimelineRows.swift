@@ -41,7 +41,7 @@ extension ChatRow {
 
 /// Consecutive room events shown as one foldable line.
 public struct NoticesRowModel: Equatable, Identifiable {
-  /// The first event's item id.
+  /// The newest event's item id, so prepending older notices keeps this row's identity.
   public let id: String
   public let texts: [String]
 }
@@ -68,7 +68,7 @@ public struct MessageRowModel: Equatable, Identifiable {
 }
 
 public struct AlbumRowModel: Equatable, Identifiable {
-  /// The first picture's item id.
+  /// The album's batch id, or the first picture's item id when there is no batch.
   public let id: String
   public let messages: [TimelineMessage]
   public let position: GroupPosition
@@ -110,7 +110,8 @@ public enum TimelineRows {
         run.append(message)
         units[units.count - 1] = .pictures(id: id, run)
       } else if isAlbumPicture(message) {
-        units.append(.pictures(id: item.id, [message]))
+        // batchId stays the same when an older picture of the same send is prepended, so the row id does not change.
+        units.append(.pictures(id: message.batchId ?? item.id, [message]))
       } else {
         units.append(.message(id: item.id, message))
       }
@@ -161,7 +162,8 @@ public enum TimelineRows {
         let texts = run.compactMap { item -> String? in
           if case .stateNotice(let text) = item.kind { text } else { nil }
         }
-        result.append(.notices(NoticesRowModel(id: run[0].id, texts: texts)))
+        // The newest event's id, so prepending an older notice does not change the row.
+        result.append(.notices(NoticesRowModel(id: run[run.count - 1].id, texts: texts)))
       } else {
         result.append(contentsOf: run.map(ChatRow.other))
       }

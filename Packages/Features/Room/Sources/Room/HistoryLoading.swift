@@ -1,11 +1,11 @@
 import Foundation
 
-/// How far a chat loads older messages by itself while the top of the timeline is on screen.
+/// How far a chat fills itself when its content is shorter than the viewport, or when no message has shown yet.
 ///
-/// The Flutter app asks for history once when fewer than 30 events show (`_tryRequestHistory`); here the timeline
-/// keeps asking while its top is visible, so these limits stop a room that has nothing to show from loading forever.
+/// One scroll to the top loads one page; these limits only apply to that short-content fill, so a long room never
+/// pages on its own (issue #80).
 public struct HistoryLoading: Sendable, Equatable {
-  /// Pages loaded in a row before the timeline pauses and offers "Load earlier messages".
+  /// Pages loaded in a row to fill a short timeline before it pauses and offers "Load earlier messages".
   public var maxAutomaticPages: Int
   /// Failed pages in a row before it pauses.
   public var maxFailures: Int
@@ -14,7 +14,7 @@ public struct HistoryLoading: Sendable, Equatable {
   public var pauseAfterFailure: Duration
 
   public init(
-    maxAutomaticPages: Int = 10, maxFailures: Int = 3, pause: Duration = .milliseconds(250),
+    maxAutomaticPages: Int = 3, maxFailures: Int = 3, pause: Duration = .milliseconds(250),
     pauseAfterFailure: Duration = .seconds(3)
   ) {
     self.maxAutomaticPages = maxAutomaticPages

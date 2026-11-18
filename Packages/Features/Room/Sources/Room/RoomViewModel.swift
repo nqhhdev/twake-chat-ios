@@ -42,6 +42,8 @@ public final class RoomViewModel {
   public private(set) var reachedStart = false
   /// How far the timeline loads older pages by itself.
   public var historyLoading = HistoryLoading()
+  /// The top of the timeline must leave the viewport before another page can be asked for (one trigger, one page).
+  private var topArmed = true
   /// Loading by itself stopped (`HistoryLoading`): the top of the timeline offers "Load earlier messages".
   public private(set) var isHistoryPaused = false
   /// A list of this timeline held the start of the room; a later list without it means the SDK reset the timeline.
@@ -363,7 +365,6 @@ public final class RoomViewModel {
     }
     // Keys the NSE stored, or a recovery that just finished, are retried now that the timeline is open.
     await repository.retryDecryption(sessionIds: [])
-    Task { await self.loadOlder() }
     let typing = Task { [repository] in
       for await names in await repository.typingMembers() {
         await MainActor.run { withTypingAnimation { self.typingNames = names } }
@@ -420,7 +421,6 @@ public final class RoomViewModel {
     try? await media.thumbnail(reference, width: 96, height: 96)
   }
 
-  /// Loads older messages, once at a time, until the start of the room.
   /// Loads one older page. Returns `false` only when the page failed; a call while a page is loading, or at the start
   /// of the room, does nothing and returns `true`.
   @discardableResult
@@ -437,9 +437,21 @@ public final class RoomViewModel {
     }
   }
 
-  /// Loads older pages while the calling task runs (the top spinner is on screen), until the start of the room or
-  /// the limits of `historyLoading`. A room whose pages hold nothing to show (only hidden room events), or whose
-  /// pages keep failing, would otherwise load forever: it pauses, and the user asks for more (`resumeHistory`).
+  /// One approach of the top of the timeline loads one page. Leaving the top re-arms the trigger. A call while a page
+  /// is already loading, or at the start of the room, does nothing.
+  public func topZoneChanged(isNearTop: Bool) async {
+    if !isNearTop {
+      topArmed = true
+      return
+    }
+    guard topArmed, !isLoadingOlder, !reachedStart, !isHistoryPaused else { return }
+    topArmed = false
+    await loadOlder()
+  }
+
+  /// Loads older pages to fill a timeline that is shorter than the viewport, or that has nothing to show yet, until
+  /// the start of the room or the limits of `historyLoading`. A long room is not filled this way: the user scrolls
+  /// to the top for each next page (`topZoneChanged`).
   public func loadOlderWhileVisible() async {
     var pages = 0
     var failures = 0
@@ -486,9 +498,11 @@ public final class RoomViewModel {
     return isHistoryPaused ? .paused : .loading
   }
 
-  /// The user asked for earlier messages after loading paused.
-  public func resumeHistory() {
+  /// The user asked for earlier messages after loading paused: one page, not another automatic run.
+  public func resumeHistory() async {
     isHistoryPaused = false
+    topArmed = false
+    await loadOlder()
   }
 
   /// Keeps `reachedStart` true to the list on screen. The SDK empties and refills a timeline after a gap in sync; the

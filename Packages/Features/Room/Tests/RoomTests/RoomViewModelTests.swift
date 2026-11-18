@@ -397,6 +397,29 @@ struct RoomViewModelTests {
     #expect(repository.calls.contains(.ignore(message.senderId)))
   }
 
+  @Test func approachingTheTopLoadsOnePageAndNeedsAScrollAwayForTheNext() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = viewModel(repository)
+    await viewModel.topZoneChanged(isNearTop: true)
+    await viewModel.topZoneChanged(isNearTop: true)
+    #expect(repository.calls.filter { $0 == .loadOlder }.count == 1)
+    await viewModel.topZoneChanged(isNearTop: false)
+    await viewModel.topZoneChanged(isNearTop: true)
+    #expect(repository.calls.filter { $0 == .loadOlder }.count == 2)
+  }
+
+  @Test func theTopDoesNotLoadAtTheStartOfTheRoom() async {
+    let repository = FakeTimelineRepository()
+    repository.reachesStart = true
+    let viewModel = viewModel(repository)
+    await viewModel.topZoneChanged(isNearTop: true)
+    #expect(viewModel.reachedStart)
+    #expect(repository.calls.filter { $0 == .loadOlder }.count == 1)
+    await viewModel.topZoneChanged(isNearTop: false)
+    await viewModel.topZoneChanged(isNearTop: true)
+    #expect(repository.calls.filter { $0 == .loadOlder }.count == 1)
+  }
+
   @Test func loadingWhileVisibleKeepsPagingUntilTheStart() async {
     let repository = FakeTimelineRepository()
     let viewModel = viewModel(repository)
@@ -417,8 +440,9 @@ struct RoomViewModelTests {
     #expect(repository.calls.filter { $0 == .loadOlder }.count == 3)
     #expect(viewModel.isHistoryPaused)
     #expect(!viewModel.reachedStart)
-    viewModel.resumeHistory()
+    await viewModel.resumeHistory()
     #expect(!viewModel.isHistoryPaused)
+    #expect(repository.calls.filter { $0 == .loadOlder }.count == 4)
   }
 
   /// A page already on its way is waited for, not counted: a slow room paused after a few seconds with nothing
@@ -513,7 +537,6 @@ struct RoomViewModelTests {
     let newer = TimelineItem(id: "row2", kind: .message(message("$2")))
     repository.publish([newer])
     while viewModel.state != .loaded([newer]) { await Task.yield() }
-    while !repository.calls.contains(.loadOlder) || viewModel.isLoadingOlder { await Task.yield() }
     let pagesBefore = repository.calls.filter { $0 == .loadOlder }.count
     let jump = Task { await viewModel.jump(toEvent: "$1") }
     // The older page arrives through the timeline once the jump asked for it.
