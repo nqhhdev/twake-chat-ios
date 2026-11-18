@@ -1,4 +1,5 @@
-# CI for every pull request and every push to main (ADR 0014): format only. Uses no secret and no signing.
+# CI for every pull request and every push to main (ADR 0014): format, plus the architecture check (ADR 0005).
+# Uses no secret and no signing.
 # Each module is its own job, so they run in parallel and a finding names its module. Builds and tests run
 # locally before a pull request (.okf/workflows/build.md, section CI).
 name: CI
@@ -52,3 +53,16 @@ jobs:
 
       - name: swift-format lint ${{ matrix.path }}
         run: scripts/lint.sh "${{ matrix.path }}"
+
+  architecture:
+    name: architecture
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check architecture (ADR 0005)
+        run: scripts/check-architecture.sh
+
+      - name: Architecture check tests
+        run: scripts/tests/check_architecture_test.sh

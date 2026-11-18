@@ -249,7 +249,7 @@ struct EditRoomSheet: View {
       Form {
         Section {
           let avatar = viewModel.loadedAvatar
-          AvatarPicker(
+          PhotosAvatarPicker(
             name: name.isEmpty ? "?" : name, pictureID: avatar?.source,
             load: avatar.map { reference in
               { @Sendable [viewModel] in await viewModel.picture(reference) }
