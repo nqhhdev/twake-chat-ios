@@ -64,24 +64,21 @@ password login answered `403 M_FORBIDDEN`, so this path is not usable yet.
 |---|---|---|---|
 | 1 | `AuthenticationFlowTests` | welcome → company server → password → chat list → logout | pass |
 | 4 | `MessagingFlowTests` | send, reply, edit, quick reaction, delete in "E2E Chat" | pass |
-| 3 | `PaginationFlowTests` | idle on "E2E History" stays at the bottom; one scroll up keeps the message on screen | expected failure (#80): the scroll position moves |
+| 3 | `PaginationFlowTests` | idle on "E2E History" stays at the bottom; one scroll up keeps the message on screen | expects #80 (one page per trigger, scroll stays put) |
 | 10 | `ProfileFlowTests` | Settings shows "Alice E2E" | pass on the local stack (#82 did not reproduce here) |
-| 2 | `ScaffoldFlowTests.testEncryptedGroupMessageDecrypts` | encrypted group message decrypts (#79) | skipped: scaffold |
-| media | `ScaffoldFlowTests.testSendAndReceiveImage` | image send and receive | skipped: scaffold |
-
-`PaginationFlowTests` wraps its checks in `XCTExpectFailure(strict: false)`; remove the wrapper when #80 is fixed.
+An E2EE group-decrypt flow and a media send/receive flow are not in this target: they need a second crypto-capable
+client and a seeded photo, which this Synapse-only harness does not provide (#79, #81, #83). They will be added as real
+tests when that harness exists, not as skipped placeholders.
 
 ### Next
 
 - Flow 2: start a crypto-capable second client from `twake-space-chat/e2e` (`bob-*.mjs`,
   `scripts/seed-encryption.mjs`) and cross-sign it, then bootstrap recovery on iOS (#79, #81). Needs ToM for the
-  recovery words.
-- Media: seed an `m.image` from ios-bob, add photos to the simulator library.
-- CI: `.github/workflows/e2e.yml` runs on pull requests and `workflow_dispatch`. It uses `macos-15-intel` with
-  Colima so Docker Synapse and the simulator share `http://localhost:8008`. GitHub-hosted `macos-26` (Apple Silicon)
-  cannot run Docker (no nested virtualization). The job selects Xcode 26.2, runs `scripts/e2e.sh all` against the
-  bundled stack in `e2e/`, and uploads `build/e2e.xcresult` and `build/e2e.log`. If the Intel image drops Xcode 26.2,
-  revisit a Linux Synapse plus tunnel (server_name vs public URL is the hard part).
+  recovery words. Add `testEncryptedGroupMessageDecrypts` when that is in place.
+- Media: seed an `m.image` from ios-bob, add photos to the simulator library, then add `testSendAndReceiveImage`.
+- CI: `.github/workflows/e2e.yml` is `workflow_dispatch` only (macOS minutes are billed at 10×). When dispatched it
+  uses `macos-15-intel` with Colima so Docker Synapse and the simulator share `http://localhost:8008`. Prefer
+  `scripts/e2e.sh all` locally. Format and architecture CI run on `ubuntu-24.04`.
 
 ## Borrowed from element-x-ios
 

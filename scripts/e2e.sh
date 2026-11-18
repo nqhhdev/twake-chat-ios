@@ -84,7 +84,8 @@ up() {
     log "starting Synapse (twake-space-chat stack at $WEB_E2E)"
     "${COMPOSE[@]}" up -d --wait postgres mailpit dex ldap synapse
   else
-    cp "$WEB_E2E/docker/homeserver.yaml" "$data/"
+    # Named volume + read-only config mounts (e2e/docker/docker-compose.yaml): no host
+    # bind of /data, so Colima cannot leave the store read-only.
     log "starting Synapse (bundled stack at $WEB_E2E)"
     "${COMPOSE[@]}" up -d --wait
   fi

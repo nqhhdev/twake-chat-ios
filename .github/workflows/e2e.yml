@@ -1,18 +1,18 @@
-# E2E XCUITest against a local Synapse (issue #83, ADR 0014).
+# E2E XCUITest against a local Synapse (issue #83).
 #
-# Tradeoff: GitHub-hosted macos-26 runners are Apple Silicon and cannot run
-# Docker or Colima (no nested virtualization). docker/setup-docker-action also
-# fails on those ARM images. macos-15-intel can run Colima until ~August 2027
-# and currently ships Xcode 26.x, so Synapse and the simulator share
-# http://localhost:8008. A Linux Synapse job plus a tunnel would keep macos-26
-# for Xcode, but Matrix server_name "localhost" and the random tunnel hostname
-# do not mix without regenerating the homeserver per run. If this image loses
-# Xcode 26.2, this job will fail at "Select Xcode" and that split should be
-# revisited.
+# Manual only (`workflow_dispatch`): a macOS runner billed at 10× would exhaust
+# the Actions minutes if this ran on every pull request. Run it from the Actions
+# tab, or run `scripts/e2e.sh all` locally.
+#
+# Tradeoff if you do dispatch it: GitHub-hosted macos-26 (Apple Silicon) cannot
+# run Docker or Colima. macos-15-intel can run Colima until ~August 2027 and
+# currently ships Xcode 26.x, so Synapse and the simulator share
+# http://localhost:8008. timeout-minutes is 50 — enough for a cold SDK build and
+# the suite, short enough that a stuck Colima/start cannot drain the remaining
+# minutes.
 name: E2E
 
 on:
-  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -29,7 +29,7 @@ jobs:
   e2e:
     name: e2e (Synapse + XCUITest)
     runs-on: macos-15-intel
-    timeout-minutes: 90
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
 
@@ -50,7 +50,6 @@ jobs:
       - name: Run E2E suite
         run: scripts/e2e.sh all
         env:
-          # scripts/e2e.sh picks a present iPhone if this name is missing.
           SIMULATOR_NAME: iPhone 16e
 
       - name: Upload xcresult and log
