@@ -242,10 +242,41 @@ struct TimelineRowsTests {
       Issue.record("expected folded notices first")
       return
     }
-    #expect(folded.id == "n1")
+    #expect(folded.id == "n3")
     #expect(folded.texts == ["event n1", "event n2", "event n3"])
     // Two events in a row stay as they are.
     #expect(rows.count == 4)
+  }
+
+  @Test func prependingAnOlderNoticeKeepsTheFoldedRowId() {
+    let later = TimelineRows.rows(from: [notice("n1"), notice("n2"), notice("n3")])
+    let earlier = TimelineRows.rows(from: [notice("n0"), notice("n1"), notice("n2"), notice("n3")])
+    guard case .notices(let first) = later.first, case .notices(let prepended) = earlier.first
+    else {
+      Issue.record("expected folded notices")
+      return
+    }
+    #expect(first.id == prepended.id)
+    #expect(prepended.id == "n3")
+  }
+
+  @Test func prependingAnOlderPictureKeepsTheAlbumRowId() {
+    let later = TimelineRows.rows(from: [
+      item("2", from: "@a", at: 1, .image(caption: nil), media: true, batch: "b"),
+      item("3", from: "@a", at: 2, .image(caption: nil), media: true, batch: "b"),
+    ])
+    let earlier = TimelineRows.rows(from: [
+      item("1", from: "@a", at: 0, .image(caption: nil), media: true, batch: "b"),
+      item("2", from: "@a", at: 1, .image(caption: nil), media: true, batch: "b"),
+      item("3", from: "@a", at: 2, .image(caption: nil), media: true, batch: "b"),
+    ])
+    guard case .album(let first) = later.first, case .album(let prepended) = earlier.first else {
+      Issue.record("expected an album")
+      return
+    }
+    #expect(first.id == prepended.id)
+    #expect(prepended.id == "b")
+    #expect(prepended.messages.map(\.eventId) == ["$1", "$2", "$3"])
   }
 
   @Test func aPictureJustSentShowsFromTheUploadedCopy() {
