@@ -615,6 +615,25 @@ struct RoomViewModelTests {
     #expect(viewModel.peopleSheet?.title == "Seen by")
     #expect(viewModel.peopleSheet?.userIds == ["@bob:x"])
   }
+
+  @Test func retryDecryptionAsksTheOpenTimelineToTryAgain() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = viewModel(repository)
+    await viewModel.retryDecryption()
+    #expect(repository.calls == [.retryDecryption([])])
+  }
+
+  @Test func openingTheTimelineRetriesDecryption() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = viewModel(repository)
+    let task = Task { await viewModel.start() }
+    while !repository.calls.contains(.retryDecryption([])) { await Task.yield() }
+    repository.finish()
+    await task.value
+    #expect(repository.calls.contains(.open))
+    #expect(repository.calls.contains(.retryDecryption([])))
+  }
+
 }
 
 @MainActor

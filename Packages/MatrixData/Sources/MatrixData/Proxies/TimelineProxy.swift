@@ -571,7 +571,13 @@ public actor TimelineProxy: TimelineRepository {
   }
 
   /// Stops following the timeline and releases the SDK room and timeline while the client is alive.
+  public func retryDecryption(sessionIds: [String]) async {
+    guard let timeline = try? openedTimeline() else { return }
+    timeline.retryDecryption(sessionIds: sessionIds)
+  }
+
   public func close() async {
+
     for handle in typingHandles { handle.cancel() }
     typingHandles = []
     guard let opened else { return }

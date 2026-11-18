@@ -65,6 +65,10 @@ public protocol TimelineRepository: Sendable {
   /// send queue (it does after a network failure), the queue starts again, which also sends what waits behind it.
   func retrySend(transactionId: String) async
 
+  /// Retries decrypting events in this timeline that were previously un-decryptable. An empty `sessionIds` retries
+  /// every such event, as the SDK and Element X do when the app becomes active and after keys are imported.
+  func retryDecryption(sessionIds: [String]) async
+
   /// Removes the local echo `transactionId` of a message that is not sent yet, so it is never sent.
   func discardUnsent(transactionId: String) async throws(TimelineError)
 

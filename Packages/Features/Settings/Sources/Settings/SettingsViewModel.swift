@@ -249,6 +249,7 @@ public final class SettingsViewModel {
       try await repository.recover(recoveryKey: key)
       didRecover = true
       recoveryStatus = await repository.recoveryStatus()
+      NotificationCenter.default.post(name: .encryptionKeysImported, object: nil)
     } catch .wrongRecoveryKey {
       errorMessage = "Wrong recovery key"
     } catch {

@@ -361,6 +361,8 @@ public final class RoomViewModel {
       if thisStart == startCount { state = .failed("Could not open this chat.") }
       return
     }
+    // Keys the NSE stored, or a recovery that just finished, are retried now that the timeline is open.
+    await repository.retryDecryption(sessionIds: [])
     Task { await self.loadOlder() }
     let typing = Task { [repository] in
       for await names in await repository.typingMembers() {
@@ -1038,6 +1040,12 @@ public final class RoomViewModel {
     if let presenceLine { return presenceLine }
     guard let memberCount, memberCount > 0 else { return nil }
     return memberCount == 1 ? "1 member" : "\(memberCount) members"
+  }
+
+  /// Asks the open timeline to decrypt events that were UTD, for example after keys arrive from the NSE or after
+  /// recovery. An empty session list retries every such event, as Element X does.
+  public func retryDecryption() async {
+    await repository.retryDecryption(sessionIds: [])
   }
 
   /// Reads the other person's presence now and every `interval` while the chat shows, as the web reads the presence
