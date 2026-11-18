@@ -404,6 +404,7 @@ struct UnavailableTimeline: TimelineRepository {
   func loadDraft() async -> String? { nil }
   func report(eventId: String, reason: String?) async throws(TimelineError) { throw .unavailable }
   func retrySend(transactionId: String) async {}
+  func retryDecryption(sessionIds: [String]) async {}
   func discardUnsent(transactionId: String) async throws(TimelineError) { throw .unavailable }
   func ignore(userId: String) async throws(TimelineError) { throw .unavailable }
   func saveDraft(_ text: String) async {}

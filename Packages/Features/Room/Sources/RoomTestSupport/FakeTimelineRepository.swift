@@ -19,6 +19,7 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
     case forward(String, String)
     case report(String, String?)
     case retry(String)
+    case retryDecryption([String])
     case discard(String)
     case ignore(String)
     case createPoll(PollDraft)
@@ -197,6 +198,8 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
   }
 
   public func retrySend(transactionId: String) async { record(.retry(transactionId)) }
+
+  public func retryDecryption(sessionIds: [String]) async { record(.retryDecryption(sessionIds)) }
 
   public func discardUnsent(transactionId: String) async throws(TimelineError) {
     record(.discard(transactionId))

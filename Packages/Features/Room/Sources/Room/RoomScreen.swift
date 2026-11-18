@@ -166,7 +166,13 @@ public struct RoomScreen: View {
     .animation(.spring(response: 0.4, dampingFraction: 0.85), value: viewModel.pinned)
     .task { await viewModel.refreshSessionWarning() }
     .onChange(of: scenePhase) { _, phase in
-      if phase == .active { Task { await viewModel.refreshSessionWarning() } }
+      if phase == .active {
+        Task { await viewModel.refreshSessionWarning() }
+        Task { await viewModel.retryDecryption() }
+      }
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .encryptionKeysImported)) { _ in
+      Task { await viewModel.retryDecryption() }
     }
     .sensoryFeedback(.success, trigger: viewModel.toast) { _, new in new != nil }
     .navigationTitle(viewModel.threadRootId == nil ? viewModel.roomName : "Thread")

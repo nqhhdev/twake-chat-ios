@@ -32,9 +32,16 @@ struct SettingsViewModelTests {
     let repository = FakeAccountSettingsRepository()
     repository.status = .incomplete
     let viewModel = viewModel(repository)
+    final class Flag: @unchecked Sendable { var value = false }
+    let imported = Flag()
+    let token = NotificationCenter.default.addObserver(
+      forName: .encryptionKeysImported, object: nil, queue: nil
+    ) { _ in imported.value = true }
+    defer { NotificationCenter.default.removeObserver(token) }
     await viewModel.recover(with: "EsTc abcd")
     #expect(viewModel.didRecover)
     #expect(viewModel.recoveryStatus == .enabled)
+    #expect(imported.value)
   }
 
   @Test func aWrongRecoveryKeySaysSo() async {
