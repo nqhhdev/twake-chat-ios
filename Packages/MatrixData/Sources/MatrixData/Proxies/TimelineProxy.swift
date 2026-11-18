@@ -41,16 +41,25 @@ public actor TimelineProxy: TimelineRepository {
     let timeline: Timeline
     let room: Room
     do {
-      _ = try await client.startSync()
-      guard let found = try client.client.getRoom(roomId: roomId) else {
-        throw TimelineError.roomNotFound
-      }
-      room = found
-      let configuration =
-        if let content { Self.configuration(only: content) } else {
-          Self.configuration(threadRoot: threadRoot)
+      // Bound the wait: startSync or the room lookup can stall (store lock, first sync). Issue #84.
+      let roomId = roomId
+      let content = content
+      let threadRoot = threadRoot
+      (room, timeline) = try await withTimeout(.seconds(15)) {
+        _ = try await client.startSync()
+        guard let found = try await client.room(id: roomId) else {
+          throw TimelineError.roomNotFound
         }
-      timeline = try await room.timelineWithConfiguration(configuration: configuration)
+        let configuration =
+          if let content { Self.configuration(only: content) } else {
+            Self.configuration(threadRoot: threadRoot)
+          }
+        let timeline = try await found.timelineWithConfiguration(configuration: configuration)
+        return (found, timeline)
+      }
+    } catch is WaitTimeout {
+      DebugLog.failure("openTimeline", WaitTimeout())
+      throw .unavailable
     } catch let error as TimelineError {
       throw error
     } catch {

@@ -22,14 +22,14 @@ public final class RoomViewModel {
   }
 
   public let roomId: String
-  public let roomName: String
+  public private(set) var roomName: String
   /// The root of the thread this screen shows, or `nil` for the room's main timeline.
   public let threadRootId: String?
   /// The thread pushed from this room, while it shows.
   public var openedThread: RoomViewModel?
   @ObservationIgnored private let threadTimeline: ThreadTimeline?
   /// The room's picture, or `nil` when it has none.
-  public let roomAvatar: MediaReference?
+  public private(set) var roomAvatar: MediaReference?
   public private(set) var state: State = .loading
   public var draft = ""
   /// The people picked from the @ suggestions, by the name the draft shows; sending turns each into a mention.
@@ -350,13 +350,16 @@ public final class RoomViewModel {
   }
 
   /// Opens the timeline and follows it until the calling task is cancelled (the screen goes away); then closes it.
+  /// How long to wait after a `roomNotFound` or `unavailable` before opening the timeline again (cold start, #84).
+  public var openRetryDelays: [Duration] = [.seconds(1), .seconds(2), .seconds(4)]
+
   public func start() async {
     startCount += 1
     let thisStart = startCount
     state = .loading
     let items: AsyncStream<[TimelineItem]>
     do {
-      items = try await repository.open()
+      items = try await openTimeline()
     } catch {
       if thisStart == startCount { state = .failed("Could not open this chat.") }
       return
@@ -413,6 +416,20 @@ public final class RoomViewModel {
       if case .edit = composerMode {} else { await repository.saveDraft(draft) }
       await repository.close()
     }
+  }
+
+  /// Opens the timeline, trying again a few times when the room is not in the store yet (a notification cold start).
+  private func openTimeline() async throws(TimelineError) -> AsyncStream<[TimelineItem]> {
+    var lastError: TimelineError = .unavailable
+    for attempt in 0...openRetryDelays.count {
+      do { return try await repository.open() } catch {
+        lastError = error
+        let canRetry = error == .roomNotFound || error == .unavailable
+        guard canRetry, attempt < openRetryDelays.count else { throw error }
+        try? await Task.sleep(for: openRetryDelays[attempt])
+      }
+    }
+    throw lastError
   }
 
   /// Loads a picture (an avatar) as data; `nil` when it fails.
@@ -1001,6 +1018,9 @@ public final class RoomViewModel {
     isDirect = details.isDirect
     isBroadcast = details.isBroadcast
     memberCount = details.isDirect ? nil : details.joinedMemberCount
+    // A notification may have opened this screen with a placeholder name ("Chat" / the alert title).
+    if !details.name.isEmpty { roomName = details.name }
+    if let avatar = details.avatar { roomAvatar = avatar }
     var blocked: String?
     if let userId = details.directUserId, let blocking, await blocking.isBlocked(userId) {
       blocked = userId

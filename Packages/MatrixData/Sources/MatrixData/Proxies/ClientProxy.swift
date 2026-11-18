@@ -89,6 +89,51 @@ public final class ClientProxy: Sendable {
     try await sync.start(client: client).roomListService()
   }
 
+  /// The SDK room `id`, waiting when it is not in the store yet (a cold start from a notification, issue #84).
+  ///
+  /// Tries the store first, then starts sync, waits until the room list has loaded, and if the room is still missing
+  /// waits for a remote echo, all within `timeout`. Returns `nil` when the room is still unknown after that.
+  func room(id: String, timeout: Duration = .seconds(10)) async throws -> Room? {
+    if let room = try client.getRoom(roomId: id) { return room }
+    let deadline = ContinuousClock.now + timeout
+    let service = try await startSync()
+    let list = try await service.allRooms()
+    await waitUntilRoomListLoaded(list, until: deadline)
+    if let room = try client.getRoom(roomId: id) { return room }
+    let remaining = deadline - ContinuousClock.now
+    guard remaining > .zero else { return try client.getRoom(roomId: id) }
+    do {
+      return try await withTimeout(remaining) {
+        try await self.client.awaitRoomRemoteEcho(roomId: id)
+      }
+    } catch {
+      DebugLog.failure("awaitRoomRemoteEcho", error)
+      return try client.getRoom(roomId: id)
+    }
+  }
+
+  /// Returns when the room list reports it has loaded, when `deadline` is reached, or when the listener ends.
+  private func waitUntilRoomListLoaded(
+    _ roomList: RoomList, until deadline: ContinuousClock.Instant
+  )
+    async
+  {
+    let waiter = RoomListLoadingWaiter()
+    do {
+      let result = try roomList.loadingState(listener: waiter)
+      if case .loaded = result.state {
+        result.stateStream.cancel()
+        return
+      }
+      defer { result.stateStream.cancel() }
+      let remaining = deadline - ContinuousClock.now
+      guard remaining > .zero else { return }
+      await waiter.wait(for: remaining)
+    } catch {
+      DebugLog.failure("waitForRoomList", error)
+    }
+  }
+
   /// Keeps SDK objects that feed on the running sync (a room list, its controller and its entries `TaskHandle`) until
   /// sync stops, which cancels the handle and releases them while the client is still alive: the SDK aborts the
   /// process when a room list is freed after its client. Returns `false`, keeping nothing, when sync is not running
@@ -275,5 +320,33 @@ final class KeychainClientSessionDelegate: ClientSessionDelegate {
   func saveSessionInKeychain(session: Session) {
     guard let stored = try? UserSessionMapper.storedSession(from: session) else { return }
     _ = try? sessionStore.saveRefreshedTokens(stored)
+  }
+}
+
+/// Forwards the room list's loading-state updates so `ClientProxy` can wait until the first sync has filled the list.
+private final class RoomListLoadingWaiter: RoomListLoadingStateListener {
+  private let stream: AsyncStream<RoomListLoadingState>
+  private let continuation: AsyncStream<RoomListLoadingState>.Continuation
+
+  init() {
+    let (stream, continuation) = AsyncStream<RoomListLoadingState>.makeStream()
+    self.stream = stream
+    self.continuation = continuation
+  }
+
+  func onUpdate(state: RoomListLoadingState) {
+    continuation.yield(state)
+    if case .loaded = state { continuation.finish() }
+  }
+
+  func wait(for timeout: Duration) async {
+    let sleeper = Task { try await Task.sleep(for: timeout) }
+    for await state in stream {
+      if case .loaded = state {
+        sleeper.cancel()
+        return
+      }
+    }
+    _ = try? await sleeper.value
   }
 }

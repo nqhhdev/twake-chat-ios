@@ -497,6 +497,54 @@ struct ChatListSearchTests {
     #expect(viewModel.answering.isEmpty)
     #expect(viewModel.inviteErrorMessage == nil)
   }
+
+  @Test func summaryReturnsARoomAlreadyInTheList() async {
+    let repository = FakeRoomListRepository()
+    let viewModel = ChatListViewModel(repository: repository, logOut: { true })
+    let team = RoomSummary(
+      id: "!team:example.org", name: "Team", lastMessageText: "Hello", lastMessageSender: "Alice",
+      lastActivity: Date(timeIntervalSince1970: 10))
+    let task = Task { await viewModel.start() }
+    while !repository.isStarted { await Task.yield() }
+    repository.send([team])
+    while viewModel.state != .loaded([team]) { await Task.yield() }
+    let found = await viewModel.summary(for: team.id, waitingUpTo: .seconds(1))
+    #expect(found == team)
+    repository.finish()
+    await task.value
+  }
+
+  @Test func summaryWaitsUntilTheRoomAppears() async {
+    let repository = FakeRoomListRepository()
+    let viewModel = ChatListViewModel(repository: repository, logOut: { true })
+    let team = RoomSummary(
+      id: "!team:example.org", name: "Team", lastMessageText: "Hello", lastMessageSender: "Alice",
+      lastActivity: Date(timeIntervalSince1970: 10))
+    let task = Task { await viewModel.start() }
+    while !repository.isStarted { await Task.yield() }
+    let waiting = Task { await viewModel.summary(for: team.id, waitingUpTo: .seconds(2)) }
+    try? await Task.sleep(for: .milliseconds(20))
+    repository.send([team])
+    let found = await waiting.value
+    #expect(found == team)
+    repository.finish()
+    await task.value
+  }
+
+  @Test func summaryReturnsNilWhenTheRoomNeverAppears() async {
+    let repository = FakeRoomListRepository()
+    let viewModel = ChatListViewModel(repository: repository, logOut: { true })
+    let family = RoomSummary(
+      id: "!family:example.org", name: "Family", lastMessageText: "Dinner?",
+      lastMessageSender: "Alice", lastActivity: Date(timeIntervalSince1970: 5))
+    let task = Task { await viewModel.start() }
+    while !repository.isStarted { await Task.yield() }
+    repository.send([family])
+    let found = await viewModel.summary(for: "!team:example.org", waitingUpTo: .milliseconds(40))
+    #expect(found == nil)
+    repository.finish()
+    await task.value
+  }
 }
 
 private struct FoundPeople: PeopleRepository {
