@@ -12,6 +12,8 @@ final class PushCenter {
   /// A room the shell should open: a tapped notification's, or a direct chat started from a member's profile. The
   /// shell clears it once open.
   var pendingRoomId: String?
+  /// The notification's title (the room or sender name), used until the room list knows the room.
+  var pendingRoomName: String?
   /// Someone the user wants to write to and has no direct chat with yet: the shell shows the draft chat, and the
   /// first message creates the chat. The shell clears it once shown.
   var pendingDraftUserId: String?
@@ -127,8 +129,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
   nonisolated func userNotificationCenter(
     _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
   ) async {
-    let roomId = response.notification.request.content.userInfo["room_id"] as? String
-    await MainActor.run { Self.push?.pendingRoomId = roomId }
+    let content = response.notification.request.content
+    let roomId = content.userInfo["room_id"] as? String
+    let title = content.title
+    await MainActor.run {
+      Self.push?.pendingRoomId = roomId
+      if !title.isEmpty { Self.push?.pendingRoomName = title }
+    }
   }
 }
 

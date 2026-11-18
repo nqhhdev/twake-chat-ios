@@ -68,6 +68,13 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
     set { lock.withLock { _openResult = newValue } }
   }
 
+  /// Scripted results for successive `open()` calls; when this is empty, `openResult` is used.
+  public var openResults: [Result<Void, TimelineError>] {
+    get { lock.withLock { _openResults } }
+    set { lock.withLock { _openResults = newValue } }
+  }
+  private var _openResults: [Result<Void, TimelineError>] = []
+
   /// What send, reply, edit, redact and toggleReaction throw, if anything.
   public var actionResult: Result<Void, TimelineError> {
     get { lock.withLock { _actionResult } }
@@ -99,7 +106,11 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
 
   public func open() async throws(TimelineError) -> AsyncStream<[TimelineItem]> {
     record(.open)
-    try openResult.get()
+    let queued: Result<Void, TimelineError>? = lock.withLock {
+      guard !_openResults.isEmpty else { return nil }
+      return _openResults.removeFirst()
+    }
+    try (queued ?? openResult).get()
     let (stream, continuation) = AsyncStream<[TimelineItem]>.makeStream()
     lock.withLock { self.continuation = continuation }
     return stream

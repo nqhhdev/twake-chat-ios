@@ -86,13 +86,11 @@ struct ChatShell: View {
       }
       .onChange(of: push.pendingRoomId, initial: true) { _, roomId in
         guard let roomId else { return }
+        let fallbackName = push.pendingRoomName ?? "…"
         push.pendingRoomId = nil
+        push.pendingRoomName = nil
         destination = .chats
-        open(
-          chatList.visibleRooms.first { $0.id == roomId }
-            ?? RoomSummary(
-              id: roomId, name: "Chat", lastMessageText: nil, lastMessageSender: nil,
-              lastActivity: nil))
+        Task { await openWhenKnown(roomId, name: fallbackName) }
       }
       .onChange(of: push.pendingDraftUserId, initial: true) { _, userId in
         guard let userId else { return }
@@ -121,12 +119,7 @@ struct ChatShell: View {
         guard let opening else { return }
         links.opening = nil
         destination = .chats
-        open(
-          chatList.visibleRooms.first { $0.id == opening.roomId }
-            ?? RoomSummary(
-              id: opening.roomId, name: "Chat", lastMessageText: nil, lastMessageSender: nil,
-              lastActivity: nil),
-          at: opening.eventId)
+        Task { await openWhenKnown(opening.roomId, name: "…", at: opening.eventId) }
       }
       .sheet(item: $links.joining) { joining in JoinRoomSheet(joining: joining, router: links) }
       .sheet(
@@ -289,6 +282,15 @@ struct ChatShell: View {
   static func shareTargets(_ state: ChatListViewModel.State) -> [RoomSummary] {
     guard case .loaded(let rooms) = state else { return [] }
     return rooms.filter { !$0.isInvite }
+  }
+
+  /// Waits for the room list to know `roomId` (cold start from a notification or a link), then opens it.
+  private func openWhenKnown(_ roomId: String, name: String, at eventId: String? = nil) async {
+    let summary =
+      await chatList.summary(for: roomId, waitingUpTo: .seconds(10))
+      ?? RoomSummary(
+        id: roomId, name: name, lastMessageText: nil, lastMessageSender: nil, lastActivity: nil)
+    open(summary, at: eventId)
   }
 
   /// Opens a room; with an event, scrolls to that message once the room shows (a link to a message).

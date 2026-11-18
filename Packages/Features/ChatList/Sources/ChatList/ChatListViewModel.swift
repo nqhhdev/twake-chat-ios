@@ -384,6 +384,28 @@ public final class ChatListViewModel {
     return rooms.filter { $0.name.localizedCaseInsensitiveContains(text) }
   }
 
+  /// Every loaded room, ignoring the list's search and filter, so a notification can find its room.
+  public var loadedRooms: [RoomSummary] {
+    switch state {
+    case .loaded(let rooms): rooms
+    default: []
+    }
+  }
+
+  /// The room `roomId` once it appears in the loaded list, or `nil` if it is still unknown after `limit`.
+  public func summary(for roomId: String, waitingUpTo limit: Duration = .seconds(10)) async
+    -> RoomSummary?
+  {
+    if let found = loadedRooms.first(where: { $0.id == roomId }) { return found }
+    let deadline = ContinuousClock.now + limit
+    while ContinuousClock.now < deadline {
+      if Task.isCancelled { return nil }
+      if let found = loadedRooms.first(where: { $0.id == roomId }) { return found }
+      try? await Task.sleep(for: .milliseconds(50))
+    }
+    return loadedRooms.first(where: { $0.id == roomId })
+  }
+
   /// The row's preview: "sender: text", or the text alone when the sender is unknown; `nil` without a text message.
   public static func preview(of room: RoomSummary) -> String? {
     guard let body = body(of: room) else { return nil }

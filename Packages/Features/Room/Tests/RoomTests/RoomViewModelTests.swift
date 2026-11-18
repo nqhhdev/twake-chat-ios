@@ -39,8 +39,53 @@ struct RoomViewModelTests {
     let repository = FakeTimelineRepository()
     repository.openResult = .failure(.roomNotFound)
     let viewModel = viewModel(repository)
+    viewModel.openRetryDelays = [.zero, .zero, .zero]
     await viewModel.start()
     #expect(viewModel.state == .failed("Could not open this chat."))
+    #expect(repository.calls.filter { $0 == .open }.count == 4)
+  }
+
+  @Test func aRoomMissingAtFirstOpensAfterARetry() async {
+    let repository = FakeTimelineRepository()
+    repository.openResults = [.failure(.roomNotFound), .success(())]
+    let viewModel = viewModel(repository)
+    viewModel.openRetryDelays = [.zero]
+    let task = Task { await viewModel.start() }
+    while !repository.calls.contains(.markAsRead) { await Task.yield() }
+    let item = TimelineItem(id: "1", kind: .message(message("$1")))
+    repository.publish([item])
+    while viewModel.state != .loaded([item]) { await Task.yield() }
+    repository.finish()
+    await task.value
+    #expect(repository.calls.filter { $0 == .open }.count == 2)
+  }
+
+  @Test func aSignInFailureIsNotRetried() async {
+    let repository = FakeTimelineRepository()
+    repository.openResult = .failure(.notSignedIn)
+    let viewModel = viewModel(repository)
+    viewModel.openRetryDelays = [.zero, .zero, .zero]
+    await viewModel.start()
+    #expect(viewModel.state == .failed("Could not open this chat."))
+    #expect(repository.calls.filter { $0 == .open }.count == 1)
+  }
+
+  @Test func theHeaderTakesTheRoomNameFromItsDetails() async {
+    let repository = FakeTimelineRepository()
+    let details = FakeRoomDetailsRepository()
+    details.detailsResult = .success(
+      RoomDetails(
+        id: "!room:example.org", name: "Dream Team", topic: nil, alias: nil, isDirect: false,
+        isEncrypted: true, isPublic: false, joinedMemberCount: 3))
+    let viewModel = RoomViewModel(
+      roomId: "!room:example.org", roomName: "Chat", repository: repository,
+      media: FakeMediaRepository(), details: details)
+    let task = Task { await viewModel.start() }
+    while viewModel.roomName == "Chat" { await Task.yield() }
+    #expect(viewModel.roomName == "Dream Team")
+    #expect(viewModel.isEncrypted)
+    repository.finish()
+    await task.value
   }
 
   @Test func sendingClearsTheDraftAndSendsTrimmedText() async {

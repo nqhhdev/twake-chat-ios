@@ -295,7 +295,13 @@ public struct RoomScreen: View {
     case .loading:
       ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
     case .failed(let message):
-      ContentUnavailableView(message, systemImage: "exclamationmark.triangle")
+      ContentUnavailableView {
+        Label(message, systemImage: "exclamationmark.triangle")
+      } description: {
+        Text("The chat may still be syncing. Try again in a moment.")
+      } actions: {
+        Button("Retry") { Task { await viewModel.start() } }
+      }
     case .loaded:
       TimelineScroll(viewModel: viewModel, bubbleWidth: bubbleWidth)
     }
