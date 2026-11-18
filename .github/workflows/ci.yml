@@ -1,7 +1,15 @@
-# CI for every pull request and every push to main (ADR 0014): format, plus the architecture check (ADR 0005).
-# Uses no secret and no signing.
-# Each module is its own job, so they run in parallel and a finding names its module. Builds and tests run
-# locally before a pull request (.okf/workflows/build.md, section CI).
+# CI for every pull request and every push to main (ADR 0014): format, plus the
+# architecture check (ADR 0005). Uses no secret and no signing.
+#
+# Jobs run on ubuntu-24.04, not on GitHub-hosted macOS. macOS minutes are billed
+# at 10× and the remaining quota is tight; format and the architecture scripts
+# do not need Xcode or a simulator. swift-format is invoked through scripts/lint.sh
+# (xcrun on a Mac, `swift format` after setup-swift here). The pinned .swift-format
+# file is the same; the Ubuntu toolchain may be a slightly older swift-format than
+# Xcode 26.2 (6.4.4). That is a known, accepted deviation from ADR 0014's
+# "GitHub-hosted macOS runners" clause. Builds and XCTest still run locally
+# (.okf/workflows/build.md, section CI).
+# Each module is its own job, so they run in parallel and a finding names its module.
 name: CI
 
 on:
@@ -16,13 +24,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  XCODE_VERSION: "26.2"
-
 jobs:
   format:
     name: format (${{ matrix.module }})
-    runs-on: macos-26
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -45,18 +50,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # swift-format ships with Xcode; the pinned Xcode decides its version.
-      - name: Select Xcode ${{ env.XCODE_VERSION }}
-        run: |
-          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
-          xcrun swift-format --version
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.2"
 
       - name: swift-format lint ${{ matrix.path }}
         run: scripts/lint.sh "${{ matrix.path }}"
 
   architecture:
     name: architecture
-    runs-on: macos-26
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
