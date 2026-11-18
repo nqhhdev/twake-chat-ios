@@ -22,12 +22,16 @@ final class PaginationFlowTests: XCTestCase {
       .timedOut,
       "Still at the bottom after idling")
 
-    // One scroll up: the message under the finger must still be on screen once the page has loaded.
-    app.swipeDown()
-    let history = NSPredicate(format: "label BEGINSWITH %@", "History ")
-    let anchor = app.staticTexts.matching(history).element(boundBy: 0)
-    XCTAssertTrue(
-      anchor.waitForExistence(timeout: Self.timeout), "A history message after scrolling")
+    // One scroll up, held at the end so inertia is not still moving the list when we pick a
+    // message. Watch a row that is actually on screen: the first History static text is the
+    // oldest loaded line, often still above the viewport.
+    let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55))
+    let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9))
+    start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.2)
+
+    guard let anchor = visibleMessage(app, prefix: "History ") else {
+      return XCTFail("A history message after scrolling")
+    }
     let label = anchor.label
     let leftAnchor = expectation(
       for: NSPredicate(format: "isHittable == false"),

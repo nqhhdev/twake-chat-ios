@@ -67,7 +67,9 @@ extension XCTestCase {
     app.buttons[A11yIdentifiers.passwordLogin.signIn].tap()
 
     let chats =
-      app.tabBars.buttons["Chats"].exists ? app.tabBars.buttons["Chats"] : app.buttons.matching(identifier: "Chats").firstMatch
+      app.tabBars.buttons["Chats"].exists
+      ? app.tabBars.buttons["Chats"]
+      : app.buttons.matching(identifier: "Chats").firstMatch
     XCTAssertTrue(
       chats.waitForExistence(timeout: Self.timeout), "Signed in", file: file, line: line)
     dismissSystemAlerts()
@@ -131,6 +133,20 @@ extension XCTestCase {
   /// The message whose text contains `text`.
   @MainActor func message(_ app: XCUIApplication, containing text: String) -> XCUIElement {
     app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
+  }
+
+  /// The first on-screen message whose label starts with `prefix`.
+  /// `isHittable` is not a valid XCUIElementQuery key, so the query is walked.
+  @MainActor func visibleMessage(
+    _ app: XCUIApplication, prefix: String, timeout: TimeInterval = timeout
+  ) -> XCUIElement? {
+    let query = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", prefix))
+    let found = expectation(
+      for: NSPredicate { _, _ in
+        (0..<query.count).contains { query.element(boundBy: $0).isHittable }
+      }, evaluatedWith: nil)
+    guard XCTWaiter.wait(for: [found], timeout: timeout) == .completed else { return nil }
+    return (0..<query.count).map { query.element(boundBy: $0) }.first { $0.isHittable }
   }
 
   /// Long-presses a message to open its actions layer.
