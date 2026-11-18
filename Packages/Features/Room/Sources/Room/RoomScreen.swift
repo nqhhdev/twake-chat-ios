@@ -316,11 +316,11 @@ struct TimelineScroll: View {
   let viewModel: RoomViewModel
   let bubbleWidth: CGFloat
 
-  @State private var position = ScrollPosition(edge: .bottom)
+  @State private var position = ScrollPosition(idType: String.self, edge: .bottom)
   @State private var isAtBottom = true
   /// The newest row when the user scrolled up; what arrives after it is counted on the scroll-down button.
   @State private var lastSeenRowId: String?
-  /// The row that was at the top when a page was asked for, so a prepend can keep it in place.
+  /// The row at the top of the viewport when a page was asked for, so a prepend keeps it there.
   @State private var paginationAnchorId: String?
 
   var body: some View {
@@ -364,7 +364,7 @@ struct TimelineScroll: View {
       .animation(.spring(response: 0.38, dampingFraction: 0.78), value: rows.last?.id)
       .scrollTargetLayout()
     }
-    .scrollPosition($position)
+    .scrollPosition($position, anchor: .top)
     .onChange(of: viewModel.scrollTarget) { _, target in
       guard let target else { return }
       withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
@@ -374,7 +374,9 @@ struct TimelineScroll: View {
     }
     // Open on the newest message, and stay on it as messages arrive or pictures load.
     .defaultScrollAnchor(.bottom)
-    .defaultScrollAnchor(.bottom, for: .sizeChanges)
+    // Pinning size changes to the bottom while scrolled up would drag the reader with new
+    // messages or with a prepend; only the bottom of a chat they are already following stays put.
+    .defaultScrollAnchor(isAtBottom ? .bottom : nil, for: .sizeChanges)
     .scrollDismissesKeyboard(.interactively)
     .onScrollGeometryChange(for: TimelineScrollGeometry.self) { geometry in
       // The visible rect accounts for the insets (the composer, the safe area), unlike the bare content offset.
@@ -390,7 +392,10 @@ struct TimelineScroll: View {
         Task { await viewModel.loadOlderWhileVisible() }
       } else if !geometry.isShort {
         if geometry.isNearTop {
-          if paginationAnchorId == nil { paginationAnchorId = viewModel.rows.first?.id }
+          if paginationAnchorId == nil {
+            paginationAnchorId =
+              position.viewID(type: String.self) ?? viewModel.rows.first?.id
+          }
         } else {
           paginationAnchorId = nil
         }
