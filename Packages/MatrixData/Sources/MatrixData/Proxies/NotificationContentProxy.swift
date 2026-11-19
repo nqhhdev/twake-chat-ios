@@ -13,12 +13,42 @@ public actor NotificationContentProxy: NotificationContentRepository {
     self.authentication = authentication
   }
 
+  /// The pauses before each further try when the event could not be read yet. The room key of a new message often
+  /// arrives a moment after its push (twake-on-matrix PR #2982, #3514), and the SDK fetches it in the background, so
+  /// asking again a little later is what gets the text. Three tries stay well inside the extension's 30 seconds.
+  static let retryPauses: [Duration] = [.seconds(1), .seconds(2)]
+
   public func content(roomId: String, eventId: String) async -> NotificationOutcome {
     guard (try? await authentication.restoreSession()) != nil,
       let client = await authentication.clientProxy?.client,
-      let notifications = try? await client.notificationClient(processSetup: .multipleProcesses),
-      let status = try? await notifications.getNotification(roomId: roomId, eventId: eventId)
+      let notifications = try? await client.notificationClient(processSetup: .multipleProcesses)
     else { return .generic }
+    var pauses = Self.retryPauses[...]
+    while true {
+      let status = try? await notifications.getNotification(roomId: roomId, eventId: eventId)
+      let outcome = Self.outcome(of: status)
+      guard Self.isWorthRetrying(status), let pause = pauses.popFirst(), !Task.isCancelled else {
+        return outcome
+      }
+      try? await Task.sleep(for: pause)
+    }
+  }
+
+  /// Whether a later try may read more: the request failed, the event is not known yet, or it is still encrypted.
+  static func isWorthRetrying(_ status: NotificationStatus?) -> Bool {
+    switch status {
+    case nil, .eventNotFound: return true
+    case .eventFilteredOut, .eventRedacted: return false
+    case .event(let item):
+      guard case .timeline(let event) = item.event else { return false }
+      if case .messageLike(.roomEncrypted)? = try? event.content() { return true }
+      return false
+    }
+  }
+
+  /// What the notification shows for the SDK's answer; the generic text when there is none.
+  static func outcome(of status: NotificationStatus?) -> NotificationOutcome {
+    guard let status else { return .generic }
     guard case .event(let item) = status else {
       return Self.outcome(withoutEvent: status) ?? .generic
     }
