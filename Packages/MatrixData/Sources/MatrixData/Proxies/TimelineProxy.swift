@@ -481,12 +481,32 @@ public actor TimelineProxy: TimelineRepository {
     let ownUserId = try? opened.client.userId
     var messages: [TimelineMessage] = []
     for eventId in info.pinnedEventIds {
-      guard let event = try? await opened.timeline.getEventTimelineItemByEventId(eventId: eventId),
-        let message = TimelineItemMapper.message(from: event, ownUserId: ownUserId)
-      else { continue }
-      messages.append(message)
+      if let event = try? await opened.timeline.getEventTimelineItemByEventId(eventId: eventId) {
+        if let message = TimelineItemMapper.message(from: event, ownUserId: ownUserId) {
+          messages.append(message)
+        }
+      } else if let event = try? await opened.room.loadOrFetchEvent(eventId: eventId),
+        let message = Self.pinnedMessage(from: event, ownUserId: ownUserId)
+      {
+        // Pinned long ago, so not among the loaded messages: read from the store or the homeserver, or the banner
+        // would miss it until the user scrolls that far back (twake-on-matrix #2826, #211).
+        messages.append(message)
+      }
     }
     return messages
+  }
+
+  /// A pinned message that is not in the loaded timeline, with what the banner and the pinned list show: who wrote
+  /// it, when, and its text or a short description. `nil` for what is not a message (or cannot be decrypted).
+  static func pinnedMessage(from event: TimelineEvent, ownUserId: String?) -> TimelineMessage? {
+    guard case .messageLike(let content)? = try? event.content(),
+      let text = NotificationContentProxy.body(of: content)
+    else { return nil }
+    let senderId = event.senderId()
+    return TimelineMessage(
+      eventId: event.eventId(), senderId: senderId, senderName: senderId,
+      isOwn: senderId == ownUserId, date: TimelineItemMapper.date(event.timestamp()),
+      body: .text(text))
   }
 
   /// Sends the original event's content to the other room, without the reply or edit it relates to, so pictures and
