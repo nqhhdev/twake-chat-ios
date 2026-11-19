@@ -8,8 +8,8 @@ import MatrixData
 /// push the gateway sends with only a room id and an event id. It opens the app's session store from the App Group and
 /// the shared Keychain group (ADR 0007), asks the SDK to fetch and decrypt the event, and rewrites the notification with
 /// the sender and the text. If that fails or time runs out, the generic text from the push stays, never ciphertext.
-/// An event that does not notify (an edit, a reaction, a redaction, one the push rules filter out) shows nothing. Nothing here logs: the content is the user's
-/// message.
+/// An event that does not notify (an edit, a reaction, a redaction, one the push rules filter out) shows nothing. The app icon badge takes the push's `unread_count` when it has one. Nothing here logs: the
+/// content is the user's message.
 final class NotificationService: UNNotificationServiceExtension, @unchecked Sendable {
   private let lock = NSLock()
   private var deliver: ((UNNotificationContent) -> Void)?
@@ -23,11 +23,15 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
       contentHandler(request.content)
       return
     }
+    let userInfo = request.content.userInfo
+    // The homeserver's count, fresh with every push, including chats read on another device. Without one, the badge
+    // stays as it is.
+    let unreadCount = PushPayload.unreadCount(in: userInfo)
+    if let unreadCount { content.badge = NSNumber(value: unreadCount) }
     lock.withLock {
       deliver = contentHandler
       pending = content
     }
-    let userInfo = request.content.userInfo
     guard let roomId = userInfo["room_id"] as? String, let eventId = userInfo["event_id"] as? String,
       let repository = Self.makeRepository()
     else {
@@ -44,8 +48,11 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
           pending?.body = found.body
         }
       case .hide:
-        // An empty content has nothing to show, so the system shows no notification for this push.
-        lock.withLock { pending = UNMutableNotificationContent() }
+        // An empty content has nothing to show, so the system shows no notification for this push; the badge still
+        // follows the count.
+        let empty = UNMutableNotificationContent()
+        if let unreadCount { empty.badge = NSNumber(value: unreadCount) }
+        lock.withLock { pending = empty }
       case .generic:
         break
       }

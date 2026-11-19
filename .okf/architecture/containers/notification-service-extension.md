@@ -26,6 +26,7 @@ status: draft
 4. Rewrites the notification title and body. If it cannot decrypt in time, it shows a generic text.
 5. Shows nothing for an event that does not notify: an edit, a reaction, a redaction, a deleted message, or one the
    user's push rules filter out (`NotificationContentProxy`).
+6. Sets the app icon badge to the push's `unread_count`, the homeserver's count, when the push has one.
 
 ## Why it shares the store
 In the Flutter app the main app runs the Dart SDK and the NSE runs the Rust SDK, so the NSE has no keys of its own and
