@@ -6,11 +6,16 @@ import MatrixRustSDK
 /// The recovery key is never logged or stored here; it is returned once to be shown to the user.
 public actor AccountSettingsProxy: AccountSettingsRepository {
   private let clientProxy: @Sendable () async -> ClientProxy?
+  /// Where a new recovery key is kept for the user's next device (ADR 0024); `nil` keeps it nowhere.
+  private let recoveryVault: (any RecoveryVault)?
   /// The identity reset waiting for the user's password or web approval.
   private var pendingReset: IdentityResetHandle?
 
-  public init(authentication: MatrixAuthenticationRepository) {
+  public init(
+    authentication: MatrixAuthenticationRepository, recoveryVault: (any RecoveryVault)? = nil
+  ) {
     clientProxy = { await authentication.clientProxy }
+    self.recoveryVault = recoveryVault
   }
 
   /// `GET /profile/{userId}`, as Flutter `fetchOwnProfile` reads it: an unset name is `nil`, a failed request throws.
@@ -127,14 +132,22 @@ public actor AccountSettingsProxy: AccountSettingsRepository {
     pendingReset = nil
   }
 
+  /// Sets recovery up and gives ToM the new key, replacing the key of an earlier setup, which opens nothing any more
+  /// (ADR 0024). Settings shows the key whatever ToM answers.
   public func enableRecovery() async throws(SettingsError) -> String {
     guard let client = await clientProxy() else { throw .notSignedIn }
+    let key: String
     do {
-      return try await client.client.encryption().enableRecovery(
+      key = try await client.client.encryption().enableRecovery(
         waitForBackupsToUpload: false, passphrase: nil, progressListener: IgnoredRecoveryProgress())
     } catch {
       throw .requestFailed
     }
+    if let recoveryVault, await recoveryVault.saveRecoveryKey(key) == .alreadyKept {
+      await recoveryVault.deleteRecoveryKey()
+      _ = await recoveryVault.saveRecoveryKey(key)
+    }
+    return key
   }
 
   public func linkedAddresses() async -> [LinkedAddress] {
@@ -290,6 +303,45 @@ enum NotificationModeMapper {
     case .allMessages: .allMessages
     case .mentionsAndKeywords: .mentionsAndKeywordsOnly
     case .mute: .mute
+    }
+  }
+}
+
+/// The unlock after sign-in (ADR 0024) uses the same encryption calls as the Settings recovery.
+extension AccountSettingsProxy: DeviceRecoveryRepository {
+  public func isDeviceVerified() async -> Bool {
+    guard let client = await clientProxy() else { return false }
+    let encryption = client.client.encryption()
+    await encryption.waitForE2eeInitializationTasks()
+    return encryption.verificationState() == .verified
+  }
+
+  public func recover(recoveryKey: String, fixingBackup: Bool) async -> Bool {
+    guard let client = await clientProxy() else { return false }
+    let encryption = client.client.encryption()
+    let key = recoveryKey.trimmingCharacters(in: .whitespacesAndNewlines)
+    do {
+      if fixingBackup {
+        try await encryption.recoverAndFixBackup(recoveryKey: key)
+      } else {
+        try await encryption.recover(recoveryKey: key)
+      }
+      return true
+    } catch {
+      DebugLog.failure(fixingBackup ? "recoverAndFixBackup" : "recover", error)
+      return false
+    }
+  }
+
+  /// The SDK's setup, without giving the key to ToM: the unlock decides what ToM keeps.
+  public func setUpRecovery() async -> String? {
+    guard let client = await clientProxy() else { return nil }
+    do {
+      return try await client.client.encryption().enableRecovery(
+        waitForBackupsToUpload: false, passphrase: nil, progressListener: IgnoredRecoveryProgress())
+    } catch {
+      DebugLog.failure("setUpRecovery", error)
+      return nil
     }
   }
 }

@@ -61,6 +61,12 @@ final class RootCoordinator {
   /// What other apps share into the app, waiting for a chat.
   @ObservationIgnored let shares = ShareCenter()
   @ObservationIgnored private let verificationRepository: (any VerificationRepository)?
+  /// Unlocks this device with the recovery key kept on ToM (ADR 0024); `nil` (tests) never runs.
+  @ObservationIgnored private let deviceUnlock: DeviceUnlocker?
+  /// The sign-in the unlock last ran for, so it runs once per sign-in and launch.
+  @ObservationIgnored private weak var unlockedSignIn: SignedInViewModel?
+  /// A recovery key the unlock made but ToM did not keep: shown once, or it is lost with this device.
+  var unsavedRecoveryKey: String?
   @ObservationIgnored private let devicesRepository: (any DevicesRepository)?
   /// Which room events chats show, kept on this device.
   @ObservationIgnored private let chatDisplay: (any ChatDisplaySettingsStore)?
@@ -93,6 +99,7 @@ final class RootCoordinator {
     threadPrefs: (any ThreadPrefsRepository)? = nil,
     roomLinks: (any RoomLinkRepository)? = nil,
     accountSettings: (any AccountSettingsRepository)? = nil,
+    deviceUnlock: DeviceUnlocker? = nil,
     people: (any PeopleRepository)? = nil, push: (any PushRepository)? = nil,
     verification: (any VerificationRepository)? = nil, devices: (any DevicesRepository)? = nil,
     chatDisplay: (any ChatDisplaySettingsStore)? = nil, appLock: AppLock? = nil,
@@ -120,6 +127,7 @@ final class RootCoordinator {
     self.savedMessages = savedMessages
     self.threadPrefs = threadPrefs
     self.accountSettings = accountSettings
+    self.deviceUnlock = deviceUnlock
     self.people = people
     self.signInConfiguration = signInConfiguration
     self.webAuthenticator = webAuthenticator
@@ -218,6 +226,14 @@ final class RootCoordinator {
         verification: await verificationRepository.state(),
         recovery: await accountSettings.recoveryStatus())
     }
+  }
+
+  /// Unlocks this device with the recovery key kept on ToM, once per sign-in and launch (ADR 0024). Without a key
+  /// that works, the room banner and Settings stay the way to verify; a key ToM did not keep is shown to the user.
+  func unlockDevice(for signedIn: SignedInViewModel) async {
+    guard let deviceUnlock, unlockedSignIn !== signedIn else { return }
+    unlockedSignIn = signedIn
+    if case .setUpNotSaved(let key) = await deviceUnlock.run() { unsavedRecoveryKey = key }
   }
 
   /// Rejoins a left chat from its read-only screen (the archive belongs to the room list proxy).
@@ -378,6 +394,16 @@ struct RootView: View {
           )
           // Signed in: ask for notifications and register this device.
           .task { await coordinator.push.start() }
+          .task { await coordinator.unlockDevice(for: signedIn) }
+          .sheet(
+            isPresented: Binding(
+              get: { coordinator.unsavedRecoveryKey != nil },
+              set: { if !$0 { coordinator.unsavedRecoveryKey = nil } })
+          ) {
+            if let key = coordinator.unsavedRecoveryKey {
+              RecoveryKeySheet(key: key) { coordinator.unsavedRecoveryKey = nil }
+            }
+          }
         }
       }
     } else {
