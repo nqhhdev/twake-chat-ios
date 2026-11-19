@@ -80,3 +80,4 @@
 
 ## 2026-11-19
 * **Change**: The Notification Service Extension shows nothing for an edit, a reaction, a redaction, a deleted message or an event the push rules filter out (#91); a failure still shows the generic text (ADR 0009).
+* **Change**: The Notification Service Extension sets the app icon badge to the push's `unread_count`, the homeserver's count, when the push has one (#91, #113; owner decision 2026-11-19).
