@@ -225,7 +225,7 @@ final class RootCoordinator {
   }
 
   /// Whether this session can read encrypted messages, for the chat's banner: its verification, then its recovery.
-  private func sessionCheck() -> (@Sendable () async -> SessionWarning?)? {
+  func sessionCheck() -> (@Sendable () async -> SessionWarning?)? {
     guard let verificationRepository, let accountSettings else { return nil }
     return {
       SessionWarning.of(
@@ -432,7 +432,7 @@ struct RootView: View {
             chatList: chatList, signedIn: signedIn, settings: coordinator.settings(for: signedIn),
             push: coordinator.push, links: coordinator.links, shares: coordinator.shares,
             makePeopleSearch: coordinator.peopleSearch(mode:onOpen:),
-            makeRoom: coordinator.room(for:onLeft:)
+            makeRoom: coordinator.room(for:onLeft:), checkSession: coordinator.sessionCheck()
           )
           // Signed in: ask for notifications and register this device.
           .task { await coordinator.push.start() }

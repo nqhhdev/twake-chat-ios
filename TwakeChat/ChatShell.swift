@@ -33,6 +33,8 @@ struct ChatShell: View {
       PeopleSearchViewModel
   /// Makes a room's screen model; the closure it is given closes the room (after the user left it).
   let makeRoom: (RoomSummary, @escaping @MainActor () -> Void) -> RoomViewModel
+  /// Whether this session can read encrypted messages; asked once after sign-in, to offer the way to fix it.
+  var checkSession: (@Sendable () async -> SessionWarning?)?
 
   /// How the shell lays out a screen of `width` points (safe areas included, as Flutter measures).
   struct Layout: Equatable {
@@ -54,6 +56,8 @@ struct ChatShell: View {
   @State private var settingsPage: SettingsPage? = .security
   /// Privacy & Security over the chat, from the banner that warns encrypted messages may not show.
   @State private var isFixingSession = false
+  /// What the prompt after sign-in asks the user to do, as the Flutter app asks for recovery right after login.
+  @State private var sessionPrompt: SessionWarning?
 
   var body: some View {
     GeometryReader { geometry in
@@ -122,6 +126,24 @@ struct ChatShell: View {
         Task { await openWhenKnown(opening.roomId, name: "…", at: opening.eventId) }
       }
       .sheet(item: $links.joining) { joining in JoinRoomSheet(joining: joining, router: links) }
+      .task { await promptForSessionFix() }
+      .alert(
+        "Unlock your encrypted messages",
+        isPresented: Binding(
+          get: { sessionPrompt != nil }, set: { if !$0 { sessionPrompt = nil } }),
+        presenting: sessionPrompt
+      ) { warning in
+        Button(warning == .unverified ? "Verify this device" : "Enter recovery key") {
+          isFixingSession = true
+        }
+        Button("Later", role: .cancel) {}
+      } message: { warning in
+        Text(
+          warning == .unverified
+            ? "Verify this device with another one, or with your recovery key, to read your encrypted messages."
+            : "Enter your recovery key to read the encrypted messages sent before you signed in here."
+        )
+      }
       .sheet(
         isPresented: $isFixingSession,
         onDismiss: { Task { await room?.refreshSessionWarning() } }
@@ -308,5 +330,20 @@ struct ChatShell: View {
       room = made
     }
     isRoomPushed = true
+  }
+
+  /// Once per sign-in: asks, shortly after the first sync had time to report it, whether this session can read
+  /// encrypted messages, and offers Privacy & Security when it cannot. The banner in a chat stays for those who
+  /// choose Later.
+  private func promptForSessionFix() async {
+    guard let checkSession else { return }
+    for pause in [Duration.seconds(3), .seconds(10)] {
+      try? await Task.sleep(for: pause)
+      if Task.isCancelled { return }
+      if let warning = await checkSession() {
+        sessionPrompt = warning
+        return
+      }
+    }
   }
 }
