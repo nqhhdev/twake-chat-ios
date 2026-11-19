@@ -40,6 +40,7 @@ public struct SettingsScreen: View {
   @State private var isRenaming = false
   @State private var isEditingStatus = false
   @State private var statusDraft = ""
+  @Environment(\.scenePhase) private var scenePhase
 
   public init(viewModel: SettingsViewModel, selection: Binding<SettingsPage?>? = nil) {
     self.viewModel = viewModel
@@ -141,6 +142,9 @@ public struct SettingsScreen: View {
     }
     .animation(.default, value: viewModel.displayName)
     .task { await viewModel.load() }
+    .onChange(of: scenePhase) { _, phase in
+      if phase == .active { Task { await viewModel.refreshDisplayName() } }
+    }
     .sheet(isPresented: $isRenaming) { EditProfileSheet(viewModel: viewModel) }
     .alert("Status", isPresented: $isEditingStatus) {
       TextField("What are you up to?", text: $statusDraft)
