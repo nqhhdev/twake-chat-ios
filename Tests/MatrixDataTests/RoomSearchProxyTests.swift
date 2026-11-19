@@ -38,6 +38,22 @@ struct RoomSearchProxyTests {
     #expect(page.results[0].text == "lunch at noon")
   }
 
+  @Test func anEditShowsOnceAsTheMessageItEditsWithTheNewText() {
+    let json = """
+      {"search_categories":{"room_events":{"results":[
+        {"rank":1,"result":{"event_id":"$edit","sender":"@alice:example.org","origin_server_ts":3000,
+          "type":"m.room.message","content":{"msgtype":"m.text","body":"* lunch at one",
+            "m.new_content":{"msgtype":"m.text","body":"lunch at one"},
+            "m.relates_to":{"rel_type":"m.replace","event_id":"$1"}}}},
+        {"rank":1,"result":{"event_id":"$1","sender":"@alice:example.org","origin_server_ts":2000,
+          "type":"m.room.message","content":{"msgtype":"m.text","body":"lunch at noon"}}}
+      ]}}}
+      """
+    let page = RoomSearchProxy.page(from: Data(json.utf8))
+    #expect(page.results.map(\.eventId) == ["$1"])
+    #expect(page.results[0].text == "lunch at one")
+  }
+
   @Test func anUnreadableAnswerIsAnEmptyLastPage() {
     let page = RoomSearchProxy.page(from: Data("nope".utf8))
     #expect(page.results.isEmpty)

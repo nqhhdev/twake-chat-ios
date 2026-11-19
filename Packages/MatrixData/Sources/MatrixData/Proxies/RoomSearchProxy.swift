@@ -82,17 +82,32 @@ public actor RoomSearchProxy: RoomSearchRepository {
         let eventId = event["event_id"] as? String,
         let sender = event["sender"] as? String,
         let content = event["content"] as? [String: Any],
-        let body = content["body"] as? String
+        var body = content["body"] as? String
       else { return nil }
+      // An edit (`m.replace`) is found as its own event: show it as the message it edits, with the new text, so a
+      // tap jumps to that message and it does not show twice (twake-on-matrix #3038).
+      var shownEventId = eventId
+      if let relation = content["m.relates_to"] as? [String: Any],
+        relation["rel_type"] as? String == "m.replace",
+        let original = relation["event_id"] as? String
+      {
+        shownEventId = original
+        if let edited = (content["m.new_content"] as? [String: Any])?["body"] as? String {
+          body = edited
+        }
+      }
       let profiles = (entry["context"] as? [String: Any])?["profile_info"] as? [String: Any]
       let name = (profiles?[sender] as? [String: Any])?["displayname"] as? String
       let timestamp = (event["origin_server_ts"] as? NSNumber)?.doubleValue ?? 0
       return RoomSearchResult(
-        eventId: eventId, senderId: sender,
+        eventId: shownEventId, senderId: sender,
         senderName: name.flatMap { $0.isEmpty ? nil : $0 } ?? sender,
         date: Date(timeIntervalSince1970: timestamp / 1000), text: body,
         roomId: event["room_id"] as? String)
     }
-    return RoomSearchPage(results: results, nextBatch: roomEvents["next_batch"] as? String)
+    // Newest first: of a message and its edits, the first one met is the latest version.
+    var seen: Set<String> = []
+    let unique = results.filter { seen.insert($0.eventId).inserted }
+    return RoomSearchPage(results: unique, nextBatch: roomEvents["next_batch"] as? String)
   }
 }
