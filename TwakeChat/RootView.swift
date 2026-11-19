@@ -225,7 +225,7 @@ final class RootCoordinator {
   }
 
   /// Whether this session can read encrypted messages, for the chat's banner: its verification, then its recovery.
-  func sessionCheck() -> (@Sendable () async -> SessionWarning?)? {
+  private func sessionCheck() -> (@Sendable () async -> SessionWarning?)? {
     guard let verificationRepository, let accountSettings else { return nil }
     return {
       SessionWarning.of(
@@ -234,11 +234,30 @@ final class RootCoordinator {
     }
   }
 
+  /// True while the unlock with ToM's recovery key runs.
+  @ObservationIgnored private var isUnlockingDevice = false
+
+  /// The session check for the prompt after sign-in. It waits for the ToM unlock to end first: a device that is
+  /// being unlocked needs nothing from the user, and asking then would show a prompt the unlock is about to make
+  /// wrong. The prompt is what is left for a server without ToM, or a key that did not work.
+  func sessionCheckAfterUnlock() -> (@Sendable () async -> SessionWarning?)? {
+    guard let check = sessionCheck() else { return nil }
+    return { [weak self] in
+      while await self?.isUnlockingDevice == true {
+        try? await Task.sleep(for: .milliseconds(250))
+        if Task.isCancelled { return nil }
+      }
+      return await check()
+    }
+  }
+
   /// Unlocks this device with the recovery key kept on ToM, once per sign-in and launch (ADR 0024). Without a key
   /// that works, the room banner and Settings stay the way to verify; a key ToM did not keep is shown to the user.
   func unlockDevice(for signedIn: SignedInViewModel) async {
     guard let deviceUnlock, unlockedSignIn !== signedIn else { return }
     unlockedSignIn = signedIn
+    isUnlockingDevice = true
+    defer { isUnlockingDevice = false }
     if case .setUpNotSaved(let key) = await deviceUnlock.run() { unsavedRecoveryKey = key }
   }
 
@@ -432,7 +451,8 @@ struct RootView: View {
             chatList: chatList, signedIn: signedIn, settings: coordinator.settings(for: signedIn),
             push: coordinator.push, links: coordinator.links, shares: coordinator.shares,
             makePeopleSearch: coordinator.peopleSearch(mode:onOpen:),
-            makeRoom: coordinator.room(for:onLeft:), checkSession: coordinator.sessionCheck()
+            makeRoom: coordinator.room(for:onLeft:),
+            checkSession: coordinator.sessionCheckAfterUnlock()
           )
           // Signed in: ask for notifications and register this device.
           .task { await coordinator.push.start() }
