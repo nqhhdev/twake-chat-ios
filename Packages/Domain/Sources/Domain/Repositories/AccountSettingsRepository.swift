@@ -29,8 +29,9 @@ public enum SettingsError: Error, Sendable, Equatable {
 /// What the Settings tab needs about the signed-in account: its display name, its encryption recovery, and its default
 /// notification modes. Implemented in MatrixData; no SDK type appears here (ADR 0006).
 public protocol AccountSettingsRepository: Sendable {
-  /// The user's display name, or `nil` when the profile has none.
-  func displayName() async -> String?
+  /// The user's display name from the server, or `nil` when the profile has none. Throws when it cannot be read, so a
+  /// failed request is not mistaken for a profile without a name.
+  func displayName() async throws(SettingsError) -> String?
   /// The user's own picture, or `nil`.
   func avatar() async -> MediaReference?
   /// The people the user blocked (Matrix "ignored users"), by name.

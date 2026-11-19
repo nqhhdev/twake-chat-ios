@@ -78,7 +78,26 @@ public final class FakeAccountSettingsRepository: AccountSettingsRepository, @un
     lock.withLock { _modes[isDirect] ?? .allMessages }
   }
 
-  public func displayName() async -> String? { name }
+  private var _nameFailures = 0
+  private var _nameReads = 0
+  /// How many of the next profile reads fail with `.requestFailed` before one answers.
+  public var nameFailures: Int {
+    get { lock.withLock { _nameFailures } }
+    set { lock.withLock { _nameFailures = newValue } }
+  }
+  /// How many times the profile was read.
+  public var nameReads: Int { lock.withLock { _nameReads } }
+
+  public func displayName() async throws(SettingsError) -> String? {
+    let fails = lock.withLock {
+      _nameReads += 1
+      guard _nameFailures > 0 else { return false }
+      _nameFailures -= 1
+      return true
+    }
+    if fails { throw .requestFailed }
+    return name
+  }
   public func avatar() async -> MediaReference? { lock.withLock { _avatar } }
 
   private var _avatar: MediaReference?

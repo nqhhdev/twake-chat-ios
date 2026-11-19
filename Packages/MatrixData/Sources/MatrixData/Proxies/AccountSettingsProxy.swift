@@ -13,9 +13,16 @@ public actor AccountSettingsProxy: AccountSettingsRepository {
     clientProxy = { await authentication.clientProxy }
   }
 
-  public func displayName() async -> String? {
-    guard let client = await clientProxy() else { return nil }
-    return (try? await client.client.displayName()).flatMap { $0.isEmpty ? nil : $0 }
+  /// `GET /profile/{userId}`, as Flutter `fetchOwnProfile` reads it: an unset name is `nil`, a failed request throws.
+  public func displayName() async throws(SettingsError) -> String? {
+    guard let client = await clientProxy() else { throw .notSignedIn }
+    do {
+      let profile = try await client.client.getProfile(userId: client.userId)
+      return profile.displayName.flatMap { $0.isEmpty ? nil : $0 }
+    } catch {
+      DebugLog.failure("ownDisplayName", error)
+      throw .requestFailed
+    }
   }
 
   public func avatar() async -> MediaReference? {

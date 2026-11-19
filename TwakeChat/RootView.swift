@@ -436,7 +436,7 @@ struct UnavailableMedia: MediaRepository {
 
 /// The account settings of a root built without them (tests): nothing is known and nothing changes.
 struct UnavailableAccountSettings: AccountSettingsRepository {
-  func displayName() async -> String? { nil }
+  func displayName() async throws(SettingsError) -> String? { nil }
   func setDisplayName(_ name: String) async throws(SettingsError) { throw .notSignedIn }
   func setAvatar(_ picture: PictureUpload) async throws(SettingsError) { throw .notSignedIn }
   func removeAvatar() async throws(SettingsError) { throw .notSignedIn }
