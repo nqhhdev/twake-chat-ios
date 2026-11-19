@@ -49,6 +49,7 @@ final class RootCoordinator {
   @ObservationIgnored private let roomDetails: (any RoomDetailsRepository)?
   @ObservationIgnored private let roomSearch: (any RoomSearchRepository)?
   @ObservationIgnored private let savedMessages: (any SavedMessagesRepository)?
+  @ObservationIgnored private let threadPrefs: (any ThreadPrefsRepository)?
   @ObservationIgnored private let accountSettings: (any AccountSettingsRepository)?
   @ObservationIgnored private let people: (any PeopleRepository)?
   /// Push notifications of the signed-in account.
@@ -89,6 +90,7 @@ final class RootCoordinator {
     roomDetails: (any RoomDetailsRepository)? = nil,
     roomSearch: (any RoomSearchRepository)? = nil,
     savedMessages: (any SavedMessagesRepository)? = nil,
+    threadPrefs: (any ThreadPrefsRepository)? = nil,
     roomLinks: (any RoomLinkRepository)? = nil,
     accountSettings: (any AccountSettingsRepository)? = nil,
     people: (any PeopleRepository)? = nil, push: (any PushRepository)? = nil,
@@ -116,6 +118,7 @@ final class RootCoordinator {
     self.roomDetails = roomDetails
     self.roomSearch = roomSearch
     self.savedMessages = savedMessages
+    self.threadPrefs = threadPrefs
     self.accountSettings = accountSettings
     self.people = people
     self.signInConfiguration = signInConfiguration
@@ -135,7 +138,8 @@ final class RootCoordinator {
     let viewModel = ChatListViewModel(
       repository: roomList, media: media, archive: archive, publicRooms: publicRooms,
       spaces: spaces, messageSearch: roomSearch, doNotDisturb: doNotDisturb(),
-      saved: savedMessages, people: people, openPerson: openDirectChat()
+      saved: savedMessages, threadPrefs: threadPrefs, people: people,
+      openPerson: openDirectChat()
     ) {
       [weak signedIn, push] in
       guard let signedIn else { return false }
@@ -163,7 +167,8 @@ final class RootCoordinator {
       isArchived: summary.isArchived, rejoin: rejoin(summary.id), linkPreviews: linkPreviews,
       checkSession: sessionCheck(), display: displaySettings(), blocking: blocking(),
       saved: savedMessages,
-      threadTimeline: { [makeThreadTimeline] root in makeThreadTimeline(summary.id, root) })
+      threadTimeline: { [makeThreadTimeline] root in makeThreadTimeline(summary.id, root) },
+      threadPrefs: threadPrefs)
   }
 
   /// The account's do not disturb, for the chat list's banner.
@@ -436,7 +441,7 @@ struct UnavailableMedia: MediaRepository {
 
 /// The account settings of a root built without them (tests): nothing is known and nothing changes.
 struct UnavailableAccountSettings: AccountSettingsRepository {
-  func displayName() async -> String? { nil }
+  func displayName() async throws(SettingsError) -> String? { nil }
   func setDisplayName(_ name: String) async throws(SettingsError) { throw .notSignedIn }
   func setAvatar(_ picture: PictureUpload) async throws(SettingsError) { throw .notSignedIn }
   func removeAvatar() async throws(SettingsError) { throw .notSignedIn }

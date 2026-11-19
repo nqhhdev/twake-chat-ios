@@ -2,6 +2,7 @@ import AVFoundation
 import CoreGraphics
 import Foundation
 import ImageIO
+import UniformTypeIdentifiers
 
 /// What the SDK needs before it sends a media message. Its FFI turns `ImageInfo` and `VideoInfo` into the event's
 /// info and refuses the attachment (`RoomError.InvalidAttachmentData`) when the width, height, size or blurhash is
@@ -75,6 +76,61 @@ enum AttachmentMetadata {
     return Visual(
       width: UInt64(max(1, size.width ?? 1)), height: UInt64(max(1, size.height ?? 1)),
       blurhash: frame.flatMap(BlurHash.encode) ?? BlurHash.placeholder, duration: seconds ?? 0)
+  }
+
+  /// A JPEG thumbnail in a temporary file, which the caller deletes once the attachment is sent. Receivers show it
+  /// while the media loads.
+  struct Thumbnail: Sendable, Equatable {
+    let url: URL
+    let width: UInt64
+    let height: UInt64
+    let size: UInt64
+  }
+
+  /// The longest side of a thumbnail, in pixels.
+  static let thumbnailMaxSide = 800
+
+  /// A thumbnail of a picture larger than a thumbnail, as it shows (EXIF orientation applied); `nil` for a smaller
+  /// picture, which receivers show itself, and for a file that is no picture.
+  static func imageThumbnail(at url: URL) -> Thumbnail? {
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+      let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+      let width = properties[kCGImagePropertyPixelWidth] as? Int,
+      let height = properties[kCGImagePropertyPixelHeight] as? Int,
+      max(width, height) > thumbnailMaxSide
+    else { return nil }
+    let options: [CFString: Any] = [
+      kCGImageSourceCreateThumbnailFromImageAlways: true,
+      kCGImageSourceCreateThumbnailWithTransform: true,
+      kCGImageSourceThumbnailMaxPixelSize: thumbnailMaxSide,
+    ]
+    guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+    else { return nil }
+    return writeThumbnail(image)
+  }
+
+  /// A thumbnail of a video's first frame, as it plays (its track transform applied).
+  static func videoThumbnail(at url: URL) async -> Thumbnail? {
+    let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+    generator.appliesPreferredTrackTransform = true
+    generator.maximumSize = CGSize(width: thumbnailMaxSide, height: thumbnailMaxSide)
+    guard let frame = try? await generator.image(at: .zero).image else { return nil }
+    return writeThumbnail(frame)
+  }
+
+  private static func writeThumbnail(_ image: CGImage) -> Thumbnail? {
+    let url = FileManager.default.temporaryDirectory.appending(
+      path: "thumbnail-\(UUID().uuidString).jpg")
+    guard
+      let destination = CGImageDestinationCreateWithURL(
+        url as CFURL, UTType.jpeg.identifier as CFString, 1, nil)
+    else { return nil }
+    let properties: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: 0.8]
+    CGImageDestinationAddImage(destination, image, properties as CFDictionary)
+    guard CGImageDestinationFinalize(destination) else { return nil }
+    return Thumbnail(
+      url: url, width: UInt64(image.width), height: UInt64(image.height),
+      size: size(of: url, given: nil))
   }
 
   /// An audio file's duration: the one given, else read from the file, else 0.

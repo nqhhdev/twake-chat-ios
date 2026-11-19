@@ -67,14 +67,34 @@ public final class SettingsViewModel {
     try? await media?.thumbnail(reference, width: 192, height: 192)
   }
 
+  /// The pauses before each new try when the profile cannot be read; the user id's localpart is shown meanwhile.
+  @ObservationIgnored var profileRetryDelays: [Duration] = [.seconds(1), .seconds(3)]
+
   public func load() async {
-    if let name = await repository.displayName() { displayName = name }
+    async let name: Void = refreshDisplayName()
     avatar = await repository.avatar()
     directMode = await repository.defaultNotificationMode(isDirect: true)
     groupMode = await repository.defaultNotificationMode(isDirect: false)
     doNotDisturb = await repository.isDoNotDisturbOn()
     statusMessage = await repository.statusMessage()
     recoveryStatus = await repository.recoveryStatus()
+    await name
+  }
+
+  /// Reads the display name from the server again, so a rename made on another client shows. A failed read is tried
+  /// again after each of `profileRetryDelays`; if every try fails, the name shown stays. A profile without a name shows
+  /// the localpart.
+  public func refreshDisplayName() async {
+    for delay in [Duration.zero] + profileRetryDelays {
+      if delay > .zero {
+        try? await Task.sleep(for: delay)
+        if Task.isCancelled { return }
+      }
+      do {
+        displayName = try await repository.displayName() ?? Self.localpart(of: userId)
+        return
+      } catch {}
+    }
   }
 
   /// The people the user blocked; `nil` until loaded.

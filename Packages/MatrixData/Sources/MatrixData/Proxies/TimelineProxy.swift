@@ -137,7 +137,7 @@ public actor TimelineProxy: TimelineRepository {
     do {
       return try await timeline.paginateBackwards(numEvents: Self.pageSize)
     } catch {
-      throw .requestFailed
+      throw Self.failure("loadOlder", error)
     }
   }
 
@@ -146,7 +146,7 @@ public actor TimelineProxy: TimelineRepository {
     do {
       _ = try await timeline.send(msg: Self.content(text))
     } catch {
-      throw .requestFailed
+      throw Self.failure("send", error)
     }
   }
 
@@ -155,7 +155,7 @@ public actor TimelineProxy: TimelineRepository {
     do {
       _ = try await timeline.send(msg: Self.content(text, isEmote: true))
     } catch {
-      throw .requestFailed
+      throw Self.failure("sendEmote", error)
     }
   }
 
@@ -168,25 +168,31 @@ public actor TimelineProxy: TimelineRepository {
     let url = attachment.fileURL
     let size = AttachmentMetadata.size(of: url, given: attachment.size)
     let mimeType = Self.mimeType(for: attachment)
+    // The SDK reads the thumbnail file when the attachment is queued, so it can go once `join` returns.
+    var thumbnail: AttachmentMetadata.Thumbnail?
+    defer { if let thumbnail { try? FileManager.default.removeItem(at: thumbnail.url) } }
     do {
       let handle: SendAttachmentJoinHandle
       switch attachment.kind {
       case .image(let width, let height):
         let image = AttachmentMetadata.image(at: url, width: width, height: height)
+        thumbnail = AttachmentMetadata.imageThumbnail(at: url)
         handle = try timeline.sendImage(
-          params: params, thumbnailSource: nil,
+          params: params, thumbnailSource: Self.source(of: thumbnail),
           imageInfo: ImageInfo(
             height: image.height, width: image.width, mimetype: mimeType, size: size,
-            thumbnailInfo: nil, thumbnailSource: nil, blurhash: image.blurhash, isAnimated: nil))
+            thumbnailInfo: Self.info(of: thumbnail), thumbnailSource: nil,
+            blurhash: image.blurhash, isAnimated: nil))
       case .video(let width, let height, let duration):
         let video = await AttachmentMetadata.video(
           at: url, width: width, height: height, duration: duration)
+        thumbnail = await AttachmentMetadata.videoThumbnail(at: url)
         handle = try timeline.sendVideo(
-          params: params, thumbnailSource: nil,
+          params: params, thumbnailSource: Self.source(of: thumbnail),
           videoInfo: VideoInfo(
             duration: video.duration ?? 0, height: video.height, width: video.width,
-            mimetype: mimeType, size: size, thumbnailInfo: nil, thumbnailSource: nil,
-            blurhash: video.blurhash))
+            mimetype: mimeType, size: size, thumbnailInfo: Self.info(of: thumbnail),
+            thumbnailSource: nil, blurhash: video.blurhash))
       case .audio(let duration):
         let seconds = await AttachmentMetadata.audioDuration(of: url, given: duration)
         handle = try timeline.sendAudio(
@@ -205,8 +211,18 @@ public actor TimelineProxy: TimelineRepository {
       }
       try await handle.join()
     } catch {
-      DebugLog.failure("sendAttachment", error)
-      throw .requestFailed
+      throw Self.failure("sendAttachment", error)
+    }
+  }
+
+  /// The SDK sends a thumbnail only when both its file and its info are given.
+  private static func source(of thumbnail: AttachmentMetadata.Thumbnail?) -> UploadSource? {
+    thumbnail.map { .file(filename: $0.url.path(percentEncoded: false)) }
+  }
+
+  private static func info(of thumbnail: AttachmentMetadata.Thumbnail?) -> ThumbnailInfo? {
+    thumbnail.map {
+      ThumbnailInfo(height: $0.height, width: $0.width, mimetype: "image/jpeg", size: $0.size)
     }
   }
 
@@ -232,8 +248,7 @@ public actor TimelineProxy: TimelineRepository {
         maxSelections: draft.allowsMultipleChoices ? UInt8(clamping: answers.count) : 1,
         pollKind: draft.hidesResults ? .undisclosed : .disclosed)
     } catch {
-      DebugLog.failure("createPoll", error)
-      throw .requestFailed
+      throw Self.failure("createPoll", error)
     }
   }
 
@@ -242,8 +257,7 @@ public actor TimelineProxy: TimelineRepository {
     do {
       try await timeline.sendPollResponse(pollStartEventId: pollEventId, answers: answerIds)
     } catch {
-      DebugLog.failure("sendPollResponse", error)
-      throw .requestFailed
+      throw Self.failure("sendPollResponse", error)
     }
   }
 
@@ -253,8 +267,7 @@ public actor TimelineProxy: TimelineRepository {
       // The fallback text of `m.poll.end`, for clients without polls.
       try await timeline.endPoll(pollStartEventId: pollEventId, text: "The poll has ended.")
     } catch {
-      DebugLog.failure("endPoll", error)
-      throw .requestFailed
+      throw Self.failure("endPoll", error)
     }
   }
 
@@ -298,8 +311,7 @@ public actor TimelineProxy: TimelineRepository {
       case .verifiedChanged: try await identity.withdrawVerification()
       }
     } catch {
-      DebugLog.failure("acceptIdentity", error)
-      throw .requestFailed
+      throw Self.failure("acceptIdentity", error)
     }
   }
 
@@ -370,8 +382,7 @@ public actor TimelineProxy: TimelineRepository {
     do {
       try await room.sendRaw(eventType: "m.room.message", content: content)
     } catch {
-      DebugLog.failure("sendCommand", error)
-      throw .requestFailed
+      throw Self.failure("sendCommand", error)
     }
   }
 
@@ -417,7 +428,7 @@ public actor TimelineProxy: TimelineRepository {
     do {
       try await timeline.sendReply(msg: Self.content(text), eventId: eventId)
     } catch {
-      throw .requestFailed
+      throw Self.failure("reply", error)
     }
   }
 
@@ -428,7 +439,7 @@ public actor TimelineProxy: TimelineRepository {
         eventOrTransactionId: .eventId(eventId: eventId),
         newContent: .roomMessage(content: Self.content(text)))
     } catch {
-      throw .requestFailed
+      throw Self.failure("edit", error)
     }
   }
 
@@ -437,7 +448,7 @@ public actor TimelineProxy: TimelineRepository {
     do {
       try await timeline.redactEvent(eventOrTransactionId: .eventId(eventId: eventId), reason: nil)
     } catch {
-      throw .requestFailed
+      throw Self.failure("redact", error)
     }
   }
 
@@ -446,7 +457,7 @@ public actor TimelineProxy: TimelineRepository {
     do {
       _ = try await timeline.toggleReaction(itemId: .eventId(eventId: eventId), key: key)
     } catch {
-      throw .requestFailed
+      throw Self.failure("toggleReaction", error)
     }
   }
 
@@ -458,7 +469,7 @@ public actor TimelineProxy: TimelineRepository {
         ? try await timeline.pinEvent(eventId: eventId)
         : try await timeline.unpinEvent(eventId: eventId)
     } catch {
-      throw .requestFailed
+      throw Self.failure("setPinned", error)
     }
   }
 
@@ -494,7 +505,7 @@ public actor TimelineProxy: TimelineRepository {
       let body = try JSONSerialization.data(withJSONObject: content)
       try await target.sendRaw(eventType: type, content: String(decoding: body, as: UTF8.self))
     } catch {
-      throw .requestFailed
+      throw Self.failure("forward", error)
     }
   }
 
@@ -529,20 +540,22 @@ public actor TimelineProxy: TimelineRepository {
       try await timeline.redactEvent(
         eventOrTransactionId: .transactionId(transactionId: transactionId), reason: nil)
     } catch {
-      throw .requestFailed
+      throw Self.failure("discardUnsent", error)
     }
   }
 
   public func report(eventId: String, reason: String?) async throws(TimelineError) {
     let room = try openedState().room
     do { try await room.reportContent(eventId: eventId, reason: reason) } catch {
-      throw .requestFailed
+      throw Self.failure("report", error)
     }
   }
 
   public func ignore(userId: String) async throws(TimelineError) {
     let client = try openedState().client
-    do { try await client.client.ignoreUser(userId: userId) } catch { throw .requestFailed }
+    do { try await client.client.ignoreUser(userId: userId) } catch {
+      throw Self.failure("ignore", error)
+    }
   }
 
   /// The message content of a Markdown text. A link to a user (`[Name](https://matrix.to/#/@user:server)`, as the
@@ -604,6 +617,12 @@ public actor TimelineProxy: TimelineRepository {
   private func openedTimeline() throws(TimelineError) -> Timeline {
     guard let opened else { throw .unavailable }
     return opened.timeline
+  }
+
+  /// Logs why an SDK call failed (Debug builds only) and names the cause the room can show.
+  private static func failure(_ operation: String, _ error: any Error) -> TimelineError {
+    DebugLog.failure(operation, error)
+    return TimelineErrorMapper.map(error)
   }
 
   private struct Opened {

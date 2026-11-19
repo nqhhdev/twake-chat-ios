@@ -28,6 +28,50 @@ struct SettingsViewModelTests {
     #expect(viewModel.directMode == .allMessages)
   }
 
+  @Test func aFailedProfileReadIsTriedAgainUntilTheNameLoads() async {
+    let repository = FakeAccountSettingsRepository()
+    repository.name = "Alice Martin"
+    repository.nameFailures = 2
+    let viewModel = viewModel(repository)
+    viewModel.profileRetryDelays = [.zero, .zero]
+    await viewModel.load()
+    #expect(viewModel.displayName == "Alice Martin")
+    #expect(repository.nameReads == 3)
+  }
+
+  @Test func aProfileReadThatKeepsFailingStopsAfterTheRetriesAndKeepsTheLastName() async {
+    let repository = FakeAccountSettingsRepository()
+    repository.name = "Alice Martin"
+    let viewModel = viewModel(repository)
+    viewModel.profileRetryDelays = [.zero, .zero]
+    await viewModel.load()
+    repository.name = "Alice M."
+    repository.nameFailures = 10
+    await viewModel.refreshDisplayName()
+    #expect(viewModel.displayName == "Alice Martin")
+    #expect(repository.nameReads == 4)
+  }
+
+  @Test func refreshingPicksUpANameChangedElsewhere() async {
+    let repository = FakeAccountSettingsRepository()
+    repository.name = "Alice Martin"
+    let viewModel = viewModel(repository)
+    await viewModel.load()
+    repository.name = "Alice M."
+    await viewModel.refreshDisplayName()
+    #expect(viewModel.displayName == "Alice M.")
+  }
+
+  @Test func aProfileWithoutANameShowsTheLocalpart() async {
+    let repository = FakeAccountSettingsRepository()
+    repository.name = "Alice Martin"
+    let viewModel = viewModel(repository)
+    await viewModel.load()
+    repository.name = nil
+    await viewModel.refreshDisplayName()
+    #expect(viewModel.displayName == "alice")
+  }
+
   @Test func aRightRecoveryKeyUnlocksOldMessages() async {
     let repository = FakeAccountSettingsRepository()
     repository.status = .incomplete

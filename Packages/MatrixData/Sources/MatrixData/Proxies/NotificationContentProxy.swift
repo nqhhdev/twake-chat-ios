@@ -13,27 +13,63 @@ public actor NotificationContentProxy: NotificationContentRepository {
     self.authentication = authentication
   }
 
-  public func content(roomId: String, eventId: String) async -> NotificationContent? {
+  public func content(roomId: String, eventId: String) async -> NotificationOutcome {
     guard (try? await authentication.restoreSession()) != nil,
       let client = await authentication.clientProxy?.client,
       let notifications = try? await client.notificationClient(processSetup: .multipleProcesses),
-      case .event(let item)? = try? await notifications.getNotification(
-        roomId: roomId, eventId: eventId)
-    else { return nil }
+      let status = try? await notifications.getNotification(roomId: roomId, eventId: eventId)
+    else { return .generic }
+    guard case .event(let item) = status else {
+      return Self.outcome(withoutEvent: status) ?? .generic
+    }
     let sender = item.senderInfo.displayName.flatMap { $0.isEmpty ? nil : $0 }
     switch item.event {
     case .invite(let senderId):
-      return Self.content(
-        sender: sender ?? senderId, room: item.roomInfo.displayName,
-        isDirect: item.roomInfo.isDirect, body: "Invited you to chat")
+      return .show(
+        Self.content(
+          sender: sender ?? senderId, room: item.roomInfo.displayName,
+          isDirect: item.roomInfo.isDirect, body: "Invited you to chat"))
     case .timeline(let event):
-      guard case .messageLike(let content)? = try? event.content(),
-        let body = Self.body(of: content)
-      else { return nil }
-      return Self.content(
-        sender: sender ?? event.senderId(), room: item.roomInfo.displayName,
-        isDirect: item.roomInfo.isDirect, body: body)
+      guard case .messageLike(let content)? = try? event.content() else { return .generic }
+      if Self.isSilent(content, rawEvent: item.rawEvent) { return .hide }
+      guard let body = Self.body(of: content) else { return .generic }
+      return .show(
+        Self.content(
+          sender: sender ?? event.senderId(), room: item.roomInfo.displayName,
+          isDirect: item.roomInfo.isDirect, body: body))
     }
+  }
+
+  /// A status without an event: hidden when the SDK says the event must not notify (the user's push rules, an ignored
+  /// sender) or was deleted; the generic text when it was not found, as for any other failure (ADR 0009). `nil` for a
+  /// found event, which `content(roomId:eventId:)` reads.
+  static func outcome(withoutEvent status: NotificationStatus) -> NotificationOutcome? {
+    switch status {
+    case .event: nil
+    case .eventFilteredOut, .eventRedacted: .hide
+    case .eventNotFound: .generic
+    }
+  }
+
+  /// Events that never notify: a reaction, a redaction, and an edit of an earlier message (`m.replace`), which the
+  /// homeserver may still push in an encrypted room.
+  static func isSilent(_ content: MessageLikeEventContent, rawEvent: String) -> Bool {
+    switch content {
+    case .reactionContent, .roomRedaction: true
+    case .roomMessage: isEdit(rawEvent: rawEvent)
+    default: false
+    }
+  }
+
+  /// Whether the event's JSON relates it to an earlier event as a replacement. The relation stays in clear in an
+  /// encrypted event, so this holds whether or not the SDK hands back the decrypted JSON.
+  static func isEdit(rawEvent: String) -> Bool {
+    guard
+      let event = try? JSONSerialization.jsonObject(with: Data(rawEvent.utf8)) as? [String: Any],
+      let content = event["content"] as? [String: Any],
+      let relation = content["m.relates_to"] as? [String: Any]
+    else { return false }
+    return relation["rel_type"] as? String == "m.replace"
   }
 
   /// A direct chat is titled with the sender, as Messages does; a group with the room, and the sender below.
