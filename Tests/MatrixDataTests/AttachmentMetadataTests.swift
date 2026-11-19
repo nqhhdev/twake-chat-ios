@@ -1,5 +1,8 @@
+import CoreGraphics
 import Foundation
+import ImageIO
 import Testing
+import UniformTypeIdentifiers
 
 @testable import MatrixData
 
@@ -27,5 +30,52 @@ struct AttachmentMetadataTests {
     defer { try? FileManager.default.removeItem(at: url) }
     #expect(AttachmentMetadata.size(of: url, given: nil) == 1_234)
     #expect(AttachmentMetadata.size(of: url, given: 99) == 99)
+  }
+}
+
+/// Receivers show a picture's or video's thumbnail while the media loads; the SDK uploads the file given as
+/// `thumbnailSource` and fills `thumbnail_info` from `ThumbnailInfo`.
+struct AttachmentThumbnailTests {
+  private func picture(width: Int, height: Int) throws -> URL {
+    let context = try #require(
+      CGContext(
+        data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+    context.setFillColor(red: 0, green: 0.4, blue: 1, alpha: 1)
+    context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+    let image = try #require(context.makeImage())
+    let url = FileManager.default.temporaryDirectory.appending(path: "\(UUID()).png")
+    let destination = try #require(
+      CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil))
+    CGImageDestinationAddImage(destination, image, nil)
+    #expect(CGImageDestinationFinalize(destination))
+    return url
+  }
+
+  @Test func aLargePictureGetsAJPEGThumbnailOfAtMost800() throws {
+    let url = try picture(width: 2_000, height: 1_000)
+    defer { try? FileManager.default.removeItem(at: url) }
+    let thumbnail = try #require(AttachmentMetadata.imageThumbnail(at: url))
+    defer { try? FileManager.default.removeItem(at: thumbnail.url) }
+    #expect(thumbnail.width == 800)
+    #expect(thumbnail.height == 400)
+    #expect(thumbnail.size > 0)
+    #expect(thumbnail.size == AttachmentMetadata.size(of: thumbnail.url, given: nil))
+    let source = try #require(CGImageSourceCreateWithURL(thumbnail.url as CFURL, nil))
+    #expect(CGImageSourceGetType(source) as String? == UTType.jpeg.identifier)
+  }
+
+  @Test func aSmallPictureIsItsOwnThumbnail() throws {
+    let url = try picture(width: 300, height: 200)
+    defer { try? FileManager.default.removeItem(at: url) }
+    #expect(AttachmentMetadata.imageThumbnail(at: url) == nil)
+  }
+
+  @Test func aFileThatIsNoPictureHasNoThumbnail() throws {
+    let url = FileManager.default.temporaryDirectory.appending(path: "\(UUID()).bin")
+    try Data(count: 64).write(to: url)
+    defer { try? FileManager.default.removeItem(at: url) }
+    #expect(AttachmentMetadata.imageThumbnail(at: url) == nil)
   }
 }

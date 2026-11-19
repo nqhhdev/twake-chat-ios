@@ -10,4 +10,14 @@ public enum TimelineError: Error, Sendable, Equatable {
   case unavailable
   /// The request failed; trying again may work.
   case requestFailed
+  /// The server refused the content as too large (`M_TOO_LARGE`).
+  case tooLarge
+  /// The file's type cannot be sent: its MIME type is missing or not valid.
+  case unsupportedType
+  /// The server could not be reached.
+  case network
+  /// The server refused the request for this user (`M_FORBIDDEN`), such as sending in a read-only chat.
+  case forbidden
+  /// The attachment could not be read, described or uploaded.
+  case uploadFailed
 }
