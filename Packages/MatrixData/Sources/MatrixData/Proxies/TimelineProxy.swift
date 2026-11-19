@@ -69,6 +69,9 @@ public actor TimelineProxy: TimelineRepository {
     let ownUserId = try? client.userId
     let (items, itemsContinuation) = AsyncStream<[Domain.TimelineItem]>.makeStream(
       bufferingPolicy: .bufferingNewest(1))
+    // The SDK may send no first diff for a room with nothing cached, which left the screen loading forever. An empty
+    // list first lets it show the timeline and load older pages; the SDK's first items replace it in the buffer.
+    itemsContinuation.yield([])
     let (diffs, diffsContinuation) = AsyncStream<[TimelineDiff]>.makeStream()
     // The listener is called on an SDK thread; diffs are applied in order by one task, which keeps the client alive
     // until it ends.
