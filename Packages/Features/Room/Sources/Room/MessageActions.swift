@@ -230,6 +230,7 @@ struct MessageActionsOverlay: View {
         }
         .buttonStyle(PressScaleButtonStyle())
         .accessibilityLabel(isMine ? "Remove \(key)" : "React \(key)")
+        .accessibilityIdentifier(A11yIdentifiers.room.reaction(key))
       }
       more
     }
@@ -279,6 +280,7 @@ struct MessageActionsOverlay: View {
           .contentShape(Rectangle())
         }
         .buttonStyle(MenuRowButtonStyle())
+        .accessibilityIdentifier(A11yIdentifiers.room.action(action.title))
       }
     }
   }

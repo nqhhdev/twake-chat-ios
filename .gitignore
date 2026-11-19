@@ -12,3 +12,6 @@ xcuserdata/
 
 # macOS
 .DS_Store
+
+# Local Synapse data for the bundled E2E stack.
+e2e/.data/

@@ -1,0 +1,43 @@
+# Local E2E Synapse only (server_name localhost, password registration via the
+# admin API). Not for production. Secrets below are fixtures for the test stack.
+server_name: localhost
+public_baseurl: http://localhost:8008/
+pid_file: /data/homeserver.pid
+report_stats: false
+suppress_key_server_warning: true
+
+listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: false
+    bind_addresses: ["0.0.0.0"]
+    resources:
+      - names: [client, federation]
+        compress: false
+
+database:
+  name: sqlite3
+  args:
+    database: /data/homeserver.db
+
+log_config: /data/localhost.log.config
+media_store_path: /data/media_store
+signing_key_path: /data/localhost.signing.key
+registration_shared_secret: ios-e2e-registration-secret
+macaroon_secret_key: ios-e2e-macaroon-secret
+form_secret: ios-e2e-form-secret
+enable_registration: false
+
+rc_login:
+  address: { per_second: 10, burst_count: 30 }
+  account: { per_second: 10, burst_count: 30 }
+  failed_attempts: { per_second: 10, burst_count: 30 }
+rc_message: { per_second: 1000, burst_count: 1000 }
+rc_joins:
+  local: { per_second: 1000, burst_count: 1000 }
+  remote: { per_second: 1000, burst_count: 1000 }
+rc_invites:
+  per_room: { per_second: 1000, burst_count: 1000 }
+  per_user: { per_second: 1000, burst_count: 1000 }
+rc_room_creation: { per_second: 1000, burst_count: 1000 }

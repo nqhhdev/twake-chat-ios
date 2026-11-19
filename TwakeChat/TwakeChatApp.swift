@@ -19,9 +19,13 @@ struct TwakeChatApp: App {
     else {
       preconditionFailure("The app's entitlements give it no App Group or Keychain access group.")
     }
+    let sessionStore = KeychainSessionStore(service: "app.twake.ios.chat", accessGroup: accessGroup)
+    #if DEBUG
+      // UI tests start signed out, whatever an earlier failed test left behind.
+      E2EHarness.resetIfAsked(storeDirectory: storeDirectory, sessionStore: sessionStore)
+    #endif
     let repository = MatrixAuthenticationRepository(
-      storeDirectory: storeDirectory,
-      sessionStore: KeychainSessionStore(service: "app.twake.ios.chat", accessGroup: accessGroup))
+      storeDirectory: storeDirectory, sessionStore: sessionStore)
     // The build configuration sets the sign-in URLs: staging in Debug, Twake SaaS in Release. None is a secret.
     func url(_ key: String) -> URL? {
       (Bundle.main.object(forInfoDictionaryKey: key) as? String).flatMap {
@@ -30,7 +34,7 @@ struct TwakeChatApp: App {
     }
     let configuration = SignInConfiguration(
       registrationURL: url("RegistrationURL"), workplaceHomeserver: url("WorkplaceHomeserver"),
-      defaultHomeserver: url("DefaultHomeserver"),
+      defaultHomeserver: E2EHarness.homeserver ?? url("DefaultHomeserver"),
       privacyURL: url("PrivacyURL") ?? URL(string: "https://twake.app/policy")!)
     let roomList = RoomListProxy(authentication: repository)
     // The recovery key kept on ToM (ADR 0024): Settings gives it a new key, the unlock after sign-in reads it.
