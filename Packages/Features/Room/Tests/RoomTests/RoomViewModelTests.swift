@@ -830,6 +830,22 @@ struct RoomAttachmentAndTypingTests {
     #expect(viewModel.errorMessage == "Could not send the attachment. Please try again.")
   }
 
+  @Test(arguments: [
+    (TimelineError.tooLarge, "This file is larger than the server allows."),
+    (.unsupportedType, "This type of file cannot be sent."),
+    (.network, "Could not reach the server. Check your connection and try again."),
+    (.forbidden, "You are not allowed to send files in this chat."),
+    (.uploadFailed, "Could not upload the file. Please try again."),
+  ])
+  func aFailedUploadSaysWhy(error: TimelineError, message: String) async {
+    let repository = FakeTimelineRepository()
+    repository.actionResult = .failure(error)
+    let viewModel = viewModel(repository)
+    await viewModel.send(
+      attachment: .file, fileURL: URL(filePath: "/tmp/a.pdf"), mimeType: nil, size: nil)
+    #expect(viewModel.errorMessage == message)
+  }
+
   @Test func typingIsSentWhenTheDraftStartsAndStops() async {
     let repository = FakeTimelineRepository()
     let viewModel = viewModel(repository)

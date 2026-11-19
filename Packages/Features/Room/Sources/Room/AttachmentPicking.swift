@@ -2,6 +2,7 @@ import AVFoundation
 import DesignSystem
 import Domain
 import Foundation
+import ImageIO
 import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
@@ -18,10 +19,10 @@ enum AttachmentLoader {
     let size: Int?
   }
 
-  /// A picture or a video from the photo library.
+  /// A picture or a video from the photo library, typed by its bytes rather than by the first type the picker lists.
   static func load(_ item: PhotosPickerItem) async -> Loaded? {
     guard let data = try? await item.loadTransferable(type: Data.self) else { return nil }
-    let type = item.supportedContentTypes.first ?? .jpeg
+    let type = AttachmentType.of(data: data, offered: item.supportedContentTypes)
     let isVideo = type.conforms(to: .movie)
     let url = temporaryFile(
       named: "\(UUID().uuidString).\(type.preferredFilenameExtension ?? (isVideo ? "mov" : "jpg"))")
@@ -46,19 +47,11 @@ enum AttachmentLoader {
     defer { if scoped { url.stopAccessingSecurityScopedResource() } }
     let copy = temporaryFile(named: url.lastPathComponent)
     guard (try? FileManager.default.copyItem(at: url, to: copy)) != nil else { return nil }
-    let type = UTType(filenameExtension: url.pathExtension)
+    let type = AttachmentType.of(file: url)
     let size = (try? copy.resourceValues(forKeys: [.fileSizeKey]))?.fileSize
-    let kind: OutgoingAttachment.Kind =
-      if type?.conforms(to: .image) == true {
-        .image(width: nil, height: nil)
-      } else if type?.conforms(to: .movie) == true {
-        .video(width: nil, height: nil, duration: nil)
-      } else if type?.conforms(to: .audio) == true {
-        .audio(duration: nil)
-      } else {
-        .file
-      }
-    return Loaded(kind: kind, fileURL: copy, mimeType: type?.preferredMIMEType, size: size)
+    return Loaded(
+      kind: AttachmentType.kind(of: type), fileURL: copy, mimeType: type?.preferredMIMEType,
+      size: size)
   }
 
   /// A picture from the clipboard, written to a temporary JPEG file like a picked one.
@@ -98,6 +91,39 @@ enum AttachmentLoader {
       path: "outgoing/\(UUID().uuidString)")
     try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     return folder.appending(path: name.isEmpty ? "file" : name)
+  }
+}
+
+/// The type of a picked file, from which its MIME type, extension and kind of message follow.
+enum AttachmentType {
+  /// What picked bytes are: the first listed type that is a picture or a video, else the first listed type, else
+  /// JPEG; for a picture, the format its bytes hold wins (the picker may list a type it did not hand over). A video's
+  /// bytes are not read: ImageIO may take a video's container for a HEIF picture.
+  static func of(data: Data, offered: [UTType]) -> UTType {
+    let listed =
+      offered.first { $0.conforms(to: .image) || $0.conforms(to: .movie) } ?? offered.first
+      ?? .jpeg
+    guard !listed.conforms(to: .movie),
+      let source = CGImageSourceCreateWithData(data as CFData, nil),
+      let identifier = CGImageSourceGetType(source) as String?,
+      let type = UTType(identifier)
+    else { return listed }
+    return type
+  }
+
+  /// A file's type as the file system records it, else as its extension says.
+  static func of(file url: URL) -> UTType? {
+    (try? url.resourceValues(forKeys: [.contentTypeKey]))?.contentType
+      ?? UTType(filenameExtension: url.pathExtension)
+  }
+
+  /// The message a file of this type is sent as.
+  static func kind(of type: UTType?) -> OutgoingAttachment.Kind {
+    guard let type else { return .file }
+    if type.conforms(to: .image) { return .image(width: nil, height: nil) }
+    if type.conforms(to: .movie) { return .video(width: nil, height: nil, duration: nil) }
+    if type.conforms(to: .audio) { return .audio(duration: nil) }
+    return .file
   }
 }
 

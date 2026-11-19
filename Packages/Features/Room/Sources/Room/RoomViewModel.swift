@@ -833,7 +833,20 @@ public final class RoomViewModel {
           kind: kind, fileURL: fileURL, mimeType: mimeType, size: size, caption: caption,
           replyTo: replyTo))
     } catch {
-      errorMessage = "Could not send the attachment. Please try again."
+      errorMessage = Self.attachmentFailureMessage(error)
+    }
+  }
+
+  /// Why an attachment was not sent, as the composer shows it.
+  static func attachmentFailureMessage(_ error: TimelineError) -> String {
+    switch error {
+    case .tooLarge: "This file is larger than the server allows."
+    case .unsupportedType: "This type of file cannot be sent."
+    case .network: "Could not reach the server. Check your connection and try again."
+    case .forbidden: "You are not allowed to send files in this chat."
+    case .uploadFailed: "Could not upload the file. Please try again."
+    case .notSignedIn, .roomNotFound, .unavailable, .requestFailed:
+      "Could not send the attachment. Please try again."
     }
   }
 
