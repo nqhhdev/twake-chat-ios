@@ -295,7 +295,10 @@ public struct RoomScreen: View {
   @ViewBuilder private func timeline(bubbleWidth: CGFloat) -> some View {
     switch viewModel.state {
     case .loading:
-      ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+      // The same insets as the timeline's rows (`TimelineScroll`).
+      TimelineSkeleton(bubbleWidth: bubbleWidth)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     case .failed(let message):
       ContentUnavailableView {
         Label(message, systemImage: "exclamationmark.triangle")

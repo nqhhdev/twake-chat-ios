@@ -30,7 +30,7 @@ struct TimelineScroll: View {
       LazyVStack(spacing: 0) {
         if let placeholder = viewModel.placeholder {
           // No message to show yet: say so in the middle of the screen instead of a small spinner at its top.
-          TimelinePlaceholderView(placeholder: placeholder) {
+          TimelinePlaceholderView(placeholder: placeholder, bubbleWidth: bubbleWidth) {
             Task { await viewModel.resumeHistory() }
           }
           .task(id: placeholder) {
@@ -298,17 +298,15 @@ struct OtherRow: View {
 /// Shown while a chat has no message on screen and its start is not reached.
 private struct TimelinePlaceholderView: View {
   let placeholder: RoomViewModel.Placeholder
+  let bubbleWidth: CGFloat
   let onLoadMore: () -> Void
 
   var body: some View {
-    VStack(spacing: 12) {
-      switch placeholder {
-      case .loading:
-        ProgressView()
-        Text("Loading messages…")
-          .textStyle(TextStyles.bodyMedium)
-          .foregroundStyle(SysColors.textSecondary)
-      case .paused:
+    switch placeholder {
+    case .loading:
+      TimelineSkeleton(bubbleWidth: bubbleWidth)
+    case .paused:
+      VStack(spacing: 12) {
         Text("No messages to show yet")
           .textStyle(TextStyles.titleMedium)
           .foregroundStyle(SysColors.onSurface)
@@ -319,9 +317,9 @@ private struct TimelinePlaceholderView: View {
         Button("Load earlier messages", action: onLoadMore)
           .buttonStyle(.bordered)
       }
+      .frame(maxWidth: .infinity, minHeight: 320)
+      .padding(.horizontal, 24)
     }
-    .frame(maxWidth: .infinity, minHeight: 320)
-    .padding(.horizontal, 24)
   }
 }
 
