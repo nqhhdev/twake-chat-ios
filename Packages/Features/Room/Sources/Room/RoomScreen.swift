@@ -189,6 +189,9 @@ public struct RoomScreen: View {
           }
           .accessibilityElement(children: .combine)
         }
+        if viewModel.canFollowThread {
+          ToolbarItem(placement: .topBarTrailing) { ThreadFollowMenu(viewModel: viewModel) }
+        }
       } else {
         // As in the Flutter chat, the header opens the chat details.
         ToolbarItem(placement: .principal) {

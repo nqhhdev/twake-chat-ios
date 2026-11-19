@@ -46,6 +46,7 @@ struct TwakeChatApp: App {
         roomDetails: RoomDetailsProxy(authentication: repository),
         roomSearch: RoomSearchProxy(authentication: repository),
         savedMessages: SavedMessagesProxy(authentication: repository),
+        threadPrefs: ThreadPrefsProxy(authentication: repository),
         roomLinks: RoomLinkProxy(authentication: repository),
         accountSettings: AccountSettingsProxy(authentication: repository),
         people: PeopleProxy(authentication: repository),

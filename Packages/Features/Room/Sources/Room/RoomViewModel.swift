@@ -59,6 +59,9 @@ public final class RoomViewModel {
   /// The user may delete other people's messages, as a moderator; loaded with the timeline.
   public private(set) var canRedactOthers = false
   @ObservationIgnored private let saved: (any SavedMessagesRepository)?
+  @ObservationIgnored let threadPrefs: (any ThreadPrefsRepository)?
+  /// On a thread's screen: what the user chose for it, shared with the web app; `nil` when nothing was chosen.
+  var threadPref: ThreadPref?
   /// The commands of the room's bots, loaded with the timeline.
   public private(set) var botCommands: [BotCommand] = []
 
@@ -107,6 +110,30 @@ public final class RoomViewModel {
       showToast(save ? "Saved" : "Removed from saved messages")
     } catch {
       errorMessage = "Could not update your saved messages."
+    }
+  }
+
+  /// On a thread's screen, the choice the user made for it (`Threads.swift`).
+  func loadThreadPref() async {
+    guard let threadRootId, let threadPrefs else { return }
+    threadPref =
+      await threadPrefs.threadPrefs()
+      .first { $0.roomId == roomId && $0.threadId == threadRootId }?.pref
+  }
+
+  /// Saves the choice for this thread; it shows only once the server took it.
+  public func setThreadPref(_ pref: ThreadPref) async {
+    guard let threadRootId, let threadPrefs else { return }
+    do {
+      try await threadPrefs.setThreadPref(pref, roomId: roomId, threadId: threadRootId)
+      threadPref = pref
+      switch pref {
+      case .follow: showToast("Following this thread")
+      case .unfollow: showToast("You no longer follow this thread")
+      case .mute: showToast("Thread muted")
+      }
+    } catch {
+      errorMessage = "Could not update this thread."
     }
   }
 
@@ -221,8 +248,10 @@ public final class RoomViewModel {
     display: @escaping @MainActor () -> ChatDisplaySettings = { ChatDisplaySettings() },
     blocking: Blocking? = nil,
     saved: (any SavedMessagesRepository)? = nil,
-    threadTimeline: ThreadTimeline? = nil, threadRootId: String? = nil
+    threadTimeline: ThreadTimeline? = nil, threadRootId: String? = nil,
+    threadPrefs: (any ThreadPrefsRepository)? = nil
   ) {
+    self.threadPrefs = threadPrefs
     self.threadTimeline = threadTimeline
     self.threadRootId = threadRootId
     self.saved = saved
@@ -258,7 +287,7 @@ public final class RoomViewModel {
       forwardTargets: forwardTargets, invitePeople: invitePeople, contentTimeline: nil,
       openDirectChat: openDirectChat, search: nil, isArchived: isArchived, rejoin: nil,
       linkPreviews: linkPreviews, checkSession: nil, display: display, blocking: blocking,
-      saved: saved, threadTimeline: nil, threadRootId: eventId)
+      saved: saved, threadTimeline: nil, threadRootId: eventId, threadPrefs: threadPrefs)
   }
 
   /// The details page of this room, or `nil` when the app gave no details repository.
@@ -395,8 +424,9 @@ public final class RoomViewModel {
       async let roomState: Void = loadRoomState()
       async let reactions: Void = loadRecentReactions()
       async let saved: Void = loadSaved()
+      async let threadPref: Void = loadThreadPref()
       let commands = await repository.botCommands()
-      _ = await (pinned, roomState, reactions, saved)
+      _ = await (pinned, roomState, reactions, saved, threadPref)
       botCommands = commands
     }
     defer { extras.cancel() }
