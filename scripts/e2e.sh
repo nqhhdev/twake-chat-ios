@@ -62,13 +62,15 @@ up() {
   docker info >/dev/null 2>&1 || die "Docker is not running (open -a Docker, or use the CI Colima setup)"
   [ -f "$WEB_E2E/docker/docker-compose.yaml" ] || die "e2e compose not found at $WEB_E2E/docker (set WEB_E2E)"
   export E2E_UID="$(id -u)" E2E_GID="$(id -g)"
-  local data="$WEB_E2E/.data/synapse"
-  if [ ! -f "$data/localhost.signing.key" ]; then
-    mkdir -p "$data"
-    docker run --rm -v "$data:/data" -e UID="$E2E_UID" -e GID="$E2E_GID" \
-      -e SYNAPSE_SERVER_NAME=localhost -e SYNAPSE_REPORT_STATS=no "$SYNAPSE_IMAGE" generate >/dev/null
-  fi
   if [ -d "$WEB_E2E/docker/synapse" ]; then
+    # Only this stack reads a host data folder. The bundled stack ships its key and log config, and
+    # Colima mounts the home folder read-only, so `generate` into a host bind fails there.
+    local data="$WEB_E2E/.data/synapse"
+    if [ ! -f "$data/localhost.signing.key" ]; then
+      mkdir -p "$data"
+      docker run --rm -v "$data:/data" -e UID="$E2E_UID" -e GID="$E2E_GID" \
+        -e SYNAPSE_SERVER_NAME=localhost -e SYNAPSE_REPORT_STATS=no "$SYNAPSE_IMAGE" generate >/dev/null
+    fi
     if [ ! -f "$data/tls.crt" ]; then
       openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=localhost" \
         -addext "subjectAltName=DNS:localhost" -keyout "$data/tls.key" -out "$data/tls.crt" >/dev/null 2>&1
