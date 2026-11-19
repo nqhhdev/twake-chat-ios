@@ -43,6 +43,30 @@ extension RoomViewModel {
   public var threadFollow: ThreadFollow {
     ThreadPrefs.follow(isParticipating: isParticipatingInThread, pref: threadPref)
   }
+
+  /// On a thread's screen, the choice the user made for it.
+  func loadThreadPref() async {
+    guard let threadRootId, let threadPrefs else { return }
+    threadPref =
+      await threadPrefs.threadPrefs()
+      .first { $0.roomId == roomId && $0.threadId == threadRootId }?.pref
+  }
+
+  /// Saves the choice for this thread; it shows only once the server took it.
+  public func setThreadPref(_ pref: ThreadPref) async {
+    guard let threadRootId, let threadPrefs else { return }
+    do {
+      try await threadPrefs.setThreadPref(pref, roomId: roomId, threadId: threadRootId)
+      threadPref = pref
+      switch pref {
+      case .follow: showToast("Following this thread")
+      case .unfollow: showToast("You no longer follow this thread")
+      case .mute: showToast("Thread muted")
+      }
+    } catch {
+      errorMessage = "Could not update this thread."
+    }
+  }
 }
 
 /// The thread screen's menu: follow or unfollow, and mute, as the web's thread header offers them.
