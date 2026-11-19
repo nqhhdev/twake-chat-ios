@@ -26,6 +26,56 @@ extension RoomViewModel {
   }
 }
 
+/// Follow, unfollow and mute of the thread this screen shows (web D60), kept in the account data the web reads.
+extension RoomViewModel {
+  /// A thread's screen, with the account's thread choices to read and write.
+  public var canFollowThread: Bool { threadRootId != nil && threadPrefs != nil }
+
+  /// The user started the thread or replied in it: they follow it unless they chose otherwise.
+  var isParticipatingInThread: Bool {
+    guard case .loaded(let items) = state else { return false }
+    return items.contains { item in
+      if case .message(let message) = item.kind { message.isOwn } else { false }
+    }
+  }
+
+  /// Whether the user follows this thread, and whether it is muted (web `resolveThreadFollow`).
+  public var threadFollow: ThreadFollow {
+    ThreadPrefs.follow(isParticipating: isParticipatingInThread, pref: threadPref)
+  }
+}
+
+/// The thread screen's menu: follow or unfollow, and mute, as the web's thread header offers them.
+struct ThreadFollowMenu: View {
+  let viewModel: RoomViewModel
+
+  var body: some View {
+    let follow = viewModel.threadFollow
+    Menu {
+      if follow.isFollowing {
+        Button("Unfollow Thread", systemImage: "bell.slash") { set(.unfollow) }
+      } else {
+        Button("Follow Thread", systemImage: "bell") { set(.follow) }
+      }
+      if follow.isMuted {
+        Button("Unmute Thread", systemImage: "speaker.wave.2") { set(.follow) }
+      } else {
+        Button("Mute Thread", systemImage: "speaker.slash") { set(.mute) }
+      }
+    } label: {
+      Image(
+        systemName: follow.isMuted ? "bell.slash.fill" : follow.isFollowing ? "bell.fill" : "bell")
+    }
+    .accessibilityLabel(
+      follow.isMuted
+        ? "Thread muted" : follow.isFollowing ? "Following thread" : "Not following thread")
+  }
+
+  private func set(_ pref: ThreadPref) {
+    Task { await viewModel.setThreadPref(pref) }
+  }
+}
+
 /// One room screen is one value: the room pushes a thread with `navigationDestination(item:)`.
 extension RoomViewModel: Hashable {
   nonisolated public static func == (lhs: RoomViewModel, rhs: RoomViewModel) -> Bool { lhs === rhs }
