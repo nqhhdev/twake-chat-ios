@@ -272,13 +272,28 @@ public actor RoomDetailsProxy: RoomDetailsRepository {
     }
   }
 
-  public func invite(userIds: [String], roomId: String) async throws(RoomDetailsError) {
+  /// The invitations go out together: a homeserver answers an invitation to another server only once that server
+  /// does, which can take minutes (twake-on-matrix #3262), and one slow or failing person must not hold the others.
+  @discardableResult
+  public func invite(userIds: [String], roomId: String) async throws(RoomDetailsError) -> [String] {
     let room = try await room(roomId)
-    do {
-      for userId in userIds { try await room.inviteUserById(userId: userId) }
-    } catch {
-      throw .requestFailed
+    let failed = await withTaskGroup(of: String?.self) { group in
+      for userId in userIds {
+        group.addTask {
+          do {
+            try await room.inviteUserById(userId: userId)
+            return nil
+          } catch {
+            DebugLog.failure("inviteUserById", error)
+            return userId
+          }
+        }
+      }
+      var failed: Set<String> = []
+      for await userId in group { if let userId { failed.insert(userId) } }
+      return failed
     }
+    return userIds.filter(failed.contains)
   }
 
   public func statusMessage(of userId: String) async -> String? {

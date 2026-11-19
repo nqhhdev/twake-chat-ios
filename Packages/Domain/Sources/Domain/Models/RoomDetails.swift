@@ -169,8 +169,10 @@ public protocol RoomDetailsRepository: Sendable {
   func rename(_ name: String, roomId: String) async throws(RoomDetailsError)
   /// Sets the room's topic; an empty text removes it.
   func setTopic(_ topic: String, roomId: String) async throws(RoomDetailsError)
-  /// Invites these Matrix users; the first failure stops and throws.
-  func invite(userIds: [String], roomId: String) async throws(RoomDetailsError)
+  /// Invites these Matrix users, each on its own: one that cannot be invited (a server that does not answer, a
+  /// banned person) does not stop the others. Returns the ids that were not invited; empty when all were.
+  @discardableResult
+  func invite(userIds: [String], roomId: String) async throws(RoomDetailsError) -> [String]
   /// Removes (kicks) a member from the room.
   func remove(userId: String, roomId: String) async throws(RoomDetailsError)
   /// Bans a member: removed, and kept out until unbanned.

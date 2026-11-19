@@ -87,9 +87,11 @@ public final class FakeRoomDetailsRepository: RoomDetailsRepository, @unchecked 
     lock.withLock { _changes.append("topic \(topic)") }
   }
 
-  public func invite(userIds: [String], roomId: String) async throws(RoomDetailsError) {
+  @discardableResult
+  public func invite(userIds: [String], roomId: String) async throws(RoomDetailsError) -> [String] {
     try changeResult.get()
     lock.withLock { _changes.append("invite \(userIds.joined(separator: ","))") }
+    return []
   }
 
   public func setAvatar(_ picture: PictureUpload, roomId: String) async throws(RoomDetailsError) {

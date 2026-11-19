@@ -46,7 +46,7 @@ public final class PeopleSearchViewModel {
   @ObservationIgnored private var searchTask: Task<Void, Never>?
   @ObservationIgnored private let debounce: Duration
   /// Invites the picked people (their Matrix ids) and says whether it worked; for `.invite`.
-  @ObservationIgnored private let inviteAction: (@MainActor ([String]) async -> Bool)?
+  @ObservationIgnored private let inviteAction: (@MainActor ([String]) async -> [String])?
   /// Set once the picked people were invited; the invite screen closes.
   public private(set) var didInvite = false
 
@@ -54,7 +54,7 @@ public final class PeopleSearchViewModel {
   public init(
     mode: Mode = .direct, repository: any PeopleRepository, debounce: Duration = .milliseconds(300),
     onOpen: @escaping @MainActor (String, String) -> Void,
-    invite: (@MainActor ([String]) async -> Bool)? = nil
+    invite: (@MainActor ([String]) async -> [String])? = nil
   ) {
     self.mode = mode
     self.repository = repository
@@ -69,10 +69,16 @@ public final class PeopleSearchViewModel {
     isCreating = true
     defer { isCreating = false }
     errorMessage = nil
-    if await inviteAction(selected.map(\.id)) {
+    let failed = await inviteAction(selected.map(\.id))
+    if failed.isEmpty {
       didInvite = true
-    } else {
+    } else if failed.count == selected.count {
       errorMessage = "Could not invite. Please try again."
+    } else {
+      // The others are in: keep only the people still to invite, by name, so the user can try them again.
+      selected = selected.filter { failed.contains($0.id) }
+      let names = selected.map { $0.displayName ?? $0.id }.formatted(.list(type: .and))
+      errorMessage = "Could not invite \(names). The others were invited."
     }
   }
 

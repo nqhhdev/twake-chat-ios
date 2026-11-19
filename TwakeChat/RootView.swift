@@ -278,11 +278,11 @@ final class RootCoordinator {
         mode: .invite, repository: people, onOpen: { _, _ in },
         invite: { userIds in
           do {
-            try await roomDetails.invite(userIds: userIds, roomId: roomId)
-            onInvited()
-            return true
+            let failed = try await roomDetails.invite(userIds: userIds, roomId: roomId)
+            if failed.count < userIds.count { onInvited() }
+            return failed
           } catch {
-            return false
+            return userIds
           }
         })
       return AnyView(InviteScreen(viewModel: search))
