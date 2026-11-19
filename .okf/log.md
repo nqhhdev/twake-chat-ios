@@ -81,3 +81,4 @@
 ## 2026-11-19
 * **Change**: The Notification Service Extension shows nothing for an edit, a reaction, a redaction, a deleted message or an event the push rules filter out (#91); a failure still shows the generic text (ADR 0009).
 * **Change**: The Notification Service Extension sets the app icon badge to the push's `unread_count`, the homeserver's count, when the push has one (#91, #113; owner decision 2026-11-19).
+* **Change**: Deferred Features now says, for each feature, whether the code on `origin/main` (`5745f8a`) has built it, with the file and commit, and which open issue tracks what is left (issue #89). Most deferred features are built, so the constraint "No code for a deferred feature in v1" (ADR 0011) no longer matches the code; the owner settles it through #65 and #100.
