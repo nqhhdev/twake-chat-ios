@@ -32,6 +32,11 @@ final class RootCoordinator {
   private(set) var authentication: AuthenticationCoordinator?
 
   @ObservationIgnored private let repository: any AuthenticationRepository
+  /// Reports a session the server signed out.
+  @ObservationIgnored private let sessionExpiry: (any SessionExpiry)?
+  @ObservationIgnored private var expiryWatch: Task<Void, Never>?
+  /// Shown once on the sign-in form after the server signed this device out.
+  var sessionExpiredNotice = false
   @ObservationIgnored private let roomList: (any RoomListRepository)?
   /// The chats the user left.
   @ObservationIgnored private let archive: (any ArchivedRoomsRepository)?
@@ -103,10 +108,11 @@ final class RootCoordinator {
     people: (any PeopleRepository)? = nil, push: (any PushRepository)? = nil,
     verification: (any VerificationRepository)? = nil, devices: (any DevicesRepository)? = nil,
     chatDisplay: (any ChatDisplaySettingsStore)? = nil, appLock: AppLock? = nil,
-    sync: (any SyncLifecycle)? = nil,
+    sync: (any SyncLifecycle)? = nil, sessionExpiry: (any SessionExpiry)? = nil,
     signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator
   ) {
     let pushCenter = PushCenter(repository: push)
+    self.sessionExpiry = sessionExpiry
     self.push = pushCenter
     self.lifecycle = AppLifecycle(sync: sync, push: pushCenter)
     self.verificationRepository = verification
@@ -340,6 +346,32 @@ final class RootCoordinator {
     }
     state = .restored(session)
     authentication = makeAuthentication(session: session)
+    watchSessionExpiry()
+  }
+
+  /// Follows the server signing this device out (from another device, or by an administrator) for as long as the app
+  /// runs: each report removes the local session and shows the sign-in form.
+  private func watchSessionExpiry() {
+    guard expiryWatch == nil, let sessionExpiry else { return }
+    expiryWatch = Task { [weak self] in
+      for await _ in await sessionExpiry.sessionExpirations() {
+        await self?.sessionExpired()
+      }
+    }
+  }
+
+  /// The server no longer knows this device: the saved session and its store are useless. They are removed (the
+  /// server call inside `logout` fails, which is expected) and the sign-in form shows with a notice. Nothing happens
+  /// when nobody is signed in any more.
+  func sessionExpired() async {
+    guard case .restored = state, case .signedIn? = authentication?.screen else { return }
+    await push.stop()
+    try? await repository.logout()
+    guard (try? await repository.restoreSession()) == nil else { return }
+    chatList = nil
+    sessionExpiredNotice = true
+    state = .restored(nil)
+    authentication = makeAuthentication(session: nil)
   }
 
   /// The way out of `restoreFailed` when the error does not pass: signs out (the repository clears the local session
@@ -369,6 +401,16 @@ struct RootView: View {
   var body: some View {
     content
       .task { await coordinator.start() }
+      .alert(
+        "You were signed out",
+        isPresented: Binding(
+          get: { coordinator.sessionExpiredNotice },
+          set: { coordinator.sessionExpiredNotice = $0 })
+      ) {
+        Button("OK", role: .cancel) {}
+      } message: {
+        Text("This device was signed out from another device. Sign in again to continue.")
+      }
       .overlay {
         if let lock = coordinator.appLock, lock.isLocked || lock.isCovered {
           AppLockScreen(lock: lock).transition(.opacity)

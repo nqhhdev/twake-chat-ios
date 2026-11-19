@@ -1,6 +1,7 @@
 import AppShared
 import Foundation
 import MatrixRustSDK
+import os
 
 /// Wraps the SDK `Client` of one signed-in session and its sync service (ADR 0006). Nothing public on it uses an SDK
 /// type.
@@ -13,11 +14,21 @@ import MatrixRustSDK
 public final class ClientProxy: Sendable {
   let client: Client
   private let sync = SyncServiceHolder()
+  /// Keeps the SDK's delegate registration alive for as long as this proxy lives.
+  private let authErrorHandle = OSAllocatedUnfairLock<TaskHandle?>(initialState: nil)
 
   private init(client: Client) {
     self.client = client
     // Local echoes of pictures, videos and files then carry how much is uploaded, for the progress ring.
     client.enableSendQueueUploadProgress(enable: true)
+  }
+
+  /// Calls `handler` when the server refuses this session's token for good (the device was signed out elsewhere).
+  /// A soft logout, where the server only asks for the token to be renewed, is not reported. A later call replaces
+  /// the handler.
+  func onSessionExpired(_ handler: @escaping @Sendable () -> Void) {
+    let handle = try? client.setDelegate(delegate: AuthErrorDelegate(onHardLogout: handler))
+    authErrorHandle.withLock { $0 = handle }
   }
 
   /// The signed-in user's Matrix id.
@@ -169,8 +180,27 @@ public final class ClientProxy: Sendable {
   /// happens even when this throws; sync is stopped first, and cannot start again on this client, so nothing writes to
   /// the store while it is removed.
   func logout() async throws {
+    await uploadPendingRoomKeys()
     await sync.close()
     try await client.logout()
+  }
+
+  /// How long a logout waits for the keys of recent messages to reach the chat backup.
+  static let backupUploadTimeout: Duration = .seconds(10)
+
+  /// Gives room keys that are not in the chat backup yet the time to get there, so the next device that restores the
+  /// backup reads the last messages too (twake-on-matrix PR #2227). It waits only while a backup is on, and never
+  /// longer than `backupUploadTimeout`: offline, the logout goes on without them.
+  private func uploadPendingRoomKeys() async {
+    let encryption = client.encryption()
+    guard encryption.backupState() == .enabled else { return }
+    do {
+      try await withTimeout(Self.backupUploadTimeout) {
+        try await encryption.waitForBackupUploadSteadyState(progressListener: nil)
+      }
+    } catch {
+      DebugLog.failure("waitForBackupUploadSteadyState", error)
+    }
   }
 
   private static func build(
@@ -349,4 +379,20 @@ private final class RoomListLoadingWaiter: RoomListLoadingStateListener {
     }
     _ = try? await sleeper.value
   }
+}
+
+/// Passes the SDK's unknown-token report on. Only a hard logout counts: after a soft one the device still exists on
+/// the server and the SDK renews the token.
+private final class AuthErrorDelegate: ClientDelegate {
+  private let onHardLogout: @Sendable () -> Void
+
+  init(onHardLogout: @escaping @Sendable () -> Void) {
+    self.onHardLogout = onHardLogout
+  }
+
+  func didReceiveAuthError(isSoftLogout: Bool) {
+    if !isSoftLogout { onHardLogout() }
+  }
+
+  func onBackgroundTaskErrorReport(taskName: String, error: BackgroundTaskFailureReason) {}
 }
