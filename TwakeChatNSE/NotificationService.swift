@@ -7,8 +7,9 @@ import MatrixData
 /// The Notification Service Extension (ADR 0009, container "Notification Service Extension"): APNs starts it for each
 /// push the gateway sends with only a room id and an event id. It opens the app's session store from the App Group and
 /// the shared Keychain group (ADR 0007), asks the SDK to fetch and decrypt the event, and rewrites the notification with
-/// the sender and the text. If that fails or time runs out, the generic text from the push stays; it never shows
-/// ciphertext or nothing. Nothing here logs: the content is the user's message.
+/// the sender and the text. If that fails or time runs out, the generic text from the push stays, never ciphertext.
+/// An event that does not notify (an edit, a reaction, a redaction, one the push rules filter out) shows nothing. Nothing here logs: the content is the user's
+/// message.
 final class NotificationService: UNNotificationServiceExtension, @unchecked Sendable {
   private let lock = NSLock()
   private var deliver: ((UNNotificationContent) -> Void)?
@@ -35,12 +36,18 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
     }
     content.threadIdentifier = roomId
     Task {
-      if let found = await repository.content(roomId: roomId, eventId: eventId) {
+      switch await repository.content(roomId: roomId, eventId: eventId) {
+      case .show(let found):
         lock.withLock {
           pending?.title = found.title
           pending?.subtitle = found.subtitle
           pending?.body = found.body
         }
+      case .hide:
+        // An empty content has nothing to show, so the system shows no notification for this push.
+        lock.withLock { pending = UNMutableNotificationContent() }
+      case .generic:
+        break
       }
       finish()
     }

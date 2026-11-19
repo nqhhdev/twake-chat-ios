@@ -84,9 +84,11 @@ struct NotificationContentIntegrationTests {
           authentication: MatrixAuthenticationRepository(
             storeDirectory: storeDirectory, sessionStore: sessionStore, lockHolderName: "nse"))
         let started = Date()
+        let outcome = await extensionSide.content(roomId: room, eventId: event)
+        let shown: NotificationContent? =
+          if case .show(let content) = outcome { content } else { nil }
         let content = try #require(
-          await extensionSide.content(roomId: room, eventId: event),
-          "step 3: the notification client returned nothing for a loaded text message")
+          shown, "step 3: the notification client did not show a loaded text message")
         // The system gives a notification service extension about 30 s.
         #expect(Date().timeIntervalSince(started) < 25, "step 3 took too long for an extension")
         #expect(!content.title.isEmpty)
