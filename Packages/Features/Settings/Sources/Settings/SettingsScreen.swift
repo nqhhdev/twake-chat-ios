@@ -418,12 +418,18 @@ struct SecurityScreen: View {
   }
 }
 
-/// The new recovery key, shown once, with Copy and Share.
-struct RecoveryKeySheet: View {
+/// The new recovery key, shown once, with Copy and Share. The app also shows it after sign-in when ToM did not keep the
+/// key the unlock made (ADR 0024).
+public struct RecoveryKeySheet: View {
   let key: String
   let done: () -> Void
 
-  var body: some View {
+  public init(key: String, done: @escaping () -> Void) {
+    self.key = key
+    self.done = done
+  }
+
+  public var body: some View {
     VStack(spacing: 16) {
       Image(systemName: "key.horizontal").font(.system(size: 40)).foregroundStyle(SysColors.primary)
       Text("Recovery key").textStyle(TextStyles.titleLarge)

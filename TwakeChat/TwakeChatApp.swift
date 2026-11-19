@@ -1,5 +1,6 @@
 import AppShared
 import Authentication
+import Domain
 import Foundation
 import MatrixData
 import SwiftUI
@@ -32,6 +33,10 @@ struct TwakeChatApp: App {
       defaultHomeserver: url("DefaultHomeserver"),
       privacyURL: url("PrivacyURL") ?? URL(string: "https://twake.app/policy")!)
     let roomList = RoomListProxy(authentication: repository)
+    // The recovery key kept on ToM (ADR 0024): Settings gives it a new key, the unlock after sign-in reads it.
+    let recoveryVault = TomRecoveryVault(authentication: repository)
+    let accountSettings = AccountSettingsProxy(
+      authentication: repository, recoveryVault: recoveryVault)
     _root = State(
       initialValue: RootCoordinator(
         repository: repository, roomList: roomList, archive: roomList,
@@ -48,7 +53,8 @@ struct TwakeChatApp: App {
         savedMessages: SavedMessagesProxy(authentication: repository),
         threadPrefs: ThreadPrefsProxy(authentication: repository),
         roomLinks: RoomLinkProxy(authentication: repository),
-        accountSettings: AccountSettingsProxy(authentication: repository),
+        accountSettings: accountSettings,
+        deviceUnlock: DeviceUnlocker(encryption: accountSettings, vault: recoveryVault),
         people: PeopleProxy(authentication: repository),
         push: url("PushGatewayURL").map {
           PusherProxy(
