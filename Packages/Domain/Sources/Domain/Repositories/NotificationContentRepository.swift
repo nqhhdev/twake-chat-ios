@@ -16,10 +16,20 @@ public struct NotificationContent: Sendable, Equatable {
   }
 }
 
+/// What the notification service extension does with a push once the SDK has looked at its event.
+public enum NotificationOutcome: Sendable, Equatable {
+  /// Rewrite the notification with this content.
+  case show(NotificationContent)
+  /// Show nothing: the event does not notify (an edit, a reaction, a redaction, a message that was deleted, or an
+  /// event the user's push rules filter out).
+  case hide
+  /// Keep the push's generic text: the event could not be fetched or decrypted in time (ADR 0009).
+  case generic
+}
+
 /// Fetches and decrypts the event a push is about, for the notification service extension (ADR 0009). Implemented in
 /// MatrixData; no SDK type appears here (ADR 0006).
 public protocol NotificationContentRepository: Sendable {
-  /// The notification's content, or `nil` when the event cannot be fetched or decrypted in time, in which case the
-  /// extension keeps the generic text.
-  func content(roomId: String, eventId: String) async -> NotificationContent?
+  /// What the notification shows for this event.
+  func content(roomId: String, eventId: String) async -> NotificationOutcome
 }

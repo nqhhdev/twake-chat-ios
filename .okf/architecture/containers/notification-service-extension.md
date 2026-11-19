@@ -24,6 +24,8 @@ status: draft
 2. Restores the user's session from the shared Keychain and opens the SDK store in the App Group container.
 3. Asks the SDK's notification client for that event, which fetches and decrypts it.
 4. Rewrites the notification title and body. If it cannot decrypt in time, it shows a generic text.
+5. Shows nothing for an event that does not notify: an edit, a reaction, a redaction, a deleted message, or one the
+   user's push rules filter out (`NotificationContentProxy`).
 
 ## Why it shares the store
 In the Flutter app the main app runs the Dart SDK and the NSE runs the Rust SDK, so the NSE has no keys of its own and
