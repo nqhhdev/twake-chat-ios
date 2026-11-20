@@ -146,6 +146,18 @@ public final class RoomDetailsViewModel {
     return true
   }
 
+  /// Shows the room's changes while the screen is open: each one reloads the details and the members, once a short
+  /// burst of changes (a sync with several member events) has passed.
+  public func followChanges(settle: Duration = .milliseconds(300)) async {
+    for await _ in await repository.changes(roomId: roomId) {
+      try? await Task.sleep(for: settle)
+      if Task.isCancelled { return }
+      guard case .loaded = state else { continue }
+      if let details = try? await repository.details(roomId: roomId) { state = .loaded(details) }
+      members = (try? await repository.members(roomId: roomId)) ?? members
+    }
+  }
+
   public func load() async {
     do {
       state = .loaded(try await repository.details(roomId: roomId))

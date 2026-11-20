@@ -316,9 +316,30 @@ public actor RoomDetailsProxy: RoomDetailsRepository {
     return found.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
   }
 
+  /// The SDK reports a new room info for each change of the room's state, members included (twake-on-matrix #2233,
+  /// #1154: the member list stayed stale until the screen was reopened).
+  public func changes(roomId: String) async -> AsyncStream<Void> {
+    guard let room = try? await room(roomId) else { return AsyncStream { $0.finish() } }
+    let (stream, continuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    let handle = room.subscribeToRoomInfoUpdates(listener: RoomInfoChanges { continuation.yield() })
+    continuation.onTermination = { _ in handle.cancel() }
+    return stream
+  }
+
   private func room(_ roomId: String) async throws(RoomDetailsError) -> Room {
     guard let client = await clientProxy() else { throw .notSignedIn }
     guard let room = try? client.client.getRoom(roomId: roomId) else { throw .roomNotFound }
     return room
   }
+}
+
+/// Passes each room info the SDK reports on as a bare change.
+private final class RoomInfoChanges: RoomInfoListener {
+  private let onChange: @Sendable () -> Void
+
+  init(onChange: @escaping @Sendable () -> Void) {
+    self.onChange = onChange
+  }
+
+  func call(roomInfo: RoomInfo) { onChange() }
 }
