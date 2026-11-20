@@ -147,6 +147,10 @@ struct MessageActionsOverlay: View {
           viewModel.historyMessage = message
         })
     }
+    if message.eventId != nil {
+      list.append(
+        .init(title: "Message Info", icon: "info.circle") { viewModel.infoMessage = message })
+    }
     if viewModel.canEndPoll(message) {
       list.append(
         .init(title: "End Poll", icon: "checkmark.circle") {

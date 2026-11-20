@@ -103,6 +103,12 @@ public struct RoomScreen: View {
         EditHistorySheet(message: message, viewModel: viewModel)
       }
     }
+    .sheet(
+      isPresented: Binding(
+        get: { viewModel.infoMessage != nil }, set: { if !$0 { viewModel.infoMessage = nil } })
+    ) {
+      if let message = viewModel.infoMessage { MessageInfoSheet(message: message) }
+    }
     .overlay {
       if viewModel.isPreparingShare {
         ProgressView()

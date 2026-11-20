@@ -67,6 +67,8 @@ public final class RoomViewModel {
 
   /// The message whose edit history the sheet shows.
   public var historyMessage: TimelineMessage?
+  /// The message whose details the info sheet shows (Flutter `EventInfoDialog`).
+  public var infoMessage: TimelineMessage?
   /// The files a message menu's Share downloaded; the share sheet also saves them to Photos or Files.
   var sharedFiles: DownloadedFiles?
   /// Share is downloading; the screen shows a spinner until the sheet opens.

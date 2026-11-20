@@ -236,3 +236,59 @@ struct EditHistorySheet: View {
     }
   }
 }
+
+/// A message's details, as the Flutter app's `EventInfoDialog` lists them: who sent it, when, what kind of message it
+/// is, and its event id, which a support request or a bug report can quote. The id can be selected and copied.
+struct MessageInfoSheet: View {
+  let message: TimelineMessage
+  @Environment(\.dismiss) private var dismiss
+
+  var body: some View {
+    NavigationStack {
+      List {
+        LabeledContent("Sender") {
+          VStack(alignment: .trailing, spacing: 2) {
+            Text(message.senderName)
+            if message.senderName != message.senderId {
+              Text(message.senderId).font(.caption).foregroundStyle(SysColors.textSecondary)
+            }
+          }
+        }
+        LabeledContent("Sent") {
+          Text(message.date, format: .dateTime.day().month(.wide).year().hour().minute().second())
+        }
+        LabeledContent("Type", value: Self.kind(of: message.body))
+        if message.isEdited { LabeledContent("Edited", value: "Yes") }
+        if let eventId = message.eventId {
+          Section("Event ID") {
+            Text(eventId).font(.footnote.monospaced()).textSelection(.enabled)
+          }
+        }
+      }
+      .twakeTitle("Message Info")
+      .toolbar {
+        ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+      }
+    }
+    .presentationDetents([.medium, .large])
+  }
+
+  /// What kind of message it is, in words.
+  static func kind(of body: TimelineMessage.Body) -> String {
+    switch body {
+    case .text: "Text"
+    case .emote: "Emote"
+    case .notice: "Notice"
+    case .image: "Picture"
+    case .video: "Video"
+    case .audio: "Audio"
+    case .file: "File"
+    case .location: "Location"
+    case .sticker: "Sticker"
+    case .poll: "Poll"
+    case .redacted: "Deleted message"
+    case .unableToDecrypt: "Encrypted message"
+    case .unsupported: "Unsupported message"
+    }
+  }
+}
