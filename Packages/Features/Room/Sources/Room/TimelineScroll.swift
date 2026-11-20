@@ -63,6 +63,10 @@ struct TimelineScroll: View {
       // Only the newest row animates in; loading older messages at the top does not move the view.
       .animation(.spring(response: 0.38, dampingFraction: 0.78), value: rows.last?.id)
       .scrollTargetLayout()
+      // The content is exactly as wide as the screen. A row that asked for more made it wider, and then each jump
+      // or page (`scrollTo` centres its row across too) slid the whole chat sideways: the avatars touched the left
+      // edge and the right side had twice the margin.
+      .containerRelativeFrame(.horizontal)
     }
     .scrollPosition($position, anchor: .top)
     .onChange(of: viewModel.scrollTarget) { _, target in
