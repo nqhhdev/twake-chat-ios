@@ -27,6 +27,27 @@ struct RoomDetailsViewModelTests {
     #expect(viewModel.members.map(\.name) == ["Alice", "@bob:example.org"])
   }
 
+  @Test func aRoomChangeReloadsTheMembersWhileTheScreenIsOpen() async {
+    let repository = FakeRoomDetailsRepository()
+    repository.detailsResult = .success(details)
+    repository.members = [
+      .init(id: "@alice:example.org", displayName: "Alice", membership: .joined),
+      .init(id: "@bob:example.org", displayName: "Bob", membership: .joined),
+    ]
+    let viewModel = RoomDetailsViewModel(
+      roomId: "!r:example.org", repository: repository, onLeft: {})
+    await viewModel.load()
+    let following = Task { await viewModel.followChanges(settle: .zero) }
+    // Bob was removed from another device: the SDK reports the room changed.
+    repository.members = [
+      .init(id: "@alice:example.org", displayName: "Alice", membership: .joined)
+    ]
+    repository.roomChanges.continuation.yield()
+    repository.roomChanges.continuation.finish()
+    await following.value
+    #expect(viewModel.members.map(\.name) == ["Alice"])
+  }
+
   @Test func aRoomThatCannotLoadShowsAnError() async {
     let viewModel = RoomDetailsViewModel(
       roomId: "!r", repository: FakeRoomDetailsRepository(), onLeft: {})

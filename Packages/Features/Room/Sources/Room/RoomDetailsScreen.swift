@@ -54,6 +54,7 @@ public struct RoomDetailsScreen: View {
         }
       }
       .task { await viewModel.load() }
+      .task { await viewModel.followChanges() }
   }
 
   @ViewBuilder private var content: some View {

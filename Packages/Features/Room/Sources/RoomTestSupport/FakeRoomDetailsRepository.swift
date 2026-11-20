@@ -11,6 +11,11 @@ public final class FakeRoomDetailsRepository: RoomDetailsRepository, @unchecked 
 
   public init() {}
 
+  /// Fed by tests to report a room change, as the SDK does on a sync.
+  public let roomChanges = AsyncStream<Void>.makeStream()
+
+  public func changes(roomId: String) async -> AsyncStream<Void> { roomChanges.stream }
+
   public var detailsResult: Result<RoomDetails, RoomDetailsError> {
     get { lock.withLock { _details } }
     set { lock.withLock { _details = newValue } }

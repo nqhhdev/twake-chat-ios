@@ -149,11 +149,19 @@ public enum RoomDetailsError: Error, Sendable, Equatable {
   case requestFailed
 }
 
+extension RoomDetailsRepository {
+  /// No changes reported: a repository without live updates.
+  public func changes(roomId: String) async -> AsyncStream<Void> { AsyncStream { $0.finish() } }
+}
+
 /// Reads and changes a room's details. Implemented in MatrixData; no SDK type appears here (ADR 0006).
 public protocol RoomDetailsRepository: Sendable {
   func details(roomId: String) async throws(RoomDetailsError) -> RoomDetails
   /// The joined and invited members, by name.
   func members(roomId: String) async throws(RoomDetailsError) -> [RoomMember]
+  /// Yields each time the room changes (a member joins, leaves or is removed, the name or the picture changes), so
+  /// an open details screen shows it without being reopened. Ends when the caller stops reading it.
+  func changes(roomId: String) async -> AsyncStream<Void>
   /// Leaves the room; it disappears from the chat list.
   func leave(roomId: String) async throws(RoomDetailsError)
 
