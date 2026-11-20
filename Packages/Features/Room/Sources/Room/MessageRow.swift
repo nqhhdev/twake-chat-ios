@@ -281,7 +281,7 @@ struct MessageRow: View {
 
   /// Reaction chips: a new one pops in, a count rolls to its new value, and the user's own are highlighted.
   private var reactions: some View {
-    HStack(spacing: 4) {
+    WrappingStack(spacing: 4, alignsTrailing: message.isOwn) {
       ForEach(message.reactions) { reaction in
         Button {
           Task { await viewModel.toggleReaction(reaction.key, on: message) }
@@ -311,6 +311,11 @@ struct MessageRow: View {
       }
     }
     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: message.reactions)
+    // No wider than the bubble may be, so many reactions wrap instead of widening the chat (twake-on-matrix #3258).
+    .frame(
+      maxWidth: bubbleWidth - (message.isOwn ? 0 : 40),
+      alignment: message.isOwn ? .trailing : .leading
+    )
     .padding(.leading, message.isOwn ? 0 : 40)
     .allowsHitTesting(!isPreview)
   }

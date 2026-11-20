@@ -135,6 +135,64 @@ struct HuggingStack: Layout {
   }
 }
 
+/// Lays its children out in rows, as wide as `maxWidth` allows, starting a new row when the next child does not fit;
+/// each row hugs the leading or the trailing edge. Reactions use it, so many of them wrap under the bubble instead of
+/// making the chat wider than the screen.
+struct WrappingStack: Layout {
+  var spacing: CGFloat = 4
+  var alignsTrailing = false
+
+  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+    let rows = Self.rows(
+      of: sizes.map(\.width), maxWidth: proposal.width ?? .infinity, spacing: spacing)
+    let width = rows.map { rowWidth($0, sizes) }.max() ?? 0
+    let heights = rows.map { row in row.map { sizes[$0].height }.max() ?? 0 }
+    return CGSize(
+      width: width, height: heights.reduce(0, +) + spacing * CGFloat(max(0, rows.count - 1)))
+  }
+
+  func placeSubviews(
+    in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()
+  ) {
+    let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+    var y = bounds.minY
+    for row in Self.rows(of: sizes.map(\.width), maxWidth: bounds.width, spacing: spacing) {
+      var x = alignsTrailing ? bounds.maxX - rowWidth(row, sizes) : bounds.minX
+      for index in row {
+        subviews[index].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(sizes[index]))
+        x += sizes[index].width + spacing
+      }
+      y += (row.map { sizes[$0].height }.max() ?? 0) + spacing
+    }
+  }
+
+  private func rowWidth(_ row: [Int], _ sizes: [CGSize]) -> CGFloat {
+    row.map { sizes[$0].width }.reduce(0, +) + spacing * CGFloat(max(0, row.count - 1))
+  }
+
+  /// The children of each row, by index: as many as fit in `maxWidth`, and at least one, so a child wider than the
+  /// row still shows.
+  static func rows(of widths: [CGFloat], maxWidth: CGFloat, spacing: CGFloat) -> [[Int]] {
+    var rows: [[Int]] = []
+    var current: [Int] = []
+    var used: CGFloat = 0
+    for (index, width) in widths.enumerated() {
+      let needed = current.isEmpty ? width : used + spacing + width
+      if !current.isEmpty, needed > maxWidth {
+        rows.append(current)
+        current = [index]
+        used = width
+      } else {
+        current.append(index)
+        used = needed
+      }
+    }
+    if !current.isEmpty { rows.append(current) }
+    return rows
+  }
+}
+
 /// The card under a message's first web link (Flutter `TwakeLinkPreview`): the page's picture, site, title and
 /// description, as the homeserver previews it. It shows nothing until the preview arrives, or when there is none; a tap
 /// opens the link.
