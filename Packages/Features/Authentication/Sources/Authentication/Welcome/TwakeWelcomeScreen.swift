@@ -54,6 +54,7 @@ public struct TwakeWelcomeScreen: View {
         }
       }
       Button("Use your company server") { viewModel.useCompanyServer() }
+        .accessibilityIdentifier(A11yIdentifiers.welcome.companyServer)
         .textStyle(Self.buttonText)
         .underline()
         .foregroundStyle(SysColors.primary)

@@ -29,6 +29,8 @@ Run every command from the repository root. Swift Package Manager resolves the d
 A build passes when it ends with `** BUILD SUCCEEDED **` and has no warning. Details and edge cases:
 [Build](.okf/workflows/build.md), [Test](.okf/workflows/test.md). Tests against the staging server are opt-in and
 local only ([ADR 0020](docs/adr/0020-opt-in-local-staging-integration-tests.md)).
+End-to-end UI tests (XCUITest, test plan `E2E`) run against a local Synapse with `scripts/e2e.sh all`; see
+[E2E tests](docs/e2e.md).
 
 ## Architecture
 

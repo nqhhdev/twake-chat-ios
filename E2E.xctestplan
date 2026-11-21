@@ -1,0 +1,27 @@
+{
+  "configurations" : [
+    {
+      "id" : "E2E0C0DE-7A1C-4E2E-9B5D-2D6F1A0E2E01",
+      "name" : "Default",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "diagnosticCollectionPolicy" : "Always",
+    "maximumTestExecutionTimeAllowance" : 600,
+    "testTimeoutsEnabled" : true,
+    "uiTestingScreenshotsLifetime" : "keepAlways"
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:TwakeChat.xcodeproj",
+        "identifier" : "A100000000000000000E2E03",
+        "name" : "TwakeChatUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

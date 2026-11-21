@@ -1,3 +1,4 @@
+import DesignSystem
 import SwiftUI
 
 /// The password sign-in form. It shows the view model's state and forwards the sign-in tap; it holds no logic.
@@ -36,10 +37,12 @@ public struct PasswordLoginScreen: View {
           .keyboardType(.URL)
           .textInputAutocapitalization(.never)
           .autocorrectionDisabled()
+          .accessibilityIdentifier(A11yIdentifiers.passwordLogin.homeserver)
       }
       Section {
         TextField("Username", text: $viewModel.username)
           .textContentType(.username)
+          .accessibilityIdentifier(A11yIdentifiers.passwordLogin.username)
           .textInputAutocapitalization(.never)
           .autocorrectionDisabled()
         if let usernameError = viewModel.usernameError {
@@ -47,6 +50,7 @@ public struct PasswordLoginScreen: View {
         }
         SecureField("Password", text: $viewModel.password)
           .textContentType(.password)
+          .accessibilityIdentifier(A11yIdentifiers.passwordLogin.password)
         if let passwordError = viewModel.passwordError {
           Text(passwordError).foregroundStyle(.red)
         }
@@ -67,6 +71,7 @@ public struct PasswordLoginScreen: View {
           }
         }
         .disabled(viewModel.isLoading)
+        .accessibilityIdentifier(A11yIdentifiers.passwordLogin.signIn)
       }
     }
     .disabled(viewModel.isLoading)

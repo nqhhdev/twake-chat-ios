@@ -84,6 +84,7 @@ public struct SettingsScreen: View {
               .foregroundStyle(SysColors.onSurface)
               .lineLimit(1)
               .contentTransition(.opacity)
+              .accessibilityIdentifier(A11yIdentifiers.settings.displayName)
             Text(viewModel.userId)
               .textStyle(TextStyles.bodyMedium)
               .foregroundStyle(SysColors.textSecondary)
@@ -129,6 +130,7 @@ public struct SettingsScreen: View {
             .foregroundStyle(SysColors.error)
         }
         .disabled(viewModel.isLoggingOut)
+        .accessibilityIdentifier(A11yIdentifiers.settings.logout)
         if let message = viewModel.errorMessage {
           Text(message).foregroundStyle(SysColors.error)
         }
@@ -164,6 +166,7 @@ public struct SettingsScreen: View {
       titleVisibility: .visible
     ) {
       Button("Logout", role: .destructive) { Task { await viewModel.logOut() } }
+        .accessibilityIdentifier(A11yIdentifiers.settings.confirmLogout)
     }
   }
 
