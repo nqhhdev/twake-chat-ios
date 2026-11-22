@@ -354,6 +354,30 @@ struct RoomViewModelTests {
     #expect(repository.calls == [.toggleReaction("👍", "$1")])
   }
 
+  @Test func aNewReactionReplacesTheOwnEarlierOneAfterItIsSent() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = viewModel(repository)
+    let reacted = TimelineMessage(
+      eventId: "$1", senderId: "@bob:example.org", senderName: "Bob", isOwn: false, date: date,
+      body: .text("hello"),
+      reactions: [
+        .init(key: "👍", count: 2, includesOwn: true),
+        .init(key: "🎉", count: 1, includesOwn: false),
+      ])
+    await viewModel.toggleReaction("❤️", on: reacted)
+    #expect(repository.calls == [.toggleReaction("❤️", "$1"), .toggleReaction("👍", "$1")])
+  }
+
+  @Test func tappingTheOwnReactionOnlyRemovesIt() async {
+    let repository = FakeTimelineRepository()
+    let viewModel = viewModel(repository)
+    let reacted = TimelineMessage(
+      eventId: "$1", senderId: "@bob:example.org", senderName: "Bob", isOwn: false, date: date,
+      body: .text("hello"), reactions: [.init(key: "👍", count: 1, includesOwn: true)])
+    await viewModel.toggleReaction("👍", on: reacted)
+    #expect(repository.calls == [.toggleReaction("👍", "$1")])
+  }
+
   @Test func loadingOlderStopsAtTheStartOfTheRoom() async {
     let repository = FakeTimelineRepository()
     repository.reachesStart = true

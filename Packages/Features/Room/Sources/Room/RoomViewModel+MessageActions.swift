@@ -214,11 +214,17 @@ extension RoomViewModel {
     }
   }
 
+  /// One reaction per person, as the Flutter and web clients keep it: a new emoji replaces the user's own earlier
+  /// one, and tapping the own emoji removes it. The new reaction is sent before the old one is removed, so the row of
+  /// reactions is never empty in between. What other people sent, from any client, is left as it is.
   public func toggleReaction(_ key: String, on message: TimelineMessage) async {
     guard let eventId = message.eventId else { return }
     let adds = !message.reactions.contains { $0.key == key && $0.includesOwn }
+    let replaced =
+      adds ? message.reactions.filter { $0.includesOwn && $0.key != key }.map(\.key) : []
     do {
       try await repository.toggleReaction(key, on: eventId)
+      for old in replaced { try await repository.toggleReaction(old, on: eventId) }
       if adds {
         reactionBar = Self.reactionBar(recents: [key] + reactionBar)
         await repository.addRecentReaction(key)

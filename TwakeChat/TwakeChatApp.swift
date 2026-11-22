@@ -25,7 +25,7 @@ struct TwakeChatApp: App {
       E2EHarness.resetIfAsked(storeDirectory: storeDirectory, sessionStore: sessionStore)
     #endif
     let repository = MatrixAuthenticationRepository(
-      storeDirectory: storeDirectory, sessionStore: sessionStore)
+      storeDirectory: storeDirectory, sessionStore: sessionStore, signsOutWithoutStore: true)
     // The build configuration sets the sign-in URLs: staging in Debug, Twake SaaS in Release. None is a secret.
     func url(_ key: String) -> URL? {
       (Bundle.main.object(forInfoDictionaryKey: key) as? String).flatMap {
@@ -67,7 +67,7 @@ struct TwakeChatApp: App {
         },
         verification: VerificationProxy(authentication: repository),
         devices: DevicesProxy(authentication: repository), chatDisplay: ChatDisplayDefaults(),
-        appLock: AppLock(), sync: repository,
+        appLock: AppLock(), sync: repository, sessionExpiry: repository,
         signInConfiguration: configuration, webAuthenticator: SystemWebAuthenticator()))
     AppDelegate.push = root.push
   }

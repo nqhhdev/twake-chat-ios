@@ -204,7 +204,8 @@ struct MessageRow: View {
         }
       }
       HStack(spacing: 4) {
-        if message.isEdited { Text("edited") }
+        // A deleted message has no text left to call edited.
+        if message.isEdited, message.body != .redacted { Text("edited") }
         Text(message.date, format: .dateTime.hour().minute())
         if message.isOwn, message.sendState == .failed, !isPreview {
           Button {

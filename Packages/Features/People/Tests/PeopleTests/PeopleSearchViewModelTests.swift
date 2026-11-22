@@ -134,7 +134,7 @@ struct PeopleSearchViewModelTests {
       onOpen: { _, _ in },
       invite: { ids in
         invited = ids
-        return true
+        return []
       })
     await viewModel.tap(alice)
     await viewModel.tap(bob)
@@ -146,12 +146,24 @@ struct PeopleSearchViewModelTests {
   @Test func aFailedInviteKeepsThePickAndShowsAnError() async {
     let viewModel = PeopleSearchViewModel(
       mode: .invite, repository: FakePeopleRepository(), debounce: .seconds(60),
-      onOpen: { _, _ in }, invite: { _ in false })
+      onOpen: { _, _ in }, invite: { ids in ids })
     await viewModel.tap(alice)
     await viewModel.inviteSelected()
     #expect(!viewModel.didInvite)
     #expect(viewModel.selected == [alice])
     #expect(viewModel.errorMessage == "Could not invite. Please try again.")
+  }
+
+  @Test func aPartlyFailedInviteKeepsOnlyThePeopleStillToInvite() async {
+    let viewModel = PeopleSearchViewModel(
+      mode: .invite, repository: FakePeopleRepository(), debounce: .seconds(60),
+      onOpen: { _, _ in }, invite: { _ in ["@bob:example.org"] })
+    await viewModel.tap(alice)
+    await viewModel.tap(bob)
+    await viewModel.inviteSelected()
+    #expect(!viewModel.didInvite)
+    #expect(viewModel.selected == [bob])
+    #expect(viewModel.errorMessage?.hasSuffix("The others were invited.") == true)
   }
 }
 

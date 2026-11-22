@@ -118,6 +118,13 @@ struct TimelineScroll: View {
     } action: { _, showsNothing in
       if showsNothing { position.scrollTo(edge: .bottom) }
     }
+    // Sending brings the reader back to the newest message, as the Flutter chat does: the message they just wrote
+    // shows even when they were reading older ones.
+    .onChange(of: viewModel.sendCount) {
+      withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+        position.scrollTo(edge: .bottom)
+      }
+    }
     // A list replaced as a whole while the user is on the newest message stays on the newest message.
     .onChange(of: rows.first?.id) {
       if isAtBottom { position.scrollTo(edge: .bottom) }

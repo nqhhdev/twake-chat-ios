@@ -14,6 +14,7 @@
 		A10000000000000000000085 /* Domain in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000086 /* Domain */; };
 		A10000000000000000000087 /* AppShared in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000088 /* AppShared */; };
 		A10000000000000000000089 /* Domain in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000008A /* Domain */; };
+		A1000000000000000000008D /* MatrixRustSDK in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000008E /* MatrixRustSDK */; };
 		A1000000000000000000008B /* AuthenticationTestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000008C /* AuthenticationTestSupport */; };
 		A1000000000000000000B001 /* Domain in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D001 /* Domain */; };
 		A1000000000000000000B002 /* AppShared in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000D002 /* AppShared */; };
@@ -208,6 +209,7 @@
 				A10000000000000000000071 /* MatrixData in Frameworks */,
 				A10000000000000000000085 /* Domain in Frameworks */,
 				A10000000000000000000087 /* AppShared in Frameworks */,
+				A1000000000000000000008D /* MatrixRustSDK in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -383,6 +385,7 @@
 				A10000000000000000000072 /* MatrixData */,
 				A10000000000000000000086 /* Domain */,
 				A10000000000000000000088 /* AppShared */,
+				A1000000000000000000008E /* MatrixRustSDK */,
 			);
 			productName = MatrixDataTests;
 			productReference = A10000000000000000000070 /* MatrixDataTests.xctest */;
@@ -1050,6 +1053,10 @@
 		A10000000000000000000082 /* AppShared */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = AppShared;
+		};
+		A1000000000000000000008E /* MatrixRustSDK */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MatrixRustSDK;
 		};
 		A10000000000000000000084 /* MatrixData */ = {
 			isa = XCSwiftPackageProductDependency;

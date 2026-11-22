@@ -12,7 +12,18 @@ public actor MatrixAuthenticationRepository: AuthenticationRepository {
   private let lockHolderName: String
   private let initialDeviceName: String
   private let discovery: HomeserverDiscovery
-  private var proxy: ClientProxy?
+  private var proxy: ClientProxy? {
+    didSet {
+      guard let proxy else { return }
+      proxy.onSessionExpired { [weak self, weak proxy] in
+        Task { await self?.sessionExpired(on: proxy) }
+      }
+    }
+  }
+  /// True while `logout()` runs: the server refusing the token then is the logout itself, not an expiry.
+  private var isLoggingOut = false
+  private let expirations = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+  private let signsOutWithoutStore: Bool
   private var pendingSSO: PendingSSOLogin?
   private var isSigningIn = false
 
@@ -22,11 +33,15 @@ public actor MatrixAuthenticationRepository: AuthenticationRepository {
   ///   - lockHolderName: This process's name in the SDK's cross-process store lock.
   ///   - initialDeviceName: The device name the server shows for a new password sign-in.
   ///   - discovery: Reads a homeserver's sign-in options.
+  ///   - signsOutWithoutStore: The app passes `true`: a saved session whose SDK store is gone is signed out at
+  ///     restore instead of being restored (see `restoreSession`). The extensions keep `false` and never sign out.
   public init(
     storeDirectory: URL, sessionStore: KeychainSessionStore, lockHolderName: String = "app",
     initialDeviceName: String = "Twake Chat iOS",
-    discovery: HomeserverDiscovery = HomeserverDiscovery()
+    discovery: HomeserverDiscovery = HomeserverDiscovery(),
+    signsOutWithoutStore: Bool = false
   ) {
+    self.signsOutWithoutStore = signsOutWithoutStore
     self.discovery = discovery
     self.storeDirectory = storeDirectory
     self.sessionStore = sessionStore
@@ -127,10 +142,20 @@ public actor MatrixAuthenticationRepository: AuthenticationRepository {
 
   /// The saved session, with a client restored on it. When a client is already running, it is kept: a second client
   /// on the same store is never built.
+  ///
+  /// The Keychain item outlives the app: after the app is deleted and installed again, the session is still saved but
+  /// its SDK store, with the device's encryption keys, is gone. Restoring it would give the old device new keys, which
+  /// other devices then refuse (twake-on-matrix #1036, PR #3516). With `signsOutWithoutStore`, such a session is
+  /// signed out and removed instead, and the user signs in again as a new device.
   public func restoreSession() async throws(AuthenticationError) -> UserSession? {
     do {
       guard let stored = try sessionStore.load() else { return nil }
       if proxy != nil { return UserSessionMapper.userSession(from: stored) }
+      if signsOutWithoutStore, !hasStore {
+        // The server may not be reachable: the local session is removed all the same.
+        try? await logout()
+        return nil
+      }
       proxy = try await ClientProxy.restore(
         session: UserSessionMapper.sdkSession(from: stored), storeDirectory: storeDirectory,
         sessionStore: sessionStore, lockHolderName: lockHolderName)
@@ -144,6 +169,8 @@ public actor MatrixAuthenticationRepository: AuthenticationRepository {
   /// even when the server call fails; that failure is reported afterwards. After a cold launch with no client yet, a
   /// client is first restored on the saved session so the server still signs the device out.
   public func logout() async throws(AuthenticationError) {
+    isLoggingOut = true
+    defer { isLoggingOut = false }
     var serverError: (any Error)?
     do {
       if proxy == nil, let stored = try sessionStore.load() {
@@ -172,10 +199,29 @@ public actor MatrixAuthenticationRepository: AuthenticationRepository {
     }
   }
 
+  /// Reports an expiry only for the client in use, and not while the user is logging out.
+  private func sessionExpired(on reporter: ClientProxy?) {
+    guard let reporter, reporter === proxy, !isLoggingOut else { return }
+    expirations.continuation.yield()
+  }
+
+  /// Whether the SDK store was ever opened in `storeDirectory`: `ClientProxy` creates its `data` folder first.
+  private var hasStore: Bool {
+    FileManager.default.fileExists(
+      atPath: storeDirectory.appending(path: "data", directoryHint: .isDirectory)
+        .path(percentEncoded: false))
+  }
+
   private func removeStoreDirectory() throws {
     if FileManager.default.fileExists(atPath: storeDirectory.path(percentEncoded: false)) {
       try FileManager.default.removeItem(at: storeDirectory)
     }
+  }
+}
+
+extension MatrixAuthenticationRepository: SessionExpiry {
+  public func sessionExpirations() async -> AsyncStream<Void> {
+    expirations.stream
   }
 }
 
