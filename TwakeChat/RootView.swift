@@ -182,8 +182,11 @@ final class RootCoordinator {
       checkSession: sessionCheck(), display: displaySettings(), blocking: blocking(),
       saved: savedMessages,
       threadTimeline: { [makeThreadTimeline] root in makeThreadTimeline(summary.id, root) },
-      threadPrefs: threadPrefs)
+      threadPrefs: threadPrefs, scrollMemory: scrollMemory)
   }
+
+  /// Where each chat was left, for this run of the app (issue #138).
+  @ObservationIgnored private let scrollMemory = TimelineScrollMemory()
 
   /// The account's do not disturb, for the chat list's banner.
   private func doNotDisturb() -> ChatListViewModel.DoNotDisturb? {
