@@ -28,6 +28,29 @@ extension ChatListViewModel {
     followedThreads = await threadPrefs.followedThreads()
   }
 
+  /// How many of the most recent chats the Activity reads reactions from: each one opens a timeline from the cache.
+  static let reactionRoomLimit = 20
+
+  /// Loads the reactions of other people on the user's messages in the most recent chats (web D58), from the history
+  /// this device holds.
+  public func loadReactions() async {
+    guard let activityReactions else { return }
+    let roomIds = joinedRooms.filter { !$0.isSpace }.prefix(Self.reactionRoomLimit).map(\.id)
+    reactions = await activityReactions.reactions(inRooms: Array(roomIds))
+  }
+
+  /// What the Activity loads besides the room list: the followed threads and the reactions, side by side.
+  public func loadActivity() async {
+    async let threads: Void = loadFollowedThreads()
+    async let reactions: Void = loadReactions()
+    _ = await (threads, reactions)
+  }
+
+  /// "Sender reacted 👍 to your message", as the web's activity row says it.
+  public static func title(of reaction: ActivityReaction) -> String {
+    "\(reaction.senderName) reacted \(reaction.key) to your message"
+  }
+
   /// "Sender: text" of a followed thread's root, or "Thread" when it could not be loaded.
   public static func preview(of thread: FollowedThread) -> String {
     guard let text = thread.rootText, !text.isEmpty else { return "Thread" }
@@ -36,8 +59,8 @@ extension ChatListViewModel {
   }
 }
 
-/// Activity (web D57, D318): what needs the user, opened from the bell of the chat list. Mentions first, then the
-/// threads the user follows, then the inbox of every room with something unread, each with a button that marks it
+/// Activity (web D57, D58, D318): what needs the user, opened from the bell of the chat list. Mentions first, then the
+/// reactions to the user's messages, then the threads the user follows, then the inbox of every room with something unread, each with a button that marks it
 /// read; the saved messages last.
 struct ActivityScreen: View {
   let viewModel: ChatListViewModel
@@ -50,6 +73,12 @@ struct ActivityScreen: View {
       if !mentioned.isEmpty {
         Section("Mentions") {
           ForEach(mentioned) { room in row(room, badge: "@\(room.mentionCount)") }
+        }
+      }
+      let reactions = viewModel.reactions
+      if !reactions.isEmpty {
+        Section("Reactions") {
+          ForEach(reactions) { reaction in reactionRow(reaction) }
         }
       }
       let followed = viewModel.followedThreads
@@ -82,8 +111,46 @@ struct ActivityScreen: View {
     .navigationTitle("Activity")
     .animation(.spring(response: 0.35, dampingFraction: 0.85), value: viewModel.inbox)
     .animation(.spring(response: 0.35, dampingFraction: 0.85), value: viewModel.followedThreads)
-    .task { await viewModel.loadFollowedThreads() }
-    .refreshable { await viewModel.loadFollowedThreads() }
+    .animation(.spring(response: 0.35, dampingFraction: 0.85), value: viewModel.reactions)
+    .task { await viewModel.loadActivity() }
+    .refreshable { await viewModel.loadActivity() }
+  }
+
+  /// A reaction to one of the user's messages: who and which emoji, the message, its chat. A tap opens the chat at the
+  /// message, as a saved message opens.
+  private func reactionRow(_ reaction: ActivityReaction) -> some View {
+    Button {
+      if let url = MatrixLink.room(idOrAlias: reaction.roomId, eventId: reaction.eventId, via: [])
+        .url
+      {
+        openURL(url)
+      }
+    } label: {
+      HStack(spacing: 12) {
+        Text(reaction.key).font(.title2).accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 3) {
+          Text(ChatListViewModel.title(of: reaction)).font(.body.weight(.semibold)).lineLimit(1)
+          if let text = reaction.messageText, !text.isEmpty {
+            Text(text)
+              .font(.subheadline)
+              .foregroundStyle(SysColors.textSecondary)
+              .lineLimit(2)
+          }
+          Text(reaction.roomName)
+            .font(.caption)
+            .foregroundStyle(SysColors.textSecondary)
+            .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        Text(reaction.reactedAt, style: .relative)
+          .font(.caption)
+          .foregroundStyle(SysColors.textSecondary)
+      }
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityElement(children: .combine)
+    .accessibilityHint("Opens the message in its chat")
   }
 
   /// A followed thread: its chat and its first message. A tap opens the chat at the thread's root, whose summary

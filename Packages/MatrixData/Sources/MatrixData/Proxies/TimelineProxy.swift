@@ -679,8 +679,8 @@ private final class SendHandles: @unchecked Sendable {
   }
 }
 
-/// Queues the SDK's timeline diffs for `TimelineProxy`, in the order they arrive.
-private final class DiffListener: TimelineListener {
+/// Queues the SDK's timeline diffs for `TimelineProxy` and `ActivityReactionsProxy`, in the order they arrive.
+final class DiffListener: TimelineListener {
   private let diffs: AsyncStream<[TimelineDiff]>.Continuation
 
   init(_ diffs: AsyncStream<[TimelineDiff]>.Continuation) {

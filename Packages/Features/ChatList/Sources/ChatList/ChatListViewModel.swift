@@ -83,6 +83,7 @@ public final class ChatListViewModel {
     doNotDisturb: DoNotDisturb? = nil,
     saved: (any SavedMessagesRepository)? = nil,
     threadPrefs: (any ThreadPrefsRepository)? = nil,
+    activityReactions: (any ActivityReactionsRepository)? = nil,
     people: (any PeopleRepository)? = nil,
     openPerson: (@MainActor (String) async -> Bool)? = nil,
     previewTimeline: (@MainActor (String) -> any TimelineRepository)? = nil,
@@ -93,6 +94,7 @@ public final class ChatListViewModel {
     self.openPerson = openPerson
     self.saved = saved
     self.threadPrefs = threadPrefs
+    self.activityReactions = activityReactions
     self.doNotDisturb = doNotDisturb
     self.messageSearch = messageSearch
     self.spaces = spaces
@@ -108,6 +110,9 @@ public final class ChatListViewModel {
   @ObservationIgnored let threadPrefs: (any ThreadPrefsRepository)?
   /// The threads the user follows by choice, for the Activity (`Activity.swift`).
   public internal(set) var followedThreads: [FollowedThread] = []
+  @ObservationIgnored let activityReactions: (any ActivityReactionsRepository)?
+  /// The reactions of other people on the user's messages, for the Activity (`Activity.swift`).
+  public internal(set) var reactions: [ActivityReaction] = []
   @ObservationIgnored private let people: (any PeopleRepository)?
   @ObservationIgnored private let openPerson: (@MainActor (String) async -> Bool)?
   /// The people the search text finds (the user directory and ToM contacts), for the global search.
