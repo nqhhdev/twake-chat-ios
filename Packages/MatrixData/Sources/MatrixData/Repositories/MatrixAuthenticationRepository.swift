@@ -97,7 +97,9 @@ public actor MatrixAuthenticationRepository: AuthenticationRepository {
     }
   }
 
-  /// Finishes the started SSO sign-in. Without one, or when the callback has no `loginToken`, it throws.
+  /// Finishes the started SSO sign-in. Without one, or when the callback has no `loginToken`, it throws. The session
+  /// keeps the homeserver's `m.authentication` issuer, which log out uses to end the SSO session (ADR 0021); a
+  /// `.well-known` that cannot be read leaves it out and does not fail the sign-in.
   public func finishSSOLogin(callbackURL: URL) async throws(AuthenticationError) -> UserSession {
     guard let pending = pendingSSO, !isSigningIn, proxy == nil else { throw .unknown }
     guard Self.loginToken(in: callbackURL) != nil else { throw .invalidCredentials }
@@ -106,7 +108,9 @@ public actor MatrixAuthenticationRepository: AuthenticationRepository {
     do {
       let (proxy, session) = try await ClientProxy.finishSSO(pending, callbackURL: callbackURL)
       pendingSSO = nil
-      return try finishSignIn(proxy: proxy, session: session)
+      let issuer = await discovery.authenticationIssuer(
+        homeserver: try UserSessionMapper.userSession(from: session).homeserverURL)
+      return try finishSignIn(proxy: proxy, session: session, authenticationIssuer: issuer)
     } catch {
       throw UserSessionMapper.authenticationError(from: error)
     }
@@ -134,10 +138,15 @@ public actor MatrixAuthenticationRepository: AuthenticationRepository {
     isSigningIn = true
   }
 
-  private func finishSignIn(proxy: ClientProxy, session: Session) throws -> UserSession {
-    try sessionStore.save(try UserSessionMapper.storedSession(from: session))
+  private func finishSignIn(proxy: ClientProxy, session: Session, authenticationIssuer: URL? = nil)
+    throws -> UserSession
+  {
+    try sessionStore.save(
+      try UserSessionMapper.storedSession(from: session, authenticationIssuer: authenticationIssuer)
+    )
     self.proxy = proxy
-    return try UserSessionMapper.userSession(from: session)
+    return try UserSessionMapper.userSession(
+      from: session, authenticationIssuer: authenticationIssuer)
   }
 
   /// The saved session, with a client restored on it. When a client is already running, it is kept: a second client
