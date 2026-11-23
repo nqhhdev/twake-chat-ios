@@ -153,14 +153,14 @@ final class RootCoordinator {
       repository: roomList, media: media, archive: archive, publicRooms: publicRooms,
       spaces: spaces, messageSearch: roomSearch, doNotDisturb: doNotDisturb(),
       saved: savedMessages, threadPrefs: threadPrefs, people: people,
-      openPerson: openDirectChat()
-    ) {
-      [weak signedIn, push] in
-      guard let signedIn else { return false }
-      await push.stop()
-      await signedIn.logOut()
-      return signedIn.errorMessage == nil
-    }
+      openPerson: openDirectChat(),
+      previewTimeline: { [makeTimeline] roomId in makeTimeline(roomId, nil) },
+      logOut: { [weak signedIn, push] in
+        guard let signedIn else { return false }
+        await push.stop()
+        await signedIn.logOut()
+        return signedIn.errorMessage == nil
+      })
     chatList = (signedIn, viewModel)
     lifecycle.unreadCount = { [weak viewModel] in
       viewModel.map { RoomSummary.appBadge(for: $0.allJoinedRooms) } ?? 0

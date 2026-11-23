@@ -85,8 +85,10 @@ public final class ChatListViewModel {
     threadPrefs: (any ThreadPrefsRepository)? = nil,
     people: (any PeopleRepository)? = nil,
     openPerson: (@MainActor (String) async -> Bool)? = nil,
+    previewTimeline: (@MainActor (String) -> any TimelineRepository)? = nil,
     logOut: @escaping @MainActor () async -> Bool
   ) {
+    self.previewTimeline = previewTimeline
     self.people = people
     self.openPerson = openPerson
     self.saved = saved
@@ -217,6 +219,20 @@ public final class ChatListViewModel {
       picture: { @Sendable [weak self] reference in await self?.picture(reference) },
       onOpen: onOpen,
       markRead: { [repository] roomId in try? await repository.setUnread(false, roomId: roomId) })
+  }
+
+  /// The timeline of a room by its id, for the long-press preview; `nil` shows the menu without a preview.
+  @ObservationIgnored private let previewTimeline: (@MainActor (String) -> any TimelineRepository)?
+
+  /// Whether a long press on `room` shows its latest messages above the menu. Spaces and invitations keep the plain menu.
+  public func hasPreview(_ room: RoomSummary) -> Bool {
+    previewTimeline != nil && !room.isSpace && !room.isInvite
+  }
+
+  /// The preview's model on a new timeline of `room`, or `nil` when `hasPreview(room)` is false.
+  public func makePreview(_ room: RoomSummary) -> ChatPreviewViewModel? {
+    guard hasPreview(room), let previewTimeline else { return nil }
+    return ChatPreviewViewModel(room: room, repository: previewTimeline(room.id))
   }
 
   /// The public groups screen's model; joining a group opens it through `onJoined`.
