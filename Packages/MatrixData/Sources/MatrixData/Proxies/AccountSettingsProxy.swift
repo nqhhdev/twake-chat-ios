@@ -173,6 +173,103 @@ public actor AccountSettingsProxy: AccountSettingsRepository {
     else { throw .requestFailed }
   }
 
+  public func canChangeLinkedAddresses() async -> Bool {
+    guard let client = await clientProxy() else { return false }
+    return (try? await client.client.homeserverCapabilities().canChangeThirdpartyIds()) ?? false
+  }
+
+  /// The pinned SDK has no 3pid calls, so these go to the client-server API with the session's token. The client
+  /// secret is made here and only sent to the homeserver.
+  public func sendEmailConfirmation(to email: String) async throws(SettingsError)
+    -> PendingEmailLink
+  {
+    guard let client = await clientProxy() else { throw .notSignedIn }
+    let address = email.trimmingCharacters(in: .whitespacesAndNewlines)
+    let secret = UUID().uuidString
+    guard
+      let request = ClientServerRequest.make(
+        client: client.client, path: "account/3pid/email/requestToken", method: "POST",
+        json: ["client_secret": secret, "email": address, "send_attempt": 1])
+    else { throw .notSignedIn }
+    guard let (status, data) = await ClientServerRequest.answer(request) else {
+      throw .requestFailed
+    }
+    guard status == 200 else { throw Self.addressError(from: data) }
+    guard
+      let sid = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["sid"]
+        as? String
+    else { throw .requestFailed }
+    return PendingEmailLink(email: address, clientSecret: secret, sessionId: sid)
+  }
+
+  public func linkEmail(_ pending: PendingEmailLink, auth: DeviceAuth?) async throws(SettingsError)
+    -> DeviceAuthChallenge?
+  {
+    guard let client = await clientProxy() else { throw .notSignedIn }
+    var payload: [String: Any] = ["client_secret": pending.clientSecret, "sid": pending.sessionId]
+    if let auth {
+      do {
+        payload["auth"] = try await DevicesProxy.authBody(auth, userId: try? client.userId)
+      } catch {
+        throw .notSignedIn
+      }
+    }
+    guard
+      let request = ClientServerRequest.make(
+        client: client.client, path: "account/3pid/add", method: "POST", json: payload)
+    else { throw .notSignedIn }
+    guard let (status, data) = await ClientServerRequest.answer(request) else {
+      throw .requestFailed
+    }
+    // `…/v3/account/3pid/add` less three segments is the `…/v3/` the fallback page hangs off.
+    let base = request.url?.deletingLastPathComponent().deletingLastPathComponent()
+      .deletingLastPathComponent()
+    return try Self.linkAnswer(status: status, data: data, homeserver: base)
+  }
+
+  public func removeLinkedAddress(_ address: LinkedAddress) async throws(SettingsError) {
+    guard let client = await clientProxy(),
+      let request = ClientServerRequest.make(
+        client: client.client, path: "account/3pid/delete", method: "POST",
+        json: Self.removalBody(address))
+    else { throw .notSignedIn }
+    guard await ClientServerRequest.succeeds(request) else { throw .requestFailed }
+  }
+
+  /// The answer of `/account/3pid/add`: `nil` when linked, the server's confirmation challenge (401), or the error.
+  static func linkAnswer(status: Int, data: Data, homeserver base: URL?) throws(SettingsError)
+    -> DeviceAuthChallenge?
+  {
+    if status == 200 { return nil }
+    if status == 401, let challenge = DevicesProxy.challenge(from: data, homeserver: base) {
+      return challenge
+    }
+    throw addressError(from: data)
+  }
+
+  /// The error a 3pid answer names: in use, or not confirmed yet (spec `M_THREEPID_IN_USE`, `M_THREEPID_AUTH_FAILED`).
+  static func addressError(from data: Data) -> SettingsError {
+    let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    return switch object?["errcode"] as? String {
+    case "M_THREEPID_IN_USE": .addressInUse
+    case "M_THREEPID_AUTH_FAILED": .addressNotConfirmed
+    default: .requestFailed
+    }
+  }
+
+  /// The body of `/account/3pid/delete`; a phone is sent without the `+` `LinkedAddress` shows.
+  static func removalBody(_ address: LinkedAddress) -> [String: String] {
+    switch address.kind {
+    case .email: ["medium": "email", "address": address.address]
+    case .phone:
+      [
+        "medium": "msisdn",
+        "address": address.address.hasPrefix("+")
+          ? String(address.address.dropFirst()) : address.address,
+      ]
+    }
+  }
+
   /// The ToM server of the account, with what its calls need; `nil` without ToM.
   private func tomAccess() async -> (TwakeContactLookup, URL, String, String)? {
     let lookup = TwakeContactLookup()

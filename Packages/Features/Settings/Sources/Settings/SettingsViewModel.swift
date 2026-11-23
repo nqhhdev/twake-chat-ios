@@ -174,8 +174,107 @@ public final class SettingsViewModel {
   /// The e-mail addresses and phone numbers of the account; `nil` until loaded.
   public private(set) var linkedAddresses: [LinkedAddress]?
 
+  /// Whether the server lets the user add and remove them.
+  public private(set) var canChangeLinkedAddresses = false
+
   public func loadLinkedAddresses() async {
+    async let canChange = repository.canChangeLinkedAddresses()
     linkedAddresses = await repository.linkedAddresses()
+    canChangeLinkedAddresses = await canChange
+  }
+
+  /// The e-mail waiting for the user to open the link sent to it; `nil` when none is.
+  public private(set) var pendingEmail: PendingEmailLink?
+  /// The confirmation the server asks for before linking `pendingEmail`: the web page or the password.
+  public private(set) var emailChallenge: DeviceAuthChallenge?
+  /// The user said they opened the link, but the server has not seen it yet.
+  public private(set) var emailNotConfirmed = false
+  public private(set) var isChangingAddresses = false
+  /// The confirmation already given, sent again when the user retries after opening the link.
+  @ObservationIgnored private var emailAuth: DeviceAuth?
+
+  /// Sends a confirmation link to `email`; then `pendingEmail` waits for the user to open it.
+  public func addEmail(_ email: String) async {
+    let email = email.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !email.isEmpty, !isChangingAddresses else { return }
+    cancelLinkingEmail()
+    errorMessage = nil
+    isChangingAddresses = true
+    defer { isChangingAddresses = false }
+    do {
+      pendingEmail = try await repository.sendEmailConfirmation(to: email)
+    } catch .addressInUse {
+      errorMessage = "This e-mail is already used by another account."
+    } catch {
+      errorMessage = "Could not send the confirmation e-mail. Please try again."
+    }
+  }
+
+  /// The user opened the link: links the e-mail, or asks for the confirmation the server wants first.
+  public func finishLinkingEmail() async {
+    await linkEmail(auth: emailAuth, isNewConfirmation: false)
+  }
+
+  /// Sends the user's confirmation for `emailChallenge`: `password`, or none after the web page.
+  public func confirmLinkingEmail(password: String? = nil) async {
+    guard let challenge = emailChallenge else { return }
+    emailChallenge = nil
+    let auth: DeviceAuth =
+      if let password { .password(password, session: challenge.session) } else {
+        .confirmedOnWeb(session: challenge.session)
+      }
+    await linkEmail(auth: auth, isNewConfirmation: true)
+  }
+
+  public func cancelLinkingEmail() {
+    pendingEmail = nil
+    emailChallenge = nil
+    emailNotConfirmed = false
+    emailAuth = nil
+  }
+
+  private func linkEmail(auth: DeviceAuth?, isNewConfirmation: Bool) async {
+    guard let pending = pendingEmail, !isChangingAddresses else { return }
+    errorMessage = nil
+    isChangingAddresses = true
+    defer { isChangingAddresses = false }
+    do {
+      guard let challenge = try await repository.linkEmail(pending, auth: auth) else {
+        cancelLinkingEmail()
+        linkedAddresses = await repository.linkedAddresses()
+        return
+      }
+      if isNewConfirmation || (challenge.webURL == nil && !challenge.acceptsPassword) {
+        cancelLinkingEmail()
+        errorMessage = "Could not confirm it is you. Please try again."
+      } else {
+        emailNotConfirmed = false
+        emailChallenge = challenge
+      }
+    } catch .addressNotConfirmed {
+      emailAuth = auth
+      emailNotConfirmed = true
+    } catch .addressInUse {
+      cancelLinkingEmail()
+      errorMessage = "This e-mail is already used by another account."
+    } catch {
+      cancelLinkingEmail()
+      errorMessage = "Could not add the e-mail. Please try again."
+    }
+  }
+
+  /// Unlinks an e-mail or phone; it leaves the list once the server agrees.
+  public func removeLinkedAddress(_ address: LinkedAddress) async {
+    guard !isChangingAddresses else { return }
+    errorMessage = nil
+    isChangingAddresses = true
+    defer { isChangingAddresses = false }
+    do {
+      try await repository.removeLinkedAddress(address)
+      linkedAddresses?.removeAll { $0 == address }
+    } catch {
+      errorMessage = "Could not remove \(address.address). Please try again."
+    }
   }
 
   /// Who sees the e-mail and phone; `nil` until ToM answers, and then the choice is not offered.

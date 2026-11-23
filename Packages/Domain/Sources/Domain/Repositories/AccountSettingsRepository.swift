@@ -23,6 +23,10 @@ public enum SettingsError: Error, Sendable, Equatable {
   case notSignedIn
   /// The recovery key does not match the account's backup.
   case wrongRecoveryKey
+  /// The e-mail or phone is already linked to an account.
+  case addressInUse
+  /// The link in the confirmation e-mail was not opened yet.
+  case addressNotConfirmed
   case requestFailed
 }
 
@@ -85,6 +89,20 @@ public protocol AccountSettingsRepository: Sendable {
   /// Changes who sees the user's e-mail and phone; both follow the one choice.
   func setContactsVisibility(_ visibility: ContactsVisibility) async throws(SettingsError)
 
+  /// Whether the server lets the user add and remove e-mails and phones (the `m.3pid_changes` capability).
+  func canChangeLinkedAddresses() async -> Bool
+
+  /// Sends a confirmation link to `email` (`POST /account/3pid/email/requestToken`); the server e-mails it.
+  func sendEmailConfirmation(to email: String) async throws(SettingsError) -> PendingEmailLink
+
+  /// Links the e-mail once the user opened the link (`POST /account/3pid/add`). Returns `nil` when done, or the
+  /// confirmation the server asks for first (User-Interactive Authentication); call again with `auth` to finish.
+  func linkEmail(_ pending: PendingEmailLink, auth: DeviceAuth?) async throws(SettingsError)
+    -> DeviceAuthChallenge?
+
+  /// Unlinks an e-mail or phone from the account (`POST /account/3pid/delete`).
+  func removeLinkedAddress(_ address: LinkedAddress) async throws(SettingsError)
+
   /// The space the cached messages and media take on the device, in bytes; `nil` when unknown.
   func cacheSize() async -> Int?
 
@@ -111,6 +129,20 @@ extension AccountSettingsRepository {
   public func linkedAddresses() async -> [LinkedAddress] { [] }
   public func contactsVisibility() async -> ContactsVisibility? { nil }
   public func setContactsVisibility(_ visibility: ContactsVisibility) async throws(SettingsError) {
+    throw .requestFailed
+  }
+  public func canChangeLinkedAddresses() async -> Bool { false }
+  public func sendEmailConfirmation(to email: String) async throws(SettingsError)
+    -> PendingEmailLink
+  {
+    throw .requestFailed
+  }
+  public func linkEmail(_ pending: PendingEmailLink, auth: DeviceAuth?) async throws(SettingsError)
+    -> DeviceAuthChallenge?
+  {
+    throw .requestFailed
+  }
+  public func removeLinkedAddress(_ address: LinkedAddress) async throws(SettingsError) {
     throw .requestFailed
   }
   public func cacheSize() async -> Int? { nil }
@@ -175,6 +207,21 @@ public struct LinkedAddress: Sendable, Equatable, Hashable, Identifiable {
       default: return nil
       }
     }
+  }
+}
+
+/// An e-mail waiting for the user to open the link the server sent: the ids the server needs to link it.
+public struct PendingEmailLink: Sendable, Equatable {
+  public let email: String
+  /// The secret this app made for the confirmation; it is only sent back to the homeserver.
+  public let clientSecret: String
+  /// The server's id of the confirmation.
+  public let sessionId: String
+
+  public init(email: String, clientSecret: String, sessionId: String) {
+    self.email = email
+    self.clientSecret = clientSecret
+    self.sessionId = sessionId
   }
 }
 

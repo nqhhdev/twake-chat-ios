@@ -33,6 +33,44 @@ public final class FakeAccountSettingsRepository: AccountSettingsRepository, @un
     self.visibility = visibility
   }
 
+  /// The linked e-mails and phones; linking and removing change them.
+  public var addresses: [LinkedAddress] = []
+  public var canChangeAddresses = true
+  /// What `sendEmailConfirmation` throws, if anything.
+  public var emailConfirmationError: SettingsError?
+  /// What each `linkEmail` call answers, in turn; once empty, the e-mail is linked.
+  public var linkAnswers: [Result<DeviceAuthChallenge?, SettingsError>] = []
+  /// The confirmations `linkEmail` got, in order.
+  public private(set) var linkAuths: [DeviceAuth?] = []
+  public var removalFails = false
+
+  public func linkedAddresses() async -> [LinkedAddress] { addresses }
+
+  public func canChangeLinkedAddresses() async -> Bool { canChangeAddresses }
+
+  public func sendEmailConfirmation(to email: String) async throws(SettingsError)
+    -> PendingEmailLink
+  {
+    if let emailConfirmationError { throw emailConfirmationError }
+    return PendingEmailLink(email: email, clientSecret: "secret", sessionId: "sid")
+  }
+
+  public func linkEmail(_ pending: PendingEmailLink, auth: DeviceAuth?) async throws(SettingsError)
+    -> DeviceAuthChallenge?
+  {
+    linkAuths.append(auth)
+    if !linkAnswers.isEmpty, let challenge = try linkAnswers.removeFirst().get() {
+      return challenge
+    }
+    addresses.append(LinkedAddress(kind: .email, address: pending.email))
+    return nil
+  }
+
+  public func removeLinkedAddress(_ address: LinkedAddress) async throws(SettingsError) {
+    if removalFails { throw .requestFailed }
+    addresses.removeAll { $0 == address }
+  }
+
   /// What `cacheSize` answers; clearing sets it to 0.
   public var cacheBytes: Int? = 2_048
 

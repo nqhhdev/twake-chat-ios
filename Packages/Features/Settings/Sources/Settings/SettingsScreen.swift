@@ -517,14 +517,28 @@ struct NotificationSettingsScreen: View {
 struct StorageSettingsScreen: View {
   let viewModel: SettingsViewModel
   @State private var isConfirming = false
+  @State private var isAddingEmail = false
+  @State private var newEmail = ""
+  @State private var removing: LinkedAddress?
 
   var body: some View {
     List {
-      if let addresses = viewModel.linkedAddresses, !addresses.isEmpty {
+      if let addresses = viewModel.linkedAddresses,
+        !addresses.isEmpty || viewModel.canChangeLinkedAddresses
+      {
         Section {
           ForEach(addresses) { address in
             Label(address.address, systemImage: address.kind == .email ? "envelope" : "phone")
               .textSelection(.enabled)
+              .swipeActions {
+                if viewModel.canChangeLinkedAddresses {
+                  Button("Remove", role: .destructive) { removing = address }
+                }
+              }
+          }
+          if viewModel.canChangeLinkedAddresses {
+            Button("Add e-mail", systemImage: "plus") { isAddingEmail = true }
+              .disabled(viewModel.isChangingAddresses)
           }
         } header: {
           Text("E-mails and phones")
@@ -585,6 +599,90 @@ struct StorageSettingsScreen: View {
     .confirmationDialog("Clear the cache?", isPresented: $isConfirming, titleVisibility: .visible) {
       Button("Clear Cache", role: .destructive) { Task { await viewModel.clearCache() } }
     }
+    .overlay { if viewModel.isChangingAddresses { ProgressView().controlSize(.large) } }
+    .modifier(LinkedAddressDialogs(viewModel: viewModel))
+    .alert("Add an e-mail", isPresented: $isAddingEmail) {
+      TextField("E-mail", text: $newEmail)
+        .keyboardType(.emailAddress)
+        .textContentType(.emailAddress)
+        .textInputAutocapitalization(.never)
+        .autocorrectionDisabled()
+      Button("Cancel", role: .cancel) { newEmail = "" }
+      Button("Send link") {
+        let typed = newEmail
+        newEmail = ""
+        Task { await viewModel.addEmail(typed) }
+      }
+    } message: {
+      Text("We will send a link to this address to confirm it is yours.")
+    }
+    .confirmationDialog(
+      "Remove \(removing?.address ?? "")?",
+      isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
+      titleVisibility: .visible
+    ) {
+      Button("Remove", role: .destructive) {
+        if let address = removing { Task { await viewModel.removeLinkedAddress(address) } }
+      }
+    } message: {
+      Text("People will no longer find you by it.")
+    }
+  }
+}
+
+/// The steps after the link is sent: open it and come back, then confirm it is you on the web page or with the
+/// password when the server asks (User-Interactive Authentication), as signing devices out does.
+private struct LinkedAddressDialogs: ViewModifier {
+  let viewModel: SettingsViewModel
+  @State private var password = ""
+
+  func body(content: Content) -> some View {
+    content
+      .alert(
+        "Check your inbox",
+        isPresented: Binding(
+          get: {
+            viewModel.pendingEmail != nil && viewModel.emailChallenge == nil
+              && !viewModel.isChangingAddresses
+          },
+          set: { _ in })
+      ) {
+        Button("Cancel", role: .cancel) { viewModel.cancelLinkingEmail() }
+        Button("I opened the link") { Task { await viewModel.finishLinkingEmail() } }
+      } message: {
+        let email = viewModel.pendingEmail?.email ?? ""
+        Text(
+          viewModel.emailNotConfirmed
+            ? "The link was not opened yet. Open the link sent to \(email), then try again."
+            : "We sent a link to \(email). Open it, then come back here.")
+      }
+      .sheet(
+        isPresented: Binding(
+          get: { viewModel.emailChallenge?.webURL != nil },
+          set: { if !$0 { Task { await viewModel.confirmLinkingEmail() } } })
+      ) {
+        if let url = viewModel.emailChallenge?.webURL {
+          SafariView(url: url).ignoresSafeArea()
+        }
+      }
+      .alert(
+        "Confirm it is you",
+        isPresented: Binding(
+          get: {
+            viewModel.emailChallenge.map { $0.webURL == nil && $0.acceptsPassword } ?? false
+          },
+          set: { if !$0 { password = "" } })
+      ) {
+        SecureField("Password", text: $password)
+        Button("Cancel", role: .cancel) { viewModel.cancelLinkingEmail() }
+        Button("Add") {
+          let typed = password
+          password = ""
+          Task { await viewModel.confirmLinkingEmail(password: typed) }
+        }
+      } message: {
+        Text("Enter your account password to add the e-mail.")
+      }
   }
 }
 
