@@ -19,6 +19,8 @@ Run every command from the repository root.
 | Test the test script itself | `scripts/tests/test_test.sh` (stub `swift`, `xcrun` and `xcodebuild`; no Xcode needed) |
 | Architecture rules only (ADRs 0002, 0003, 0005, 0006; see [Constraints](../engineering/constraints.md)) | `scripts/check-architecture.sh [ROOT]` |
 | Test the architecture check on its fixture trees | `scripts/tests/check_architecture_test.sh` (trees in `scripts/tests/architecture-fixtures/`) |
+| No comments in Swift code ([ADR 0025](../../docs/adr/0025-no-comments-in-code.md)) | `scripts/check-no-comments.sh [ROOT]`; fails on `main` until the existing comments are removed |
+| Test the no-comments check | `scripts/tests/check_no_comments_test.sh` (throwaway trees under `$TMPDIR`) |
 | Staging integration test only ([ADR 0020](../../docs/adr/0020-opt-in-local-staging-integration-tests.md)) | `TEST_RUNNER_MATRIX_HOMESERVER=https://matrix.stg.lin-saas.com TEST_RUNNER_MATRIX_USER=stgtest1 TEST_RUNNER_MATRIX_PASSWORD=… xcodebuild test -project TwakeChat.xcodeproj -scheme TwakeChat -testPlan TwakeChat -only-testing:TwakeChatTests/AuthenticationIntegrationTests -destination 'platform=iOS Simulator,id=<iOS 26 simulator id>'`. Without the variables, the test reads `~/.factos/secrets/twake-chat-ios-staging.env` |
 
 `scripts/test.sh` runs in this order:

@@ -84,3 +84,6 @@
 * **Change**: Deferred Features now says, for each feature, whether the code on `origin/main` (`5745f8a`) has built it, with the file and commit, and which open issue tracks what is left (issue #89). Most deferred features are built, so the constraint "No code for a deferred feature in v1" (ADR 0011) no longer matches the code; the owner settles it through #65 and #100.
 * **Decision**: ADR 0024 (Proposed) records the owner's choice to keep the recovery key on ToM (`/_twake/recoveryWords`) as the web client's D14 and the Flutter app do, answering ADR 0017 open point 2 and widening ADR 0011's Encryption row.
 * **Change**: ToM recovery words are built as ADR 0024 says (`DeviceUnlocker` in Domain, `TomRecoveryVault` in MatrixData, run by the root after sign-in); Deferred Features is updated.
+
+## 2026-11-24
+* **Decision (owner, 2026-11-24)**: no comments in Swift code. ADR 0025 (Proposed) records it, with the `swift-tools-version` line as the only exception; `scripts/check-no-comments.sh` and its tests are added. CI runs only the check's tests for now; the check itself is turned on once the existing comments are removed, after the open pull requests merge.
