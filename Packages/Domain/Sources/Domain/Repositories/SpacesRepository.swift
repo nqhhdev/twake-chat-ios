@@ -13,10 +13,12 @@ public struct SpaceChild: Sendable, Equatable, Identifiable {
   public let isSpace: Bool
   /// Servers that can find it, for joining.
   public let via: [String]
+  /// A Broadcast (`app.twake.chat.page`): it may have a page style.
+  public let isBroadcast: Bool
 
   public init(
     id: String, name: String, topic: String?, avatar: MediaReference?, memberCount: Int,
-    isJoined: Bool, isSpace: Bool, via: [String]
+    isJoined: Bool, isSpace: Bool, via: [String], isBroadcast: Bool = false
   ) {
     self.id = id
     self.name = name
@@ -26,6 +28,7 @@ public struct SpaceChild: Sendable, Equatable, Identifiable {
     self.isJoined = isJoined
     self.isSpace = isSpace
     self.via = via
+    self.isBroadcast = isBroadcast
   }
 }
 
@@ -44,6 +47,8 @@ public protocol SpacesRepository: Sendable {
   func canAddChannel(to spaceId: String) async -> Bool
   /// Creates an encrypted private room named `name` and adds it to the space; returns its id.
   func createChannel(named name: String, in spaceId: String) async throws(SpacesError) -> String
+  /// The page style of a space or room (`app.twake.chat.page_style`), or `nil` when it has none or it cannot be read.
+  func pageStyle(of roomId: String) async -> PageStyle?
 }
 
 extension SpacesRepository {
@@ -53,4 +58,5 @@ extension SpacesRepository {
   {
     throw .requestFailed
   }
+  public func pageStyle(of roomId: String) async -> PageStyle? { nil }
 }
