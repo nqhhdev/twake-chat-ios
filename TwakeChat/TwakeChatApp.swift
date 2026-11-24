@@ -68,6 +68,7 @@ struct TwakeChatApp: App {
         verification: VerificationProxy(authentication: repository),
         devices: DevicesProxy(authentication: repository), chatDisplay: ChatDisplayDefaults(),
         appLock: AppLock(), sync: repository, sessionExpiry: repository,
+        meetCalls: MeetCallProxy(authentication: repository),
         signInConfiguration: configuration, webAuthenticator: SystemWebAuthenticator()))
     AppDelegate.push = root.push
   }
