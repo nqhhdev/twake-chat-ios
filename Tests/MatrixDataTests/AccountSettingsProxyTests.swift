@@ -47,4 +47,47 @@ struct AccountSettingsProxyTests {
       AccountSettingsProxy.removalBody(LinkedAddress(kind: .email, address: "a@b.org"))
         == ["medium": "email", "address": "a@b.org"])
   }
+
+  @Test func aPhoneCodeIsRequestedInInternationalForm() {
+    let phone = ContactAddress.phone("06 12 34 56 78", regionCode: "FR")!
+    let body = AccountSettingsProxy.phoneRequestBody(phone, regionCode: "fr", secret: "s")
+    #expect(body["client_secret"] as? String == "s")
+    #expect(body["country"] as? String == "FR")
+    #expect(body["phone_number"] as? String == "+33612345678")
+    #expect(body["send_attempt"] as? Int == 1)
+  }
+
+  @Test func theCodeGoesWhereTheServerSays() throws {
+    let phone = ContactAddress.phone("+33612345678", regionCode: nil)!
+    let answer = Data(
+      #"{"sid":"sid1","submit_url":"https://matrix.example.org/_matrix/client/unstable/add_threepid/msisdn/submit_token"}"#
+        .utf8)
+    let pending = try AccountSettingsProxy.pendingPhone(phone, secret: "s", answer: answer)
+    #expect(pending.sessionId == "sid1")
+    #expect(pending.phone == "+33612345678")
+    #expect(pending.submitURL.path().hasSuffix("/msisdn/submit_token"))
+    #expect(
+      AccountSettingsProxy.phoneCodeBody(pending, code: " 123456 ")
+        == ["client_secret": "s", "sid": "sid1", "token": "123456"])
+    #expect(throws: SettingsError.phoneNotSupported) {
+      try AccountSettingsProxy.pendingPhone(phone, secret: "s", answer: Data(#"{"sid":"x"}"#.utf8))
+    }
+  }
+
+  @Test func aWrongCodeIsToldApartFromAFailure() throws {
+    try AccountSettingsProxy.phoneCodeAnswer(status: 200, data: Data(#"{"success":true}"#.utf8))
+    #expect(throws: SettingsError.wrongCode) {
+      try AccountSettingsProxy.phoneCodeAnswer(status: 200, data: Data(#"{"success":false}"#.utf8))
+    }
+    #expect(throws: SettingsError.wrongCode) {
+      try AccountSettingsProxy.phoneCodeAnswer(
+        status: 400, data: Data(#"{"errcode":"M_THREEPID_AUTH_FAILED"}"#.utf8))
+    }
+    #expect(throws: SettingsError.requestFailed) {
+      try AccountSettingsProxy.phoneCodeAnswer(status: 502, data: Data())
+    }
+    #expect(
+      AccountSettingsProxy.addressError(
+        from: Data(#"{"errcode":"M_THREEPID_MEDIUM_NOT_SUPPORTED"}"#.utf8)) == .phoneNotSupported)
+  }
 }

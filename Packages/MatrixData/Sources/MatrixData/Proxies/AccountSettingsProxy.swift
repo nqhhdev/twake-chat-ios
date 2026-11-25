@@ -205,8 +205,52 @@ public actor AccountSettingsProxy: AccountSettingsRepository {
   public func linkEmail(_ pending: PendingEmailLink, auth: DeviceAuth?) async throws(SettingsError)
     -> DeviceAuthChallenge?
   {
+    try await link(clientSecret: pending.clientSecret, sessionId: pending.sessionId, auth: auth)
+  }
+
+  public func sendPhoneConfirmation(to number: String, regionCode: String?)
+    async throws(SettingsError) -> PendingPhoneLink
+  {
     guard let client = await clientProxy() else { throw .notSignedIn }
-    var payload: [String: Any] = ["client_secret": pending.clientSecret, "sid": pending.sessionId]
+    guard let phone = ContactAddress.phone(number, regionCode: regionCode) else {
+      throw .phoneNotSupported
+    }
+    let secret = UUID().uuidString
+    guard
+      let request = ClientServerRequest.make(
+        client: client.client, path: "account/3pid/msisdn/requestToken", method: "POST",
+        json: Self.phoneRequestBody(phone, regionCode: regionCode, secret: secret))
+    else { throw .notSignedIn }
+    guard let (status, data) = await ClientServerRequest.answer(request) else {
+      throw .requestFailed
+    }
+    guard status == 200 else { throw Self.addressError(from: data) }
+    return try Self.pendingPhone(phone, secret: secret, answer: data)
+  }
+
+  public func confirmPhone(_ pending: PendingPhoneLink, code: String) async throws(SettingsError) {
+    var request = URLRequest(url: pending.submitURL)
+    request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.httpBody = try? JSONSerialization.data(
+      withJSONObject: Self.phoneCodeBody(pending, code: code))
+    guard let (status, data) = await ClientServerRequest.answer(request) else {
+      throw .requestFailed
+    }
+    try Self.phoneCodeAnswer(status: status, data: data)
+  }
+
+  public func linkPhone(_ pending: PendingPhoneLink, auth: DeviceAuth?) async throws(SettingsError)
+    -> DeviceAuthChallenge?
+  {
+    try await link(clientSecret: pending.clientSecret, sessionId: pending.sessionId, auth: auth)
+  }
+
+  private func link(clientSecret: String, sessionId: String, auth: DeviceAuth?)
+    async throws(SettingsError) -> DeviceAuthChallenge?
+  {
+    guard let client = await clientProxy() else { throw .notSignedIn }
+    var payload: [String: Any] = ["client_secret": clientSecret, "sid": sessionId]
     if let auth {
       do {
         payload["auth"] = try await DevicesProxy.authBody(auth, userId: try? client.userId)
@@ -221,10 +265,44 @@ public actor AccountSettingsProxy: AccountSettingsRepository {
     guard let (status, data) = await ClientServerRequest.answer(request) else {
       throw .requestFailed
     }
-    // `…/v3/account/3pid/add` less three segments is the `…/v3/` the fallback page hangs off.
     let base = request.url?.deletingLastPathComponent().deletingLastPathComponent()
       .deletingLastPathComponent()
     return try Self.linkAnswer(status: status, data: data, homeserver: base)
+  }
+
+  static func phoneRequestBody(_ phone: ContactAddress, regionCode: String?, secret: String)
+    -> [String: Any]
+  {
+    [
+      "client_secret": secret, "country": (regionCode ?? "").uppercased(),
+      "phone_number": phone.address, "send_attempt": 1,
+    ]
+  }
+
+  static func pendingPhone(_ phone: ContactAddress, secret: String, answer data: Data)
+    throws(SettingsError) -> PendingPhoneLink
+  {
+    let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    guard let sid = object?["sid"] as? String else { throw .requestFailed }
+    guard let submit = object?["submit_url"] as? String, let url = URL(string: submit),
+      url.scheme == "https"
+    else { throw .phoneNotSupported }
+    return PendingPhoneLink(
+      phone: phone.address, clientSecret: secret, sessionId: sid, submitURL: url)
+  }
+
+  static func phoneCodeBody(_ pending: PendingPhoneLink, code: String) -> [String: String] {
+    [
+      "client_secret": pending.clientSecret, "sid": pending.sessionId,
+      "token": code.trimmingCharacters(in: .whitespacesAndNewlines),
+    ]
+  }
+
+  static func phoneCodeAnswer(status: Int, data: Data) throws(SettingsError) {
+    let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    if status == 200, object?["success"] as? Bool == true { return }
+    if status == 200 || (400..<500).contains(status) { throw .wrongCode }
+    throw .requestFailed
   }
 
   public func removeLinkedAddress(_ address: LinkedAddress) async throws(SettingsError) {
@@ -253,6 +331,7 @@ public actor AccountSettingsProxy: AccountSettingsRepository {
     return switch object?["errcode"] as? String {
     case "M_THREEPID_IN_USE": .addressInUse
     case "M_THREEPID_AUTH_FAILED": .addressNotConfirmed
+    case "M_THREEPID_MEDIUM_NOT_SUPPORTED": .phoneNotSupported
     default: .requestFailed
     }
   }

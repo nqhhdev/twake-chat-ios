@@ -5,9 +5,20 @@ import SwiftUI
 /// The search field and results shared by the new chat sheet and the Contacts tab.
 struct PeopleSearchList: View {
   @Bindable var viewModel: PeopleSearchViewModel
+  var phoneContacts: PhoneContactsViewModel?
 
   var body: some View {
     list
+      .sheet(
+        isPresented: Binding(
+          get: { viewModel.consent != nil }, set: { if !$0 { viewModel.declineConsent() } })
+      ) {
+        if let consent = viewModel.consent {
+          IdentityConsentSheet(
+            consent: consent, onAccept: { Task { await viewModel.acceptConsent() } },
+            onDecline: { viewModel.declineConsent() })
+        }
+      }
       .sheet(
         isPresented: Binding(
           get: { viewModel.draftChat != nil }, set: { if !$0 { viewModel.discardDraft() } })
@@ -20,10 +31,26 @@ struct PeopleSearchList: View {
 
   private var list: some View {
     List {
-      if viewModel.mode != .direct, !viewModel.selected.isEmpty {
+      if viewModel.mode != .direct,
+        !viewModel.selected.isEmpty || !viewModel.selectedAddresses.isEmpty
+      {
         Section("Selected users") {
           ScrollView(.horizontal) {
             HStack(spacing: 12) {
+              ForEach(viewModel.selectedAddresses) { address in
+                VStack(spacing: 4) {
+                  AddressAvatar(address: address, size: 44)
+                    .overlay(alignment: .topTrailing) {
+                      Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(SysColors.textSecondary)
+                        .background(Circle().fill(.white))
+                    }
+                  Text(address.address).textStyle(TextStyles.labelSmall).lineLimit(1)
+                    .frame(width: 56)
+                }
+                .onTapGesture { Task { await viewModel.tap(address) } }
+                .transition(.scale.combined(with: .opacity))
+              }
               ForEach(viewModel.selected) { person in
                 VStack(spacing: 4) {
                   TwakeAvatar(name: person.name, size: 44)
@@ -75,10 +102,50 @@ struct PeopleSearchList: View {
         }
       } footer: {
         if viewModel.query.isEmpty {
-          Text("Search for people by name or Matrix ID, such as @alice:example.org.")
-        } else if viewModel.results.isEmpty, !viewModel.isSearching {
+          Text(
+            viewModel.offersAddressInvites
+              ? "Search for people by name, Matrix ID, e-mail or phone number."
+              : "Search for people by name or Matrix ID, such as @alice:example.org.")
+        } else if viewModel.results.isEmpty, viewModel.typedAddress == nil,
+          !viewModel.isSearching
+        {
           Text("No results found")
         }
+      }
+      if let address = viewModel.typedAddress {
+        Section {
+          Button {
+            Task { await viewModel.tap(address) }
+          } label: {
+            HStack(spacing: 12) {
+              AddressAvatar(address: address, size: 40)
+              VStack(alignment: .leading, spacing: 0) {
+                Text(address.address).textStyle(TextStyles.titleMedium)
+                  .foregroundStyle(SysColors.onSurface).lineLimit(1)
+                Text(address.kind == .email ? "Invite by e-mail" : "Invite by text message")
+                  .textStyle(TextStyles.bodySmall).foregroundStyle(SysColors.textSecondary)
+              }
+              Spacer()
+              if viewModel.mode != .direct {
+                Image(
+                  systemName: viewModel.isSelected(address) ? "checkmark.circle.fill" : "circle"
+                )
+                .foregroundStyle(
+                  viewModel.isSelected(address) ? SysColors.primary : SysColors.outline
+                )
+                .contentTransition(.symbolEffect(.replace))
+              }
+            }
+            .contentShape(Rectangle())
+          }
+          .buttonStyle(.plain)
+        } footer: {
+          Text("No account yet? They get an invitation and join you once they sign up.")
+        }
+        .transition(.opacity)
+      }
+      if let phoneContacts, viewModel.mode == .direct {
+        PhoneContactsSections(contacts: phoneContacts, search: viewModel)
       }
       if let message = viewModel.errorMessage {
         Section { Text(message).foregroundStyle(SysColors.error) }
@@ -95,8 +162,11 @@ struct PeopleSearchList: View {
       if viewModel.isSearching || viewModel.isCreating { ProgressView() }
     }
     .animation(.spring(response: 0.3, dampingFraction: 0.8), value: viewModel.selected)
+    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: viewModel.selectedAddresses)
     .animation(.easeInOut(duration: 0.2), value: viewModel.results)
+    .animation(.easeInOut(duration: 0.2), value: viewModel.typedAddress)
     .sensoryFeedback(.selection, trigger: viewModel.selected)
+    .sensoryFeedback(.selection, trigger: viewModel.selectedAddresses)
   }
 }
 
@@ -163,16 +233,19 @@ public struct NewChatScreen: View {
 /// The Contacts tab: search the homeserver's people; a tap opens the direct chat.
 public struct ContactsScreen: View {
   let viewModel: PeopleSearchViewModel
+  let phoneContacts: PhoneContactsViewModel?
 
-  public init(viewModel: PeopleSearchViewModel) {
+  public init(viewModel: PeopleSearchViewModel, phoneContacts: PhoneContactsViewModel? = nil) {
     self.viewModel = viewModel
+    self.phoneContacts = phoneContacts
   }
 
   public var body: some View {
-    PeopleSearchList(viewModel: viewModel)
+    PeopleSearchList(viewModel: viewModel, phoneContacts: phoneContacts)
       .scrollContentBackground(.hidden)
       .background(SysColors.background)
       .twakeTitle("Contacts")
+      .task { await phoneContacts?.load() }
   }
 }
 
@@ -197,7 +270,9 @@ public struct InviteScreen: View {
           }
           ToolbarItem(placement: .confirmationAction) {
             Button("Invite") { Task { await viewModel.inviteSelected() } }
-              .disabled(viewModel.selected.isEmpty || viewModel.isCreating)
+              .disabled(
+                (viewModel.selected.isEmpty && viewModel.selectedAddresses.isEmpty)
+                  || viewModel.isCreating)
           }
         }
         .onChange(of: viewModel.didInvite) { _, invited in if invited { dismiss() } }

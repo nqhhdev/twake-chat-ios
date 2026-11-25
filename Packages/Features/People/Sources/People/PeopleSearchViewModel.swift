@@ -49,35 +49,55 @@ public final class PeopleSearchViewModel {
   @ObservationIgnored private let inviteAction: (@MainActor ([String]) async -> [String])?
   /// Set once the picked people were invited; the invite screen closes.
   public private(set) var didInvite = false
+  public private(set) var typedAddress: ContactAddress?
+  public private(set) var selectedAddresses: [ContactAddress] = []
+  public private(set) var consent: IdentityConsent?
+  public var offersAddressInvites: Bool { identity != nil && identityStatus != .unavailable }
+  @ObservationIgnored public var regionCode: String? = Locale.current.region?.identifier
+  @ObservationIgnored private let identity: (any IdentityRepository)?
+  @ObservationIgnored private let inviteAddressesAction:
+    (@MainActor ([ContactAddress]) async -> [ContactAddress])?
+  private var identityStatus: IdentityServerStatus?
+  @ObservationIgnored private var addressAfterConsent: ContactAddress?
 
   /// - Parameter onOpen: Opens the chat that was found or created, with its name.
   public init(
     mode: Mode = .direct, repository: any PeopleRepository, debounce: Duration = .milliseconds(300),
     onOpen: @escaping @MainActor (String, String) -> Void,
-    invite: (@MainActor ([String]) async -> [String])? = nil
+    invite: (@MainActor ([String]) async -> [String])? = nil,
+    identity: (any IdentityRepository)? = nil,
+    inviteAddresses: (@MainActor ([ContactAddress]) async -> [ContactAddress])? = nil
   ) {
     self.mode = mode
     self.repository = repository
     self.debounce = debounce
     self.onOpen = onOpen
     self.inviteAction = invite
+    self.identity = identity
+    self.inviteAddressesAction = inviteAddresses
   }
 
   /// Invites the picked people into the room (`.invite` mode).
   public func inviteSelected() async {
-    guard !selected.isEmpty, !isCreating, let inviteAction else { return }
+    guard !selected.isEmpty || !selectedAddresses.isEmpty, !isCreating, let inviteAction else {
+      return
+    }
     isCreating = true
     defer { isCreating = false }
     errorMessage = nil
-    let failed = await inviteAction(selected.map(\.id))
-    if failed.isEmpty {
+    let failed = selected.isEmpty ? [] : await inviteAction(selected.map(\.id))
+    let failedAddresses =
+      selectedAddresses.isEmpty
+      ? [] : await inviteAddressesAction?(selectedAddresses) ?? selectedAddresses
+    if failed.isEmpty, failedAddresses.isEmpty {
       didInvite = true
-    } else if failed.count == selected.count {
+    } else if failed.count == selected.count, failedAddresses.count == selectedAddresses.count {
       errorMessage = "Could not invite. Please try again."
     } else {
-      // The others are in: keep only the people still to invite, by name, so the user can try them again.
       selected = selected.filter { failed.contains($0.id) }
-      let names = selected.map { $0.displayName ?? $0.id }.formatted(.list(type: .and))
+      selectedAddresses = failedAddresses
+      let names = (selected.map { $0.displayName ?? $0.id } + failedAddresses.map(\.address))
+        .formatted(.list(type: .and))
       errorMessage = "Could not invite \(names). The others were invited."
     }
   }
@@ -85,6 +105,7 @@ public final class PeopleSearchViewModel {
   public func switchMode(_ mode: Mode) {
     self.mode = mode
     selected = []
+    selectedAddresses = []
     errorMessage = nil
   }
 
@@ -93,16 +114,127 @@ public final class PeopleSearchViewModel {
     let text = query
     guard !text.trimmingCharacters(in: .whitespaces).isEmpty else {
       results = []
+      typedAddress = nil
       return
     }
     isSearching = true
     defer { isSearching = false }
+    let address = await addressToOffer(in: text)
     do {
-      let found = try await repository.search(text)
-      if text == query { results = found }
+      var found = try await repository.search(text)
+      var offered = address
+      if let address, await currentIdentityStatus() == .ready,
+        let userId = try? await identity?.lookup([address])[address]
+      {
+        offered = nil
+        if !found.contains(where: { $0.id == userId }) {
+          found.insert(Person(id: userId, displayName: address.address), at: 0)
+        }
+      }
+      if text == query {
+        results = found
+        typedAddress = offered
+      }
       errorMessage = nil
     } catch {
       errorMessage = "Could not search. Please try again."
+    }
+  }
+
+  public func isSelected(_ address: ContactAddress) -> Bool {
+    selectedAddresses.contains(address)
+  }
+
+  public func tap(_ address: ContactAddress) async {
+    guard !isCreating else { return }
+    if mode != .direct, let index = selectedAddresses.firstIndex(of: address) {
+      selectedAddresses.remove(at: index)
+      return
+    }
+    switch await currentIdentityStatus() {
+    case .unavailable:
+      return
+    case .needsConsent(let server, let policies):
+      addressAfterConsent = address
+      consent = IdentityConsent(server: server, policies: policies)
+      return
+    case .ready:
+      break
+    }
+    isCreating = true
+    errorMessage = nil
+    let userId: String?
+    do {
+      userId = try await identity?.lookup([address])[address]
+    } catch {
+      isCreating = false
+      errorMessage = "Could not look up \(address.address). Please try again."
+      return
+    }
+    if let userId {
+      isCreating = false
+      let person = Person(id: userId, displayName: address.address)
+      if mode == .direct || !selected.contains(person) { await tap(person) }
+      return
+    }
+    switch mode {
+    case .group, .broadcast, .invite:
+      isCreating = false
+      selectedAddresses.append(address)
+    case .direct:
+      defer { isCreating = false }
+      do {
+        guard let identity else { return }
+        let roomId = try await identity.startDirectChat(inviting: address)
+        onOpen(roomId, address.address)
+      } catch {
+        errorMessage = "Could not invite \(address.address). Please try again."
+      }
+    }
+  }
+
+  public func acceptConsent() async {
+    guard let consent, let identity else { return }
+    self.consent = nil
+    do {
+      try await identity.acceptTerms(consent.policies)
+      identityStatus = .ready
+    } catch {
+      addressAfterConsent = nil
+      errorMessage = "Could not accept the terms. Please try again."
+      return
+    }
+    if let address = addressAfterConsent {
+      addressAfterConsent = nil
+      await tap(address)
+    }
+  }
+
+  public func declineConsent() {
+    consent = nil
+    addressAfterConsent = nil
+  }
+
+  private func addressToOffer(in text: String) async -> ContactAddress? {
+    guard identity != nil, let address = ContactAddress.parse(text, regionCode: regionCode),
+      await currentIdentityStatus() != .unavailable
+    else { return nil }
+    return address
+  }
+
+  private func currentIdentityStatus() async -> IdentityServerStatus {
+    if let identityStatus { return identityStatus }
+    guard let identity else { return .unavailable }
+    let status = await identity.status()
+    if case .needsConsent = status { return status }
+    identityStatus = status
+    return status
+  }
+
+  private func inviteAddresses(intoRoom roomId: String) async {
+    guard !selectedAddresses.isEmpty, let identity else { return }
+    for address in selectedAddresses {
+      try? await identity.invite(address, roomId: roomId)
     }
   }
 
@@ -179,7 +311,8 @@ public final class PeopleSearchViewModel {
   }
 
   public var canCreateGroup: Bool {
-    !selected.isEmpty && !groupName.trimmingCharacters(in: .whitespaces).isEmpty && !isCreating
+    (!selected.isEmpty || !selectedAddresses.isEmpty)
+      && !groupName.trimmingCharacters(in: .whitespaces).isEmpty && !isCreating
   }
 
   public var canCreateBroadcast: Bool { broadcast.canCreate && !isCreating }
@@ -190,6 +323,7 @@ public final class PeopleSearchViewModel {
     defer { isCreating = false }
     do {
       let roomId = try await repository.createBroadcast(broadcast, inviting: selected.map(\.id))
+      await inviteAddresses(intoRoom: roomId)
       onOpen(roomId, broadcast.name.trimmingCharacters(in: .whitespaces))
     } catch {
       errorMessage =
@@ -206,11 +340,17 @@ public final class PeopleSearchViewModel {
     let name = groupName.trimmingCharacters(in: .whitespaces)
     do {
       let roomId = try await repository.createGroup(name: name, inviting: selected.map(\.id))
+      await inviteAddresses(intoRoom: roomId)
       onOpen(roomId, name)
     } catch {
       errorMessage = "Could not create the group. Please try again."
     }
   }
+}
+
+public struct IdentityConsent: Sendable, Equatable {
+  public let server: String
+  public let policies: [IdentityPolicy]
 }
 
 /// One search is one value: the shell presents the new chat sheet with `sheet(item:)`.
