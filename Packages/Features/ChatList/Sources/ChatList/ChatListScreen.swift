@@ -20,6 +20,7 @@ public struct ChatListScreen: View {
   @State private var isConfirmingLeaveSelection = false
   /// The space opened from the list, pushed over it.
   @State private var openedSpace: SpaceViewModel?
+  @State private var newSpace: NewSpaceViewModel?
   @State private var connectivity = Connectivity()
   @Environment(\.scenePhase) private var scenePhase
 
@@ -86,6 +87,9 @@ public struct ChatListScreen: View {
           ToolbarItem(placement: .topBarTrailing) {
             Menu("More", systemImage: "ellipsis.circle") {
               MarkAllReadButton(viewModel: viewModel, rooms: viewModel.unreadRooms)
+              if viewModel.hasSpaces {
+                Button("New Space", systemImage: "cube") { startNewSpace() }
+              }
             }
           }
         }
@@ -113,6 +117,14 @@ public struct ChatListScreen: View {
         Text("You will no longer receive its messages.")
       }
       .task { await viewModel.start() }
+      .sheet(item: $newSpace) { model in NewSpaceScreen(viewModel: model) }
+  }
+
+  private func startNewSpace() {
+    newSpace = viewModel.makeNewSpace { [viewModel, onSelect] summary in
+      newSpace = nil
+      openedSpace = viewModel.makeSpace(summary, onOpen: { onSelect($0) })
+    }
   }
 
   @ViewBuilder private var content: some View {

@@ -100,3 +100,4 @@
 * **Change**: the composer takes hardware keyboard keys (#142), offers GIFs (#140) and stickers (#105) from the "+" menu, and shows received stickers without a bubble.
 * **Decision**: ADR 0029 (Proposed) records how the app finds and invites people by e-mail or phone: the identity server from `m.identity_server` (account data, then the well-known), terms accepted first, `sha256` hashed lookups, hidden without a server (issues #95, #98).
 * **Change**: Adding a phone number in Settings (`/account/3pid/msisdn/requestToken`, SMS code, `/account/3pid/add`), e-mail and phone rows in the people search, third-party invites and phone-contact matching are built (`IdentityServerProxy`, `IdentityService`, `PhoneContactsViewModel`, `SystemAddressBook`). The Parity Matrix rows are updated.
+* **Change**: Create a space and a sub-space (#177): New Space in the chat list's More menu, New Sub-space in a space's Add menu, with the web's /createRoom body (ADR 0036, Proposed).

@@ -216,6 +216,8 @@ public final class ChatListViewModel {
     allJoinedRooms.first { $0.id == result.roomId }
   }
 
+  public var hasSpaces: Bool { spaces != nil }
+
   /// Whether the list offers "Archived chats".
   public var hasArchive: Bool { archive != nil }
 
@@ -229,6 +231,12 @@ public final class ChatListViewModel {
       picture: { @Sendable [weak self] reference in await self?.picture(reference) },
       onOpen: onOpen,
       markRead: { [repository] roomId in try? await repository.setUnread(false, roomId: roomId) })
+  }
+
+  public func makeNewSpace(onCreated: @escaping @MainActor (RoomSummary) -> Void)
+    -> NewSpaceViewModel?
+  {
+    spaces.map { NewSpaceViewModel(repository: $0, onCreated: onCreated) }
   }
 
   /// The timeline of a room by its id, for the long-press preview; `nil` shows the menu without a preview.
