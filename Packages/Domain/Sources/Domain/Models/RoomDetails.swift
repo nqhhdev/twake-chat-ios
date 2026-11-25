@@ -221,11 +221,25 @@ public struct Presence: Sendable, Equatable {
   /// How long ago they were last active, when the server says.
   public let lastActive: TimeInterval?
   public let statusMessage: String?
+  public let isAway: Bool
 
-  public init(isOnline: Bool, lastActive: TimeInterval? = nil, statusMessage: String? = nil) {
+  public init(
+    isOnline: Bool, lastActive: TimeInterval? = nil, statusMessage: String? = nil,
+    isAway: Bool = false
+  ) {
     self.isOnline = isOnline
     self.lastActive = lastActive
     self.statusMessage = statusMessage
+    self.isAway = isAway
+  }
+
+  public enum Dot: Sendable, Equatable {
+    case online, away
+  }
+
+  public var dot: Dot? {
+    if isOnline { return .online }
+    return isAway ? .away : nil
   }
 
   /// From the presence JSON: `presence`, `currently_active`, `last_active_ago` (ms), `status_msg`.
@@ -234,9 +248,10 @@ public struct Presence: Sendable, Equatable {
     let active = object["currently_active"] as? Bool ?? false
     let ago = (object["last_active_ago"] as? NSNumber).map { $0.doubleValue / 1000 }
     let status = (object["status_msg"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+    let isOnline = state == "online" && (active || (ago ?? .infinity) < 300)
     return Presence(
-      isOnline: state == "online" && (active || (ago ?? .infinity) < 300), lastActive: ago,
-      statusMessage: status)
+      isOnline: isOnline, lastActive: ago, statusMessage: status,
+      isAway: !isOnline && (state == "unavailable" || state == "online"))
   }
 
   /// One line under the name: the status when set, else « Online » or « Active 5 min ago »; `nil` when nothing is

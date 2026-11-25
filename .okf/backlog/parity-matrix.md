@@ -37,7 +37,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Filters, favourites, low priority, swipe and multiple selection | `chat_list/room_list_filter`, `slidable_chat_list_item` | Phase 2b, 11 | Built: `ChatListScreen.swift` | Matrix | — |
 | Draft on the row, mark all read, offline banner, quick switcher | `chat_draft` | Phase 2b, 11 | Built: `ChatListViewModel.swift`, `MarkAllRead.swift`, `Connectivity.swift`, `QuickSwitcher.swift` | Matrix | — |
 | Preview a chat on long press | — | — | Built: `ChatList/ChatPreview.swift` (#154) | Matrix | #132 |
-| Typing on the row, presence dot, room kind badge, space unread | `chat_list_item_subtitle` | D182 | Not built | Matrix | #105, #136, #144, #145 |
+| Typing on the row, presence dot, room kind badge, space unread | `chat_list_item_subtitle` | D182 | Built: `ChatList/ChatListScreen.swift` (`ChatListRow`), `RowPresence.swift`, `RowSpaceUnread.swift`, `Domain/Models/SpaceUnread.swift`; presence read when the row shows ([ADR 0031](../../docs/adr/0031-chat-list-row-marks.md)) | Matrix (presence: `GET /presence`, off on some servers) | #105, #136, #144, #145 |
 | Archive (web account data `app.twake.chat.archived_rooms`) | `archive` | D176 | Built: `ChatList/ArchivedChats.swift`, `Domain/Models/RoomArchive.swift` | Matrix | — |
 | Public groups: browse, join, knock | `public_rooms` | D206 | Built: `ChatList/PublicRooms.swift`, `MatrixData/Proxies/PublicRoomsProxy.swift` | Matrix | — |
 | Spaces: browse, join, mark read, new channel, `page_style` | `space_home` | Phase 3 | Built: `ChatList/Spaces.swift`, `PageStyleViews.swift`, `SpacesProxy.swift` | Matrix | — |
@@ -109,7 +109,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Chat details, members, roles, remove, ban, access, encryption | `chat_details`, `assign_roles`, `room_access` | Phase 3 | Built: `Room/RoomDetailsScreen.swift`, `MemberProfile.swift` | Matrix | — |
 | Person card, groups in common, status message | `profile_info`, `chat_profile_info` | Phase 3, 10, 11 | Built: `Room/MemberProfile.swift` | Matrix | #111 (polling) |
 | Matrix links open in the app | `invitation_link_web` (dropped) | Phase 5 | Built: `Domain/Models/MatrixLink.swift`, `TwakeChat/LinkRouter.swift` | Matrix | — |
-| Personal QR | `personal_qr` | — | Not built | Matrix (ADR 0030) | #105, #104 |
+| Personal QR | `personal_qr` | — | Built: `Settings/PersonalQR.swift` (the `matrix.to` link as a QR code, Share, Copy link) and `Settings/QRCodeScanner.swift` (scan into `MatrixLink`, which also reads Flutter's `links.twake.app/chat/…`); download to Photos is the share sheet's Save Image | Matrix (ADR 0030) | #105 |
 | Support chat and Help | `create_support_chat_interactor`, `settings.dart:275` | — | Not built | Twake (well-known, build setting) | #171 |
 
 ## Encryption and security
@@ -118,7 +118,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 |---|---|---|---|---|---|
 | Recovery key, emoji verification, identity reset | `bootstrap`, `key_verification` | Phase 4 | Built: `Settings/DevicesAndVerification.swift`, `VerificationProxy.swift` | Matrix | #79, #116 |
 | Recovery key kept by ToM | `data/network/recovery_words` | D14 | Built: `MatrixData/Proxies/TomRecoveryVault.swift` (ADR 0024) | ToM | #87, #120 |
-| QR verification | `key_verification` | D28 | Not built; SDK 26.04.01 has no QR verification | Matrix (ADR 0030) | #104 |
+| QR verification | `key_verification` | D28 | Off: no SDK release up to 26.11.23 exposes it in `SessionVerificationController`; emoji only | Matrix (ADR 0030) | #104 |
 | Devices: list, rename, sign out | `device_settings` | Phase 4 | Built: `DevicesAndVerification.swift`, `DevicesProxy.swift` | Matrix | — |
 | Identity changed warning | — | Phase 4 | Built: `Room/RoomBanners.swift` | Matrix | — |
 | App lock | `widgets/lock_screen.dart` | — | Built: `TwakeChat/AppLock.swift` | Device | #114 |

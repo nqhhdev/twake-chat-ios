@@ -167,6 +167,7 @@ final class RootCoordinator {
       people: people,
       openPerson: openDirectChat(),
       previewTimeline: { [makeTimeline] roomId in makeTimeline(roomId, nil) },
+      presence: presenceLookup(),
       logOut: { [weak signedIn, push, shareSuggestions] in
         guard let signedIn else { return false }
         await push.stop()
@@ -179,6 +180,11 @@ final class RootCoordinator {
       viewModel.map { RoomSummary.appBadge(for: $0.allJoinedRooms) } ?? 0
     }
     return viewModel
+  }
+
+  private func presenceLookup() -> (@Sendable (String) async -> Presence?)? {
+    guard let roomDetails else { return nil }
+    return { userId in await roomDetails.presence(of: userId) }
   }
 
   /// A room's screen model on its own timeline; the shell keeps the open one and closes it through `onLeft`.
@@ -348,6 +354,7 @@ final class RootCoordinator {
       await signedIn.logOut()
       return signedIn.errorMessage == nil
     }
+    viewModel.personalQR.openLink = { [weak self] url in _ = self?.links.handle(url) }
     settings = (signedIn, viewModel)
     return viewModel
   }
