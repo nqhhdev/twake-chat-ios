@@ -74,6 +74,7 @@ struct TwakeChatApp: App {
         meetCalls: MeetCallProxy(authentication: repository),
         identity: IdentityServerProxy(authentication: repository),
         addressBook: SystemAddressBook(),
+        twakeContacts: TomContactsProxy(authentication: repository),
         gifs: url("TwakeProxyURL").map { GifProxy(baseURL: $0, authentication: repository) },
         signInConfiguration: configuration, webAuthenticator: SystemWebAuthenticator()))
     AppDelegate.push = root.push
