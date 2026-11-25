@@ -104,6 +104,8 @@ public protocol TimelineRepository: Sendable {
 
   func stickerPacks() async -> [StickerPack]
 
+  func emotes() async -> [Emote]
+
   func send(sticker: Sticker) async throws(TimelineError)
 
   /// Sends `text` as a message that runs `command`.
@@ -197,6 +199,7 @@ extension TimelineRepository {
   public func addRecentReaction(_ key: String) async {}
   public func gifsEnabled() async -> Bool { true }
   public func stickerPacks() async -> [StickerPack] { [] }
+  public func emotes() async -> [Emote] { [] }
   public func send(sticker: Sticker) async throws(TimelineError) { throw .requestFailed }
 }
 

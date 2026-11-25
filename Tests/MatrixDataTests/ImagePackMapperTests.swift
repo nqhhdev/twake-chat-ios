@@ -85,3 +85,29 @@ struct ImagePackMapperTests {
     #expect(relation["is_falling_back"] as? Bool == true)
   }
 }
+
+struct ImagePackEmoteTests {
+  private let source: (String) -> String? = { "source:" + $0 }
+
+  @Test func emoticonsAreTheImagesForEmotesWithAValidShortcode() {
+    let content: [String: Any] = [
+      "images": [
+        "cat": ["url": "mxc://example.org/cat", "info": ["w": 64, "h": 64]],
+        "sticker_only": ["url": "mxc://example.org/s", "usage": ["sticker"]],
+        "bad code": ["url": "mxc://example.org/b"],
+        "web": ["url": "https://example.org/w.png"],
+      ]
+    ]
+    let emotes = ImagePackMapper.emotes(content: content, source: source)
+    #expect(emotes.map(\.shortcode) == ["cat"])
+    #expect(emotes.first?.url == "mxc://example.org/cat")
+    #expect(emotes.first?.media.width == 64)
+  }
+
+  @Test func aStickerPackGivesNoEmote() {
+    let content: [String: Any] = [
+      "pack": ["usage": ["sticker"]], "images": ["a": ["url": "mxc://example.org/a"]],
+    ]
+    #expect(ImagePackMapper.emotes(content: content, source: source).isEmpty)
+  }
+}

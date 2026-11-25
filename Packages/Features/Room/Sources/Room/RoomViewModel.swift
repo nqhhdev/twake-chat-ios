@@ -68,6 +68,9 @@ public final class RoomViewModel {
   public internal(set) var gifsAvailable = false
   public internal(set) var stickerPacks: [StickerPack] = []
   var presenceDots: [String: Presence.Dot] = [:]
+  public internal(set) var emotes: [Emote] = []
+  var emoteImages: [String: UIImage] = [:]
+  @ObservationIgnored var emoteLoads: Set<String> = []
   @ObservationIgnored var presenceFetchedAt: [String: ContinuousClock.Instant] = [:]
 
   /// The message whose edit history the sheet shows.
@@ -364,8 +367,9 @@ public final class RoomViewModel {
       async let threadPref: Void = loadThreadPref()
       async let gifs: Void = loadGifsAvailability()
       async let stickers: Void = loadStickerPacks()
+      async let emotes: Void = loadEmotes()
       let commands = await repository.botCommands()
-      _ = await (pinned, roomState, reactions, saved, threadPref, gifs, stickers)
+      _ = await (pinned, roomState, reactions, saved, threadPref, gifs, stickers, emotes)
       botCommands = commands
     }
     defer { extras.cancel() }

@@ -66,10 +66,10 @@ public actor MediaProxy: MediaRepository {
       if let thumbnailSource = media.thumbnailSource {
         // The sender's own thumbnail: in an encrypted room the server cannot make one.
         data = try await client.client.getMediaContent(
-          mediaSource: MediaSource.fromJson(json: thumbnailSource))
+          mediaSource: Self.mediaSource(thumbnailSource))
       } else {
         data = try await client.client.getMediaThumbnail(
-          mediaSource: MediaSource.fromJson(json: media.source), width: UInt64(width),
+          mediaSource: Self.mediaSource(media.source), width: UInt64(width),
           height: UInt64(height))
       }
       thumbnails.setObject(data as NSData, forKey: key, cost: data.count)
@@ -79,6 +79,11 @@ public actor MediaProxy: MediaRepository {
       if media.mimeType?.hasPrefix("image/") == true { return try await content(media) }
       throw .downloadFailed
     }
+  }
+
+  static func mediaSource(_ source: String) throws -> MediaSource {
+    source.hasPrefix("mxc://")
+      ? try MediaSource.fromUrl(url: source) : try MediaSource.fromJson(json: source)
   }
 
   public func maxUploadSize() async -> Int? {
@@ -92,7 +97,7 @@ public actor MediaProxy: MediaRepository {
     let client = try await client()
     do {
       return try await client.client.getMediaContent(
-        mediaSource: MediaSource.fromJson(json: media.source))
+        mediaSource: Self.mediaSource(media.source))
     } catch {
       throw .downloadFailed
     }

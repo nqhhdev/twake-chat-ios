@@ -1,6 +1,6 @@
 import Foundation
 
-enum SpoilerMarkdown {
+enum RichMarkdown {
   static let marker = "||"
   static let hiddenText = "[Spoiler]"
 
@@ -26,28 +26,56 @@ enum SpoilerMarkdown {
     return segments
   }
 
-  static func content(_ text: String) -> (body: String, html: String)? {
+  static func content(_ text: String, emotes: [String: String] = [:]) -> (
+    body: String, html: String
+  )? {
     let segments = segments(text)
-    guard segments.contains(where: \.isSpoiler) else { return nil }
+    let hasSpoiler = segments.contains(where: \.isSpoiler)
+    guard hasSpoiler || !usedEmotes(in: text, emotes: emotes).isEmpty else { return nil }
     let body = segments.map { $0.isSpoiler ? hiddenText : $0.text }.joined()
     let html = segments.map { segment in
-      segment.isSpoiler
-        ? "<span data-mx-spoiler>\(inlineHTML(segment.text))</span>" : inlineHTML(segment.text)
+      let inner = inlineHTML(segment.text, emotes: emotes)
+      return segment.isSpoiler ? "<span data-mx-spoiler>\(inner)</span>" : inner
     }.joined()
     return (body, html)
   }
 
-  static func inlineHTML(_ markdown: String) -> String {
+  static func usedEmotes(in text: String, emotes: [String: String]) -> [String] {
+    guard !emotes.isEmpty else { return [] }
+    return text.matches(of: shortcodePattern).compactMap { match in
+      let shortcode = String(match.output.1)
+      return emotes[shortcode] == nil ? nil : shortcode
+    }
+  }
+
+  nonisolated(unsafe) static let shortcodePattern = /:([A-Za-z0-9_+\-.]+):/
+
+  static func replacingEmotes(in html: String, emotes: [String: String]) -> String {
+    guard !emotes.isEmpty else { return html }
+    return html.replacing(shortcodePattern) { match in
+      let shortcode = String(match.output.1)
+      guard let url = emotes[shortcode] else { return String(match.output.0) }
+      let alt = escape(":\(shortcode):")
+      return
+        "<img data-mx-emoticon src=\"\(escape(url))\" alt=\"\(alt)\" title=\"\(alt)\" height=\"32\">"
+    }
+  }
+
+  static func inlineHTML(_ markdown: String, emotes: [String: String] = [:]) -> String {
     guard
       let parsed = try? AttributedString(
         markdown: markdown,
         options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))
-    else { return escape(markdown).replacingOccurrences(of: "\n", with: "<br>") }
+    else {
+      return replacingEmotes(
+        in: escape(markdown).replacingOccurrences(of: "\n", with: "<br>"), emotes: emotes)
+    }
     var html = ""
     for run in parsed.runs {
       var piece = escape(String(parsed[run.range].characters))
         .replacingOccurrences(of: "\n", with: "<br>")
       let intent = run.inlinePresentationIntent ?? []
+      if !intent.contains(.code) { piece = replacingEmotes(in: piece, emotes: emotes) }
       if intent.contains(.code) { piece = "<code>\(piece)</code>" }
       if intent.contains(.strikethrough) { piece = "<del>\(piece)</del>" }
       if intent.contains(.emphasized) { piece = "<em>\(piece)</em>" }
