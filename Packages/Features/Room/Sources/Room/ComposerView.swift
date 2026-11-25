@@ -23,6 +23,14 @@ struct ComposerView: View {
         }
         .transition(.move(edge: .bottom).combined(with: .opacity))
       }
+      let emojis = viewModel.emojiSuggestions
+      if !emojis.isEmpty {
+        EmojiSuggestions(suggestions: emojis) { emoji in
+          viewModel.pickEmoji(emoji)
+          isFocused = true
+        }
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+      }
       let suggestions = viewModel.mentionSuggestions
       if !suggestions.isEmpty {
         MentionSuggestions(members: suggestions, viewModel: viewModel) { member in
@@ -75,6 +83,7 @@ struct ComposerView: View {
     }
     .animation(.spring(response: 0.3, dampingFraction: 0.85), value: viewModel.mentionSuggestions)
     .animation(.spring(response: 0.3, dampingFraction: 0.85), value: viewModel.commandSuggestions)
+    .animation(.spring(response: 0.3, dampingFraction: 0.85), value: viewModel.emojiSuggestions)
     .onChange(of: viewModel.composerMode) { _, mode in
       if mode != .new { isFocused = true }
     }
