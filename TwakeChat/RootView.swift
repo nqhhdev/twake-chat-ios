@@ -60,6 +60,7 @@ final class RootCoordinator {
   @ObservationIgnored private let people: (any PeopleRepository)?
   /// Meet calls of the account (#92).
   @ObservationIgnored let meetCalls: (any MeetCallRepository)?
+  @ObservationIgnored private let gifs: (any GifRepository)?
   /// Push notifications of the signed-in account.
   @ObservationIgnored let push: PushCenter
   /// Pauses sync in the background and resumes it on return.
@@ -111,13 +112,16 @@ final class RootCoordinator {
     accountSettings: (any AccountSettingsRepository)? = nil,
     deviceUnlock: DeviceUnlocker? = nil,
     people: (any PeopleRepository)? = nil, push: (any PushRepository)? = nil,
+    notificationActions: (any NotificationActionRepository)? = nil,
     verification: (any VerificationRepository)? = nil, devices: (any DevicesRepository)? = nil,
     chatDisplay: (any ChatDisplaySettingsStore)? = nil, appLock: AppLock? = nil,
     sync: (any SyncLifecycle)? = nil, sessionExpiry: (any SessionExpiry)? = nil,
     meetCalls: (any MeetCallRepository)? = nil,
+    gifs: (any GifRepository)? = nil,
     signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator
   ) {
-    let pushCenter = PushCenter(repository: push)
+    self.gifs = gifs
+    let pushCenter = PushCenter(repository: push, actions: notificationActions)
     self.sessionExpiry = sessionExpiry
     self.push = pushCenter
     self.lifecycle = AppLifecycle(sync: sync, push: pushCenter)
@@ -146,6 +150,7 @@ final class RootCoordinator {
     self.signInConfiguration = signInConfiguration
     self.webAuthenticator = webAuthenticator
     self.links = LinkRouter(rooms: roomLinks, openDirectChat: openDirectChat())
+    pushCenter.startSession = { [weak self] in await self?.start() }
   }
 
   /// The chat list of the current signed-in state, kept so the screen keeps its state while it is shown.
@@ -164,6 +169,7 @@ final class RootCoordinator {
       people: people,
       openPerson: openDirectChat(),
       previewTimeline: { [makeTimeline] roomId in makeTimeline(roomId, nil) },
+      presence: presenceLookup(),
       logOut: { [weak signedIn, push, shareSuggestions] in
         guard let signedIn else { return false }
         await push.stop()
@@ -176,6 +182,11 @@ final class RootCoordinator {
       viewModel.map { RoomSummary.appBadge(for: $0.allJoinedRooms) } ?? 0
     }
     return viewModel
+  }
+
+  private func presenceLookup() -> (@Sendable (String) async -> Presence?)? {
+    guard let roomDetails else { return nil }
+    return { userId in await roomDetails.presence(of: userId) }
   }
 
   /// A room's screen model on its own timeline; the shell keeps the open one and closes it through `onLeft`.
@@ -196,7 +207,7 @@ final class RootCoordinator {
       checkSession: sessionCheck(), display: displaySettings(), blocking: blocking(),
       saved: savedMessages,
       threadTimeline: { [makeThreadTimeline] root in makeThreadTimeline(summary.id, root) },
-      threadPrefs: threadPrefs, scrollMemory: scrollMemory)
+      threadPrefs: threadPrefs, scrollMemory: scrollMemory, gifs: gifs)
     shareSuggestions.follow(room)
     return room
   }
@@ -350,6 +361,7 @@ final class RootCoordinator {
       await signedIn.logOut()
       return signedIn.errorMessage == nil
     }
+    viewModel.personalQR.openLink = { [weak self] url in _ = self?.links.handle(url) }
     settings = (signedIn, viewModel)
     return viewModel
   }

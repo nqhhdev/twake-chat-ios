@@ -2,20 +2,13 @@ import Domain
 import Foundation
 import MatrixRustSDK
 
-/// `NotificationContentRepository` on the SDK's notification client (ADR 0009): restores the saved session in the
-/// extension's process on the shared store with its own cross-process lock name (ADR 0007), then asks the notification
-/// client for the event, which fetches and decrypts it. Nothing here logs: the content is the user's message.
 public actor NotificationContentProxy: NotificationContentRepository {
   private let authentication: MatrixAuthenticationRepository
 
-  /// - Parameter authentication: Built on the shared store and Keychain group with the lock holder name `"nse"`.
   public init(authentication: MatrixAuthenticationRepository) {
     self.authentication = authentication
   }
 
-  /// The pauses before each further try when the event could not be read yet. The room key of a new message often
-  /// arrives a moment after its push (twake-on-matrix PR #2982, #3514), and the SDK fetches it in the background, so
-  /// asking again a little later is what gets the text. Three tries stay well inside the extension's 30 seconds.
   static let retryPauses: [Duration] = [.seconds(1), .seconds(2)]
 
   public func content(roomId: String, eventId: String) async -> NotificationOutcome {
@@ -23,18 +16,45 @@ public actor NotificationContentProxy: NotificationContentRepository {
       let client = await authentication.clientProxy?.client,
       let notifications = try? await client.notificationClient(processSetup: .multipleProcesses)
     else { return .generic }
+    let ownUserId = try? client.userId()
     var pauses = Self.retryPauses[...]
     while true {
       let status = try? await notifications.getNotification(roomId: roomId, eventId: eventId)
-      let outcome = Self.outcome(of: status)
       guard Self.isWorthRetrying(status), let pause = pauses.popFirst(), !Task.isCancelled else {
-        return outcome
+        let outcome = Self.outcome(of: status, ownUserId: ownUserId)
+        return await Self.withAvatars(outcome, of: status, client: client)
       }
       try? await Task.sleep(for: pause)
     }
   }
 
-  /// Whether a later try may read more: the request failed, the event is not known yet, or it is still encrypted.
+  static let avatarSize: UInt64 = 96
+  static let avatarTimeout: Duration = .seconds(3)
+
+  private static func withAvatars(
+    _ outcome: NotificationOutcome, of status: NotificationStatus?, client: Client
+  ) async -> NotificationOutcome {
+    guard case .show(var content) = outcome, case .event(let item)? = status else {
+      return outcome
+    }
+    let roomURL = content.isDirect ? nil : item.roomInfo.avatarUrl
+    async let sender = avatar(item.senderInfo.avatarUrl, client: client)
+    async let room = avatar(roomURL, client: client)
+    content.senderAvatar = await sender
+    content.roomAvatar = await room
+    return .show(content)
+  }
+
+  private static func avatar(_ url: String?, client: Client) async -> Data? {
+    guard let url, !url.isEmpty, let source = try? MediaSource.fromUrl(url: url) else {
+      return nil
+    }
+    return try? await withTimeout(avatarTimeout) {
+      try await client.getMediaThumbnail(
+        mediaSource: source, width: avatarSize, height: avatarSize)
+    }
+  }
+
   static func isWorthRetrying(_ status: NotificationStatus?) -> Bool {
     switch status {
     case nil, .eventNotFound: return true
@@ -46,8 +66,9 @@ public actor NotificationContentProxy: NotificationContentRepository {
     }
   }
 
-  /// What the notification shows for the SDK's answer; the generic text when there is none.
-  static func outcome(of status: NotificationStatus?) -> NotificationOutcome {
+  static func outcome(of status: NotificationStatus?, ownUserId: String? = nil)
+    -> NotificationOutcome
+  {
     guard let status else { return .generic }
     guard case .event(let item) = status else {
       return Self.outcome(withoutEvent: status) ?? .generic
@@ -57,22 +78,22 @@ public actor NotificationContentProxy: NotificationContentRepository {
     case .invite(let senderId):
       return .show(
         Self.content(
-          sender: sender ?? senderId, room: item.roomInfo.displayName,
+          senderId: senderId, sender: sender ?? senderId, room: item.roomInfo.displayName,
           isDirect: item.roomInfo.isDirect, body: "Invited you to chat"))
     case .timeline(let event):
+      let senderId = event.senderId()
+      if Self.isOwn(senderId: senderId, ownUserId: ownUserId) { return .hide }
       guard case .messageLike(let content)? = try? event.content() else { return .generic }
       if Self.isSilent(content, rawEvent: item.rawEvent) { return .hide }
       guard let body = Self.body(of: content) else { return .generic }
       return .show(
         Self.content(
-          sender: sender ?? event.senderId(), room: item.roomInfo.displayName,
-          isDirect: item.roomInfo.isDirect, body: body))
+          senderId: senderId, sender: sender ?? senderId, room: item.roomInfo.displayName,
+          isDirect: item.roomInfo.isDirect, body: body,
+          threadId: Self.threadId(item.threadId, rawEvent: item.rawEvent), isMessage: true))
     }
   }
 
-  /// A status without an event: hidden when the SDK says the event must not notify (the user's push rules, an ignored
-  /// sender) or was deleted; the generic text when it was not found, as for any other failure (ADR 0009). `nil` for a
-  /// found event, which `content(roomId:eventId:)` reads.
   static func outcome(withoutEvent status: NotificationStatus) -> NotificationOutcome? {
     switch status {
     case .event: nil
@@ -81,8 +102,6 @@ public actor NotificationContentProxy: NotificationContentRepository {
     }
   }
 
-  /// Events that never notify: a reaction, a redaction, and an edit of an earlier message (`m.replace`), which the
-  /// homeserver may still push in an encrypted room.
   static func isSilent(_ content: MessageLikeEventContent, rawEvent: String) -> Bool {
     switch content {
     case .reactionContent, .roomRedaction: true
@@ -91,28 +110,42 @@ public actor NotificationContentProxy: NotificationContentRepository {
     }
   }
 
-  /// Whether the event's JSON relates it to an earlier event as a replacement. The relation stays in clear in an
-  /// encrypted event, so this holds whether or not the SDK hands back the decrypted JSON.
   static func isEdit(rawEvent: String) -> Bool {
+    relation(rawEvent: rawEvent)?["rel_type"] as? String == "m.replace"
+  }
+
+  static func isOwn(senderId: String, ownUserId: String?) -> Bool {
+    guard let ownUserId, !ownUserId.isEmpty else { return false }
+    return senderId == ownUserId
+  }
+
+  static func threadId(_ sdkThreadId: String?, rawEvent: String) -> String? {
+    if let sdkThreadId, !sdkThreadId.isEmpty { return sdkThreadId }
+    guard let relation = relation(rawEvent: rawEvent),
+      relation["rel_type"] as? String == "m.thread",
+      let root = relation["event_id"] as? String, !root.isEmpty
+    else { return nil }
+    return root
+  }
+
+  private static func relation(rawEvent: String) -> [String: Any]? {
     guard
       let event = try? JSONSerialization.jsonObject(with: Data(rawEvent.utf8)) as? [String: Any],
-      let content = event["content"] as? [String: Any],
-      let relation = content["m.relates_to"] as? [String: Any]
-    else { return false }
-    return relation["rel_type"] as? String == "m.replace"
+      let content = event["content"] as? [String: Any]
+    else { return nil }
+    return content["m.relates_to"] as? [String: Any]
   }
 
-  /// A direct chat is titled with the sender, as Messages does; a group with the room, and the sender below.
-  static func content(sender: String, room: String, isDirect: Bool, body: String)
-    -> NotificationContent
-  {
-    isDirect
-      ? NotificationContent(title: sender, subtitle: "", body: body)
-      : NotificationContent(title: room, subtitle: sender, body: body)
+  static func content(
+    senderId: String = "", sender: String, room: String, isDirect: Bool, body: String,
+    threadId: String? = nil, isMessage: Bool = false
+  ) -> NotificationContent {
+    NotificationContent(
+      title: isDirect ? sender : room, subtitle: isDirect ? "" : sender, body: body,
+      senderId: senderId, senderName: sender, roomName: room, isDirect: isDirect,
+      threadId: threadId, isMessage: isMessage)
   }
 
-  /// The text of a message, or a short description of what was sent; `nil` for what does not notify (or could not be
-  /// decrypted), so the generic text stays.
   static func body(of content: MessageLikeEventContent) -> String? {
     switch content {
     case .roomMessage(let type, _): body(of: type)

@@ -18,10 +18,12 @@
 	<string>$(TWAKE_PUSH_GATEWAY_URL)</string>
 	<key>PrivacyURL</key>
 	<string>$(TWAKE_PRIVACY_URL)</string>
+	<key>TwakeProxyURL</key>
+	<string>$(TWAKE_PROXY_URL)</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Twake Chat uses Face ID to unlock the app when App Lock is on.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Twake Chat uses the camera to take pictures and videos you send in a chat.</string>
+	<string>Twake Chat uses the camera to take pictures and videos you send in a chat, and to scan QR codes.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Twake Chat records voice messages with the microphone while you hold the record button.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

@@ -18,6 +18,7 @@ public final class SettingsViewModel {
   @ObservationIgnored public let verification: VerificationViewModel?
   /// The account's sessions; `nil` hides them.
   @ObservationIgnored public let devices: DevicesViewModel?
+  @ObservationIgnored public let personalQR: PersonalQRViewModel
   public private(set) var recoveryStatus: RecoveryStatus = .unknown
   public private(set) var directMode: NotificationMode = .allMessages
   public private(set) var groupMode: NotificationMode = .allMessages
@@ -53,6 +54,7 @@ public final class SettingsViewModel {
     self.verification = verification
     self.devices = devices
     self.userId = userId
+    self.personalQR = PersonalQRViewModel(userId: userId)
     self.displayName = Self.localpart(of: userId)
     self.repository = repository
     self.media = media

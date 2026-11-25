@@ -1,36 +1,35 @@
+import AppShared
 import Domain
 import Observation
 import SwiftUI
 import UIKit
 import UserNotifications
 
-/// Push notifications for the signed-in account: asks permission once the user is signed in, hands Apple's device token
-/// to the homeserver (`PushRepository`), shows notifications while the app is open, and remembers the room a tapped
-/// notification is about so the shell opens it. Without a repository (tests), it does nothing.
 @MainActor @Observable
 final class PushCenter {
-  /// A room the shell should open: a tapped notification's, or a direct chat started from a member's profile. The
-  /// shell clears it once open.
   var pendingRoomId: String?
-  /// The notification's title (the room or sender name), used until the room list knows the room.
   var pendingRoomName: String?
-  /// Someone the user wants to write to and has no direct chat with yet: the shell shows the draft chat, and the
-  /// first message creates the chat. The shell clears it once shown.
+  var pendingThreadId: String?
   var pendingDraftUserId: String?
-  /// The chat on screen: its notifications are not shown as banners, and opening it clears them.
   @ObservationIgnored var openRoomId: String? {
     didSet { if let openRoomId { clearNotifications(roomId: openRoomId) } }
   }
   @ObservationIgnored private var didRegister = false
-  /// Whether the user allowed notifications; `nil` until asked.
   private(set) var isAllowed: Bool?
 
   @ObservationIgnored private let repository: (any PushRepository)?
+  @ObservationIgnored private let actions: (any NotificationActionRepository)?
+  @ObservationIgnored var startSession: (@MainActor () async -> Void)?
+  @ObservationIgnored private let replyFailed: @MainActor (NotificationAction) async -> Void
   @ObservationIgnored private let requestAuthorization: @MainActor () async -> Bool
   @ObservationIgnored private let registerForRemoteNotifications: @MainActor () -> Void
 
   init(
     repository: (any PushRepository)?,
+    actions: (any NotificationActionRepository)? = nil,
+    replyFailed: @escaping @MainActor (NotificationAction) async -> Void = {
+      await NotificationAction.postReplyFailure($0)
+    },
     requestAuthorization: @escaping @MainActor () async -> Bool = {
       (try? await UNUserNotificationCenter.current().requestAuthorization(options: [
         .alert, .badge, .sound,
@@ -41,11 +40,12 @@ final class PushCenter {
     }
   ) {
     self.repository = repository
+    self.actions = actions
+    self.replyFailed = replyFailed
     self.requestAuthorization = requestAuthorization
     self.registerForRemoteNotifications = registerForRemoteNotifications
   }
 
-  /// Asks permission (iOS asks the user only once) and, when allowed, asks Apple for a device token.
   func start() async {
     guard repository != nil else { return }
     let allowed = await requestAuthorization()
@@ -56,13 +56,11 @@ final class PushCenter {
     }
   }
 
-  /// Asks Apple for the device token again when the app comes back, so a changed token reaches the homeserver.
   func refreshToken() async {
     guard repository != nil, didRegister else { return }
     registerForRemoteNotifications()
   }
 
-  /// Removes the delivered notifications of a chat once the user sees it.
   func clearNotifications(roomId: String) {
     Task {
       let center = UNUserNotificationCenter.current()
@@ -74,26 +72,112 @@ final class PushCenter {
     }
   }
 
-  /// Whether a notification about `roomId` shows while the app is open: not for the chat on screen.
   func showsBanner(forRoom roomId: String?) -> Bool {
     roomId == nil || roomId != openRoomId
   }
 
-  /// Apple gave a device token: register it with the homeserver, for the APNs server the app is signed for.
   func didReceive(deviceToken: Data) async {
     try? await repository?.register(
       deviceToken: deviceToken, isProduction: ApnsEnvironment.isProduction())
   }
 
-  /// Stops pushing to this device, before logging out.
   func stop() async {
     await repository?.unregister()
   }
+
+  func handle(_ action: NotificationAction) async {
+    switch action.kind {
+    case .open:
+      pendingThreadId = action.threadId
+      if !action.title.isEmpty { pendingRoomName = action.title }
+      pendingRoomId = action.roomId
+    case .reply(let text):
+      await startSession?()
+      do {
+        guard let actions else { throw NotificationActionError.notSignedIn }
+        try await actions.reply(
+          text: text, roomId: action.roomId, threadId: action.threadId,
+          eventId: action.eventId ?? "")
+        clearNotifications(roomId: action.roomId)
+      } catch {
+        await replyFailed(action)
+      }
+    case .markAsRead:
+      await startSession?()
+      do {
+        try await actions?.markAsRead(roomId: action.roomId)
+        clearNotifications(roomId: action.roomId)
+      } catch {}
+    }
+  }
 }
 
-/// UIKit's push callbacks, forwarded to the app's `PushCenter`.
+struct NotificationAction: Sendable, Equatable {
+  enum Kind: Sendable, Equatable {
+    case open
+    case reply(String)
+    case markAsRead
+  }
+
+  let kind: Kind
+  let roomId: String
+  let eventId: String?
+  let threadId: String?
+  let title: String
+
+  init?(
+    actionIdentifier: String, userText: String?, userInfo: [AnyHashable: Any], title: String
+  ) {
+    guard let roomId = PushPayload.roomId(in: userInfo) else { return nil }
+    switch actionIdentifier {
+    case PushPayload.replyAction:
+      guard let text = userText?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty
+      else { return nil }
+      kind = .reply(text)
+    case PushPayload.markAsReadAction:
+      kind = .markAsRead
+    case UNNotificationDefaultActionIdentifier:
+      kind = .open
+    default:
+      return nil
+    }
+    self.roomId = roomId
+    eventId = PushPayload.eventId(in: userInfo)
+    threadId = PushPayload.threadId(in: userInfo)
+    self.title = title
+  }
+
+  static var categories: Set<UNNotificationCategory> {
+    let reply = UNTextInputNotificationAction(
+      identifier: PushPayload.replyAction, title: "Reply", options: [],
+      textInputButtonTitle: "Send", textInputPlaceholder: "Message")
+    let markAsRead = UNNotificationAction(
+      identifier: PushPayload.markAsReadAction, title: "Mark as read", options: [])
+    return [
+      UNNotificationCategory(
+        identifier: PushPayload.messageCategory, actions: [reply, markAsRead],
+        intentIdentifiers: [], options: [])
+    ]
+  }
+
+  static func replyFailureContent(for action: NotificationAction) -> UNMutableNotificationContent {
+    let content = UNMutableNotificationContent()
+    content.title = action.title
+    content.body = "Your reply was not sent. Open the chat to try again."
+    content.threadIdentifier = action.roomId
+    content.userInfo = [PushPayload.roomIdKey: action.roomId]
+    if let threadId = action.threadId { content.userInfo[PushPayload.threadIdKey] = threadId }
+    return content
+  }
+
+  static func postReplyFailure(_ action: NotificationAction) async {
+    let request = UNNotificationRequest(
+      identifier: UUID().uuidString, content: replyFailureContent(for: action), trigger: nil)
+    try? await UNUserNotificationCenter.current().add(request)
+  }
+}
+
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
-  /// Set by the app at launch.
   @MainActor static var push: PushCenter?
 
   func application(
@@ -101,6 +185,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
     UNUserNotificationCenter.current().delegate = self
+    UNUserNotificationCenter.current().setNotificationCategories(NotificationAction.categories)
     return true
   }
 
@@ -113,14 +198,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
   func application(
     _ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: any Error
   ) {
-    // No token, no push: the app still works and asks again at the next launch.
   }
 
-  /// Notifications show as banners while the app is open, as Messages does.
   nonisolated func userNotificationCenter(
     _ center: UNUserNotificationCenter, willPresent notification: UNNotification
   ) async -> UNNotificationPresentationOptions {
-    let roomId = notification.request.content.userInfo["room_id"] as? String
+    let roomId = PushPayload.roomId(in: notification.request.content.userInfo)
     let shows = await MainActor.run {
       NotificationCenter.default.post(name: .encryptionKeysImported, object: nil)
       return Self.push?.showsBanner(forRoom: roomId) ?? true
@@ -128,24 +211,22 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     return shows ? [.banner, .list, .sound, .badge] : []
   }
 
-  /// A tap on a notification opens its room.
   nonisolated func userNotificationCenter(
     _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
   ) async {
     let content = response.notification.request.content
-    let roomId = content.userInfo["room_id"] as? String
-    let title = content.title
-    await MainActor.run {
-      Self.push?.pendingRoomId = roomId
-      if !title.isEmpty { Self.push?.pendingRoomName = title }
-    }
+    guard
+      let action = NotificationAction(
+        actionIdentifier: response.actionIdentifier,
+        userText: (response as? UNTextInputNotificationResponse)?.userText,
+        userInfo: content.userInfo, title: content.title)
+    else { return }
+    let push = await Self.push
+    await push?.handle(action)
   }
 }
 
-/// Which APNs server gave the device token. The signing profile decides, not the build configuration: a Release build
-/// installed from Xcode is signed for development and gets a sandbox token, which the production server refuses.
 enum ApnsEnvironment {
-  /// The profile Xcode embeds in a development, ad hoc or enterprise build. An App Store or TestFlight build has none.
   static var embeddedProfile: Data? {
     Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision").flatMap {
       try? Data(contentsOf: $0)
@@ -160,15 +241,11 @@ enum ApnsEnvironment {
     #endif
   }
 
-  /// Production unless the profile says `aps-environment` is `development`. No profile (App Store, TestFlight) is
-  /// production, and so is a profile without the key.
   static func isProduction(profile: Data? = embeddedProfile, isSimulator: Bool = isSimulator)
     -> Bool
   {
-    // A simulator has no profile and gets its token from the sandbox.
     if isSimulator { return false }
     guard let profile else { return true }
-    // The profile is a signed envelope around a property list; the list itself is plain text.
     let text = String(decoding: profile, as: UTF8.self)
     guard let key = text.range(of: "<key>aps-environment</key>"),
       let open = text.range(of: "<string>", range: key.upperBound..<text.endIndex),

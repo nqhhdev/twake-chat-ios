@@ -3,10 +3,6 @@ import Testing
 
 @testable import MatrixData
 
-/// Which pushes show nothing: edits, reactions, redactions, and what the SDK filters out or finds deleted; a failure
-/// keeps the generic text (ADR 0009). The SDK values are implicit enum members, so this file does not import the SDK
-/// (ADR 0006, scripts/check-architecture.sh rule 1). A `.roomMessage` needs the SDK's struct initializers, which this
-/// bundle does not link, so the edit check is tested on the event's JSON, the input `isSilent` hands it.
 struct NotificationFilteringTests {
   @Test func aPlainMessageIsNotAnEdit() {
     let raw = #"{"type":"m.room.message","content":{"msgtype":"m.text","body":"Hi"}}"#
@@ -63,5 +59,34 @@ struct NotificationFilteringTests {
 
   @Test func anEventNotFoundKeepsTheGenericText() {
     #expect(NotificationContentProxy.outcome(withoutEvent: .eventNotFound) == .generic)
+  }
+
+  @Test func ownMessagesShowNothing() {
+    #expect(NotificationContentProxy.isOwn(senderId: "@me:b", ownUserId: "@me:b"))
+    #expect(!NotificationContentProxy.isOwn(senderId: "@alice:b", ownUserId: "@me:b"))
+    #expect(!NotificationContentProxy.isOwn(senderId: "@me:b", ownUserId: nil))
+    #expect(!NotificationContentProxy.isOwn(senderId: "", ownUserId: ""))
+  }
+
+  @Test func theSdkThreadIdWins() {
+    let raw = #"{"content":{"m.relates_to":{"rel_type":"m.thread","event_id":"$other"}}}"#
+    #expect(NotificationContentProxy.threadId("$root", rawEvent: raw) == "$root")
+  }
+
+  @Test func theThreadIdIsReadFromTheClearRelation() {
+    let raw = """
+      {"type":"m.room.encrypted","content":{"ciphertext":"…",\
+      "m.relates_to":{"rel_type":"m.thread","event_id":"$root"}}}
+      """
+    #expect(NotificationContentProxy.threadId(nil, rawEvent: raw) == "$root")
+    #expect(NotificationContentProxy.threadId("", rawEvent: raw) == "$root")
+  }
+
+  @Test func aReplyOrAnEditHasNoThread() {
+    let reply = #"{"content":{"m.relates_to":{"m.in_reply_to":{"event_id":"$a"}}}}"#
+    let edit = #"{"content":{"m.relates_to":{"rel_type":"m.replace","event_id":"$a"}}}"#
+    #expect(NotificationContentProxy.threadId(nil, rawEvent: reply) == nil)
+    #expect(NotificationContentProxy.threadId(nil, rawEvent: edit) == nil)
+    #expect(NotificationContentProxy.threadId(nil, rawEvent: "") == nil)
   }
 }

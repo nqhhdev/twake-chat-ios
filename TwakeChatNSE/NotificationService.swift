@@ -4,12 +4,6 @@ import Foundation
 import MatrixData
 @preconcurrency import UserNotifications
 
-/// The Notification Service Extension (ADR 0009, container "Notification Service Extension"): APNs starts it for each
-/// push the gateway sends with only a room id and an event id. It opens the app's session store from the App Group and
-/// the shared Keychain group (ADR 0007), asks the SDK to fetch and decrypt the event, and rewrites the notification with
-/// the sender and the text. If that fails or time runs out, the generic text from the push stays, never ciphertext.
-/// An event that does not notify (an edit, a reaction, a redaction, one the push rules filter out) shows nothing. The app icon badge takes the push's `unread_count` when it has one. Nothing here logs: the
-/// content is the user's message.
 final class NotificationService: UNNotificationServiceExtension, @unchecked Sendable {
   private let lock = NSLock()
   private var deliver: ((UNNotificationContent) -> Void)?
@@ -24,32 +18,36 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
       return
     }
     let userInfo = request.content.userInfo
-    // The homeserver's count, fresh with every push, including chats read on another device. Without one, the badge
-    // stays as it is.
     let unreadCount = PushPayload.unreadCount(in: userInfo)
     if let unreadCount { content.badge = NSNumber(value: unreadCount) }
     lock.withLock {
       deliver = contentHandler
       pending = content
     }
-    guard let roomId = userInfo["room_id"] as? String, let eventId = userInfo["event_id"] as? String,
+    guard let roomId = PushPayload.roomId(in: userInfo),
+      let eventId = PushPayload.eventId(in: userInfo),
       let repository = Self.makeRepository()
     else {
       finish()
       return
     }
     content.threadIdentifier = roomId
+    content.categoryIdentifier = PushPayload.messageCategory
     Task {
       switch await repository.content(roomId: roomId, eventId: eventId) {
       case .show(let found):
-        lock.withLock {
-          pending?.title = found.title
-          pending?.subtitle = found.subtitle
-          pending?.body = found.body
+        let shown = lock.withLock { () -> UNMutableNotificationContent? in
+          guard let pending else { return nil }
+          Self.apply(found, to: pending)
+          return pending.mutableCopy() as? UNMutableNotificationContent
+        }
+        if let shown,
+          let updated = await CommunicationNotification.content(
+            shown, intent: CommunicationNotification.intent(for: found, roomId: roomId))
+        {
+          lock.withLock { if pending != nil { pending = updated } }
         }
       case .hide:
-        // An empty content has nothing to show, so the system shows no notification for this push; the badge still
-        // follows the count.
         let empty = UNMutableNotificationContent()
         if let unreadCount { empty.badge = NSNumber(value: unreadCount) }
         lock.withLock { pending = empty }
@@ -60,12 +58,19 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
     }
   }
 
-  /// The system is about to stop the extension: show what is ready, the generic text if nothing more.
+  private static func apply(_ found: NotificationContent, to content: UNMutableNotificationContent)
+  {
+    content.title = found.title
+    content.subtitle = found.subtitle
+    content.body = found.body
+    content.categoryIdentifier = found.isMessage ? PushPayload.messageCategory : ""
+    if let threadId = found.threadId { content.userInfo[PushPayload.threadIdKey] = threadId }
+  }
+
   override func serviceExtensionTimeWillExpire() {
     finish()
   }
 
-  /// Delivers the content once.
   private func finish() {
     let (deliver, content) = lock.withLock {
       defer {
@@ -77,7 +82,6 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
     if let deliver, let content { deliver(content) }
   }
 
-  /// The SDK on the app's store, in this process, under the lock name "nse" (ADR 0007).
   private static func makeRepository() -> NotificationContentProxy? {
     MatrixPlatform.setUp()
     guard let storeDirectory = AppGroupContainer().sdkStoreDirectory(),

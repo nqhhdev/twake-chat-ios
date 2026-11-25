@@ -39,6 +39,11 @@ public actor RoomListProxy: RoomListRepository {
       var summaries: [RoomSummary] = []
       var askedPreviews: Set<String> = []
       var typing = RoomListTyping(client: client, events: updatesContinuation)
+      let spaceService = await client.client.spaceService()
+      let spaceHandle = await spaceService.subscribeToSpaceFilters(
+        listener: SpaceFiltersListener(updatesContinuation))
+      updatesContinuation.yield(.spaces)
+      var spaceTree: [String: [String]] = [:]
       for await event in updates {
         guard !Task.isCancelled else { continue }
         switch event {
@@ -58,9 +63,15 @@ public actor RoomListProxy: RoomListRepository {
           }
         case .typing(let roomId, let names):
           typing.names[roomId] = names
+        case .spaces:
+          spaceTree = SpaceGraph.descendants(
+            await spaceService.spaceFilters().map {
+              SpaceNode(id: $0.spaceRoom.roomId, children: $0.descendants)
+            })
         }
-        roomsContinuation.yield(typing.applied(to: summaries))
+        roomsContinuation.yield(Self.withSpaces(spaceTree, typing.applied(to: summaries)))
       }
+      spaceHandle.cancel()
       typing.stopAll()
       roomsContinuation.finish()
       withExtendedLifetime(client) {}
@@ -87,6 +98,15 @@ public actor RoomListProxy: RoomListRepository {
       client: client, kept: objects.id, updates: updatesContinuation, applying: applying)
     roomsContinuation.onTermination = { _ in updatesContinuation.finish() }
     return rooms
+  }
+
+  static func withSpaces(_ tree: [String: [String]], _ rooms: [RoomSummary]) -> [RoomSummary] {
+    rooms.map { room in
+      guard room.isSpace else { return room }
+      var room = room
+      room.spaceDescendantIds = tree[room.id] ?? []
+      return room
+    }
   }
 
   /// The most rooms asked for a preview in one pass and over the life of a list, so an account full of empty rooms
@@ -220,6 +240,7 @@ public actor RoomListProxy: RoomListRepository {
 enum RoomListEvent {
   case entries([RoomListEntriesUpdate])
   case typing(roomId: String, names: [String])
+  case spaces
 }
 
 /// Who types in each joined room of the list, for its row (Flutter `chat_list_item_title.dart`, web `RoomList.tsx`).
@@ -276,6 +297,18 @@ struct RoomListTyping {
     for handle in handles.values { handle.cancel() }
     handles = [:]
     names = [:]
+  }
+}
+
+private final class SpaceFiltersListener: SpaceServiceSpaceFiltersListener {
+  private let updates: AsyncStream<RoomListEvent>.Continuation
+
+  init(_ updates: AsyncStream<RoomListEvent>.Continuation) {
+    self.updates = updates
+  }
+
+  func onUpdate(filterUpdates: [SpaceFilterUpdate]) {
+    updates.yield(.spaces)
   }
 }
 

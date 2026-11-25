@@ -21,8 +21,9 @@ status: stable
 | [architecture/containers/notification-service-extension.md](architecture/containers/notification-service-extension.md) | Container | C4 level 2 - the separate process that fetches and decrypts a pushed event and rewrites the notification. | [c4, container, push, e2ee] |
 | [architecture/containers/share-extension.md](architecture/containers/share-extension.md) | Container | C4 level 2 - the system share sheet entry that hands what another app shares to the app. | [c4, container, share] |
 | [architecture/context.md](architecture/context.md) | System Context | C4 level 1 - what this app is, who uses it, and which external systems it depends on. | [c4, context, ios] |
-| [backlog/deferred-features.md](backlog/deferred-features.md) | Task | Flutter features ADR 0011 left out of v1, and which of them the code has built since. | [roadmap, scope] |
+| [backlog/deferred-features.md](backlog/deferred-features.md) | Task | Replaced by the Parity Matrix: ADR 0011's deferred list is no longer kept here. | [roadmap, scope] |
 | [backlog/open-verifications.md](backlog/open-verifications.md) | Task | Assumptions in this knowledge base that nobody has confirmed yet. | [verification] |
+| [backlog/parity-matrix.md](backlog/parity-matrix.md) | Task | Every user-facing feature of twake-on-matrix and twake-space-chat, its iOS state with file evidence, the server it needs and the issue that tracks it. | [roadmap, scope, parity, server] |
 | [engineering/constraints.md](engineering/constraints.md) | Constraint | Every rule the code must keep, what enforces it, and the page that owns the reasoning - re-check before you finish. | [rules, review] |
 | [engineering/conventions/naming.md](engineering/conventions/naming.md) | Convention | Where each kind of file lives and what it is called - one table, one row per kind. | [naming, structure] |
 | [engineering/patterns/_template-pattern.md](engineering/patterns/_template-pattern.md) | Template | Copy this when documenting how to write one more of something. | [template, pattern] |
