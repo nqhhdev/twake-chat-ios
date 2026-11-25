@@ -44,6 +44,7 @@ final class RootCoordinator {
   @ObservationIgnored private let publicRooms: (any PublicRoomsRepository)?
   /// What spaces hold.
   @ObservationIgnored private let spaces: (any SpacesRepository)?
+  @ObservationIgnored private let folders: (any FoldersRepository)?
   /// Link previews from the homeserver.
   @ObservationIgnored private let linkPreviews: (any LinkPreviewRepository)?
   /// A room's timeline, or with a kind, only that kind of message, for a chat details tab.
@@ -97,6 +98,7 @@ final class RootCoordinator {
     archive: (any ArchivedRoomsRepository)? = nil,
     publicRooms: (any PublicRoomsRepository)? = nil,
     spaces: (any SpacesRepository)? = nil,
+    folders: (any FoldersRepository)? = nil,
     linkPreviews: (any LinkPreviewRepository)? = nil,
     makeTimeline: @escaping (String, RoomContentKind?) -> any TimelineRepository = { _, _ in
       UnavailableTimeline()
@@ -139,6 +141,7 @@ final class RootCoordinator {
     self.archive = archive
     self.publicRooms = publicRooms
     self.spaces = spaces
+    self.folders = folders
     self.linkPreviews = linkPreviews
     self.makeTimeline = makeTimeline
     self.makeThreadTimeline = makeThreadTimeline
@@ -175,6 +178,7 @@ final class RootCoordinator {
       openPerson: openDirectChat(),
       previewTimeline: { [makeTimeline] roomId in makeTimeline(roomId, nil) },
       presence: presenceLookup(),
+      folders: folders,
       logOut: { [weak signedIn, push, shareSuggestions] in
         guard let signedIn else { return false }
         await push.stop()

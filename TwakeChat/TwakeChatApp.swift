@@ -60,6 +60,7 @@ struct TwakeChatApp: App {
         repository: repository, roomList: roomList, archive: roomList,
         publicRooms: PublicRoomsProxy(authentication: repository),
         spaces: SpacesProxy(authentication: repository),
+        folders: FoldersProxy(authentication: repository),
         linkPreviews: LinkPreviewProxy(authentication: repository),
         makeTimeline: { TimelineProxy(roomId: $0, authentication: repository, only: $1) },
         makeThreadTimeline: {

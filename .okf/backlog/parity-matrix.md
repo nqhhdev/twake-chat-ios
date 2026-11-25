@@ -36,13 +36,13 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Rooms by activity, unread, invitations accept and decline | `chat_list`, `invitation_selection` | Phase 2, 3 | Built: `ChatList/ChatListScreen.swift`, `ChatListViewModel.swift` | Matrix | — |
 | Filters, favourites, low priority, swipe and multiple selection | `chat_list/room_list_filter`, `slidable_chat_list_item` | Phase 2b, 11 | Built: `ChatListScreen.swift` | Matrix | — |
 | Draft on the row, mark all read, offline banner, quick switcher | `chat_draft` | Phase 2b, 11 | Built: `ChatListViewModel.swift`, `MarkAllRead.swift`, `Connectivity.swift`, `QuickSwitcher.swift` | Matrix | — |
-| Preview a chat on long press | — | — | Built: `ChatList/ChatPreview.swift` (#154) | Matrix | #132 |
+| Preview a chat on long press | — | — | Built: `ChatList/ChatPreview.swift` (#154); Open in its menu; a tap on the preview does not open the chat (SwiftUI, ADR 0036) | Matrix | #132 |
 | Typing on the row, presence dot, room kind badge, space unread | `chat_list_item_subtitle` | D182 | Built: `ChatList/ChatListScreen.swift` (`ChatListRow`), `RowPresence.swift`, `RowSpaceUnread.swift`, `Domain/Models/SpaceUnread.swift`; presence read when the row shows ([ADR 0031](../../docs/adr/0031-chat-list-row-marks.md)) | Matrix (presence: `GET /presence`, off on some servers) | #105, #136, #144, #145 |
 | Archive (web account data `app.twake.chat.archived_rooms`) | `archive` | D176 | Built: `ChatList/ArchivedChats.swift`, `Domain/Models/RoomArchive.swift` | Matrix | — |
 | Public groups: browse, join, knock | `public_rooms` | D206 | Built: `ChatList/PublicRooms.swift`, `MatrixData/Proxies/PublicRoomsProxy.swift` | Matrix | — |
 | Spaces: browse, join, mark read, new channel, `page_style` | `space_home` | Phase 3 | Built: `ChatList/Spaces.swift`, `PageStyleViews.swift`, `SpacesProxy.swift` | Matrix | — |
-| Create a space and a sub-space | route `newspace` | Phase 3 | Not built | Matrix | #177 |
-| Folders | `settings_folders`, `domain/spaces/folders.dart` | D237, D318 | Not built | Matrix (account data) | #176 |
+| Create a space and a sub-space | route `newspace` | Phase 3 | Built: `ChatList/NewSpace.swift`, `Domain/Models/NewSpace.swift`, `SpacesProxy.createSpace` ([ADR 0036](../../docs/adr/0036-spaces-and-folders-in-the-chat-list.md)) | Matrix | #177 |
+| Folders | `settings_folders`, `domain/spaces/folders.dart` | D237, D318 | Built: `ChatList/Folders.swift`, `FolderScreens.swift`, `Domain/Models/Folder.swift`, `FoldersProxy` (ADR 0036); built-in folders keep the iOS chips | Matrix (account data) | #176 |
 | Activity: mentions, inbox, reactions to own messages | — | Phase 6, D57, D318 | Built: `ChatList/Activity.swift`, `ActivityReactionsProxy.swift` (#159) | Matrix | — |
 | Activity and push for followed threads | — | Phase 6 | Not built | Matrix | #93 |
 | Saved messages | — | Phase 11 | Built: `ChatList/SavedMessages.swift`, `Domain/Models/SavedMessages.swift` | Matrix | — |
@@ -83,7 +83,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Hardware keyboard: Return sends, Up edits | `chat_input_row_web` | Phase 2b | Built: `ComposerKeys.swift` | Device | #142 |
 | Broadcast channels (`app.twake.chat.page`) | `newfeed` (`app.twake.chat.feed`) | Phase 3, D2, D90 | Built: `Domain/Models/Broadcast.swift`; web form kept (ADR 0023) | Matrix | — |
 | Twake Assistant in rooms | — | D74, D102, D128, D212 | Not built; owner decision | Twake (Assistant) | #190 |
-| Public web page of a channel | — | D112, D178 | Not built | Twake (side service) | #189 |
+| Public web page of a channel | — | D112, D178 | Off: not built until the owner asks (ADR 0026, ADR 0036) | Twake (side service) | #189 |
 
 ## Media and files
 
