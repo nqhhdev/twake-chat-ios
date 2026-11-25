@@ -18,7 +18,7 @@ Run every command from the repository root unless a step says otherwise.
 | Build a package that also targets macOS | `cd Packages/Domain && swift build`, and the same in `Packages/AppShared` |
 | Build an iOS-only package | `DesignSystem` and `MatrixData` declare iOS only, so build them through the app scheme |
 | Format and lint | swift-format, which ships with Xcode 26 ([ADR 0014](../../docs/adr/0014-ci-github-actions-swift-format.md)); see Format and lint below |
-| CI | `.github/workflows/ci.yml` on GitHub Actions ([ADR 0014](../../docs/adr/0014-ci-github-actions-swift-format.md)); see CI below |
+| CI | `.github/workflows/ci.yml` on GitHub Actions ([ADR 0014](../../docs/adr/0014-ci-github-actions-swift-format.md), [ADR 0027](../../docs/adr/0027-ci-builds-and-tests-every-pull-request.md)); see CI below |
 | Release build and signing | Not designed; the Flutter app uses fastlane |
 
 Use any installed iOS 26 simulator: `xcrun simctl list devices available` lists them, and the `OS=` and `name=` values above are examples.
@@ -47,21 +47,37 @@ A build passes when it ends with `** BUILD SUCCEEDED **` and the log has no `war
 - No package dependency: swift-format ships with Xcode. CI runs `scripts/lint.sh` once per module; see CI below.
 
 ## CI
-`.github/workflows/ci.yml` checks format only (owner decision 2026-11-13), on every pull request and every push to
-`main`. A newer run on the same ref cancels the older one.
+`.github/workflows/ci.yml` runs on every pull request and every push to `main`. A newer run on the same ref cancels
+the older one. `main` requires every job below; keep the names stable.
 
-- Runner: the GitHub-hosted `macos-26` image. Xcode is pinned with `sudo xcode-select -s /Applications/Xcode_26.2.app`
-  (`XCODE_VERSION` in the workflow), which decides the swift-format version; the step prints `swift-format --version`.
-  To move Xcode, change that one value to a version the image lists.
-- One job per module, `format (<module>)`, run in parallel with `fail-fast: false`, so a finding names its module and
-  the others still report: `app` (`TwakeChat`), `domain`, `matrixdata`, `designsystem`, `appshared`, `features`
-  (each `Packages/<Name>`) and `scripts`. Each runs `scripts/lint.sh <path>`. A new top-level module needs a new
-  matrix entry, or CI does not check it.
+| Check | Runner | What it runs |
+|---|---|---|
+| `format (<module>)` | `ubuntu-24.04` | `scripts/lint.sh <path>` per module ([ADR 0014](../../docs/adr/0014-ci-github-actions-swift-format.md)) |
+| `architecture` | `ubuntu-24.04` | `scripts/check-architecture.sh` and the self-tests of the architecture and no-comments checks |
+| `build` | `macos-26` | `xcodebuild build` of the `TwakeChat` scheme for the pinned simulator ([ADR 0027](../../docs/adr/0027-ci-builds-and-tests-every-pull-request.md)) |
+| `unit tests` | `macos-26` | `swift test` in `Packages/Domain` and `Packages/AppShared`, then `xcodebuild test` with the `TwakeChat` test plan ([Test](test.md#in-ci)) |
+
+- Format: `swift-actions/setup-swift` installs Swift 6.2 on Ubuntu, so swift-format may be slightly older than
+  Xcode's; that deviation from ADR 0014 is accepted. One job per module, in parallel with `fail-fast: false`:
+  `app` (`TwakeChat`), `domain`, `matrixdata`, `designsystem`, `appshared`, `features` (each `Packages/<Name>`) and
+  `scripts`. A new top-level module needs a new matrix entry, or CI does not check it.
+- Build and unit tests: Xcode and the simulator are pinned once at the top of the workflow, `XCODE_VERSION`
+  (`26.6`) and `SIMULATOR_DESTINATION` (`platform=iOS Simulator,OS=26.5,name=iPhone 17`). To move them, pick a pair
+  the image lists ([runner image readme](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md)).
+  CI's Xcode is older than the one on developers' Macs (27.2), so code needing a newer SDK fails CI.
+- Both macOS jobs use `.github/actions/xcode-setup`: it selects Xcode, restores `build/SourcePackages` (keyed on the
+  `Package.resolved`, `Package.swift` and project files) and `build/DerivedData` (per job, keyed on
+  `Package.resolved`), then runs `xcodebuild -resolvePackageDependencies`. Only a green push to `main` saves
+  DerivedData. Output goes through `xcbeautify --renderer github-actions`, so errors show as annotations.
+- A build error, a warning (warnings are errors, see below) or a failing test fails the job. A failed `unit tests`
+  run uploads `build/TestResults.xcresult` as the `unit-tests-xcresult` artifact for 7 days.
 - No secrets and no signing: `permissions: contents: read`, no `secrets.*`, no `environment:`, no account or team.
-- Not in CI: the knowledge-base check, the build, `scripts/test.sh`, the iOS 18.0 deployment-target build, snapshot
-  tests, integration tests, signing and release lanes, the self-tests in `scripts/tests/`, and `Tests/` (not in
-  `scripts/lint.sh`'s default folders). Run the build and the tests locally before a pull request ([Test](test.md)).
-  Branch protection is set by the owner on GitHub.
+- Not in CI: the knowledge-base check, the iOS 18.0 deployment-target build, snapshot tests, the staging
+  integration tests (they skip, [ADR 0020](../../docs/adr/0020-opt-in-local-staging-integration-tests.md)), the E2E
+  suite (`e2e.yml`, manual only), signing and release lanes, and `Tests/` in `scripts/lint.sh`'s default folders.
+- Run the same commands locally with `-derivedDataPath build/DerivedData -clonedSourcePackagesDirPath
+  build/SourcePackages` to reproduce a CI failure; `build/` is ignored by git. Branch protection is set by the owner
+  on GitHub.
 
 ## Layout
 - `TwakeChat.xcodeproj` has one app target, `TwakeChat`, and a shared scheme of the same name. The `TwakeChat/` folder is a

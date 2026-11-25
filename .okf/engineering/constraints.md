@@ -10,7 +10,8 @@ status: draft
 A rule nobody enforces is a wish: the tool is named, or "review" is written honestly. To change a rule, write or
 supersede an [ADR](../../docs/adr/index.md) first. The package dependency rule and the Swift 6, strict concurrency and
 no-warnings rule are enforced today by the `Package.swift` files and the build settings, and by the local build and
-tests before a pull request; CI checks format only ([Build](../workflows/build.md#ci)). Every other
+tests before a pull request, and by CI's `build` and `unit tests` jobs ([Build](../workflows/build.md#ci),
+[ADR 0027](../../docs/adr/0027-ci-builds-and-tests-every-pull-request.md)). Every other
 "Enforced by" below is still the plan until the code it checks exists. `scripts/check-architecture.sh` runs first in
 `scripts/test.sh` and fails, naming the rule and its ADR, on any break of the rules it lists.
 
@@ -21,7 +22,7 @@ tests before a pull request; CI checks format only ([Build](../workflows/build.m
 | No `#available` / `@available` iOS version checks outside `DesignSystem` | `scripts/check-architecture.sh` rule 2 (text search of every Swift file outside `Packages/DesignSystem`) | [ADR 0002](../../docs/adr/0002-ios-18-minimum-ios-26-styling.md) |
 | No comments in Swift code; only the `// swift-tools-version:` first line of a `Package.swift` | `scripts/check-no-comments.sh` (rule 6), tested by `scripts/tests/check_no_comments_test.sh`; CI runs the check once the existing comments are removed, review until then | [ADR 0025](../../docs/adr/0025-no-comments-in-code.md) (Proposed) |
 | View models are `@MainActor @Observable`; views hold no logic | Review | [ADR 0004](../../docs/adr/0004-swiftui-observable-coordinators.md) |
-| Swift 6 language mode, strict concurrency, no warnings | Build settings; local build and tests before a pull request (CI checks format only) | [Build](../workflows/build.md) |
+| Swift 6 language mode, strict concurrency, no warnings | Build settings; CI's `build` and `unit tests` jobs ([ADR 0027](../../docs/adr/0027-ci-builds-and-tests-every-pull-request.md)) | [Build](../workflows/build.md) |
 | Secrets only in the Keychain; the recovery key is never stored | Review | [ADR 0007](../../docs/adr/0007-shared-session-store-app-group.md) |
 | Push payloads and logs never contain message content | Review | [ADR 0009](../../docs/adr/0009-push-gateway-and-nse-decryption.md) |
 | Every change in behaviour comes with a test | Review; `scripts/test.sh` locally before a pull request | [Test](../workflows/test.md) |

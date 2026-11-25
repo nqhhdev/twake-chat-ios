@@ -1,0 +1,57 @@
+name: Xcode setup
+description: Select the pinned Xcode, restore the Swift package and DerivedData caches, and resolve packages (ADR 0027).
+
+inputs:
+  xcode-version:
+    description: Xcode version as listed by the runner image, e.g. 26.6
+    required: true
+  cache-name:
+    description: Job name, so each job keeps its own DerivedData cache
+    required: true
+
+outputs:
+  derived-data-key:
+    description: Cache key to save build/DerivedData under after a green run on main
+    value: ${{ steps.dd-key.outputs.key }}
+
+runs:
+  using: composite
+  steps:
+    - name: Select Xcode ${{ inputs.xcode-version }}
+      shell: bash
+      run: |
+        sudo xcode-select -s "/Applications/Xcode_${{ inputs.xcode-version }}.app"
+        xcodebuild -version
+        xcrun simctl list runtimes ios
+
+    - name: Restore Swift packages
+      uses: actions/cache@v4
+      with:
+        path: build/SourcePackages
+        key: spm-${{ runner.os }}-xcode${{ inputs.xcode-version }}-${{ hashFiles('**/Package.resolved', '**/Package.swift', 'TwakeChat.xcodeproj/project.pbxproj') }}
+        restore-keys: |
+          spm-${{ runner.os }}-xcode${{ inputs.xcode-version }}-
+
+    - name: DerivedData cache key
+      id: dd-key
+      shell: bash
+      run: |
+        prefix="dd-${{ inputs.cache-name }}-${{ runner.os }}-xcode${{ inputs.xcode-version }}-${{ hashFiles('**/Package.resolved') }}-"
+        echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
+        echo "key=$prefix${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+    - name: Restore DerivedData
+      uses: actions/cache/restore@v4
+      with:
+        path: build/DerivedData
+        key: ${{ steps.dd-key.outputs.key }}
+        restore-keys: |
+          ${{ steps.dd-key.outputs.prefix }}
+
+    - name: Resolve packages
+      shell: bash
+      run: |
+        xcodebuild -resolvePackageDependencies \
+          -project TwakeChat.xcodeproj -scheme TwakeChat \
+          -derivedDataPath build/DerivedData \
+          -clonedSourcePackagesDirPath build/SourcePackages

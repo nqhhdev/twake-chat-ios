@@ -87,3 +87,6 @@
 
 ## 2026-11-24
 * **Decision (owner, 2026-11-24)**: no comments in Swift code. ADR 0025 (Proposed) records it, with the `swift-tools-version` line as the only exception; `scripts/check-no-comments.sh` and its tests are added. CI runs only the check's tests for now; the check itself is turned on once the existing comments are removed, after the open pull requests merge.
+
+## 2026-11-25
+* **Decision**: ADR 0027 (Proposed) adds the `build` and `unit tests` jobs to CI on `macos-26` (Xcode 26.6, iPhone 17 on iOS 26.5), after the owner turned on auto-merge on 2026-11-25. It amends ADR 0014 and the 2026-11-13 "format only" decision; Build, Test and Constraints say what CI now runs.
