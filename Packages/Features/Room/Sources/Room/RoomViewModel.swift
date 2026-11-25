@@ -176,8 +176,10 @@ public final class RoomViewModel {
     blocking: Blocking? = nil,
     saved: (any SavedMessagesRepository)? = nil,
     threadTimeline: ThreadTimeline? = nil, threadRootId: String? = nil,
-    threadPrefs: (any ThreadPrefsRepository)? = nil
+    threadPrefs: (any ThreadPrefsRepository)? = nil,
+    scrollMemory: TimelineScrollMemory? = nil
   ) {
+    self.scrollMemory = scrollMemory
     self.threadPrefs = threadPrefs
     self.threadTimeline = threadTimeline
     self.threadRootId = threadRootId
@@ -360,6 +362,7 @@ public final class RoomViewModel {
     for await list in items where thisStart == startCount {
       state = .loaded(list)
       noteStart(in: list)
+      restoreScroll(in: list)
       if let target = pendingEventId, !list.isEmpty {
         pendingEventId = nil
         Task { await jump(toEvent: target, maxPages: 50) }
@@ -407,6 +410,12 @@ public final class RoomViewModel {
 
   /// The message the timeline scrolls to (a replied-to message, a pin), then clears.
   var scrollTarget: String?
+  /// The row put back at the top of the screen when the chat reopens where it was left, then clears.
+  var restoreTarget: String?
+  /// Where this room's chats were left; `nil` for a thread, which always opens on its newest message.
+  @ObservationIgnored let scrollMemory: TimelineScrollMemory?
+  /// The saved position is applied once, to the first messages that show.
+  @ObservationIgnored var didRestoreScroll = false
   /// The row that briefly flashes after a jump, so the eye finds it.
   public internal(set) var highlightedEventId: String?
   /// The sheet listing who reacted to, or has seen, a message.

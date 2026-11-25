@@ -76,6 +76,19 @@ struct TimelineScroll: View {
       }
       viewModel.scrollTarget = nil
     }
+    // Reopened where it was left (issue #138): the same message at the top, without animation. `initial` because the
+    // target is set with the first messages, before this view shows.
+    .onChange(of: viewModel.restoreTarget, initial: true) { _, target in
+      guard let target else { return }
+      var transaction = Transaction()
+      transaction.disablesAnimations = true
+      withTransaction(transaction) { position.scrollTo(id: target, anchor: .top) }
+      viewModel.restoreTarget = nil
+    }
+    .onDisappear {
+      viewModel.rememberScroll(
+        isAtBottom: isAtBottom, topRowId: position.viewID(type: String.self))
+    }
     // Open on the newest message, and stay on it as messages arrive or pictures load.
     .defaultScrollAnchor(.bottom)
     // Pinning size changes to the bottom while scrolled up would drag the reader with new
