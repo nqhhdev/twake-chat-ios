@@ -112,6 +112,7 @@ final class RootCoordinator {
     accountSettings: (any AccountSettingsRepository)? = nil,
     deviceUnlock: DeviceUnlocker? = nil,
     people: (any PeopleRepository)? = nil, push: (any PushRepository)? = nil,
+    notificationActions: (any NotificationActionRepository)? = nil,
     verification: (any VerificationRepository)? = nil, devices: (any DevicesRepository)? = nil,
     chatDisplay: (any ChatDisplaySettingsStore)? = nil, appLock: AppLock? = nil,
     sync: (any SyncLifecycle)? = nil, sessionExpiry: (any SessionExpiry)? = nil,
@@ -120,7 +121,7 @@ final class RootCoordinator {
     signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator
   ) {
     self.gifs = gifs
-    let pushCenter = PushCenter(repository: push)
+    let pushCenter = PushCenter(repository: push, actions: notificationActions)
     self.sessionExpiry = sessionExpiry
     self.push = pushCenter
     self.lifecycle = AppLifecycle(sync: sync, push: pushCenter)
@@ -149,6 +150,7 @@ final class RootCoordinator {
     self.signInConfiguration = signInConfiguration
     self.webAuthenticator = webAuthenticator
     self.links = LinkRouter(rooms: roomLinks, openDirectChat: openDirectChat())
+    pushCenter.startSession = { [weak self] in await self?.start() }
   }
 
   /// The chat list of the current signed-in state, kept so the screen keeps its state while it is shown.

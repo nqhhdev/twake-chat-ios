@@ -3,7 +3,6 @@ import Testing
 
 @testable import AppShared
 
-/// The badge count the notification service extension takes from the push (`unread_count`).
 struct PushPayloadTests {
   @Test func theCountIsRead() {
     #expect(PushPayload.unreadCount(in: ["unread_count": 3, "room_id": "!a:b"]) == 3)
@@ -26,5 +25,19 @@ struct PushPayloadTests {
   @Test func aValueThatIsNotACountIsIgnored() {
     #expect(PushPayload.unreadCount(in: ["unread_count": "3"]) == nil)
     #expect(PushPayload.unreadCount(in: ["unread_count": -1]) == nil)
+  }
+
+  @Test func theRoomEventAndThreadAreRead() {
+    let userInfo: [AnyHashable: Any] = ["room_id": "!r:b", "event_id": "$e", "thread_id": "$t"]
+    #expect(PushPayload.roomId(in: userInfo) == "!r:b")
+    #expect(PushPayload.eventId(in: userInfo) == "$e")
+    #expect(PushPayload.threadId(in: userInfo) == "$t")
+  }
+
+  @Test func missingEmptyOrWronglyTypedIdsAreNil() {
+    let userInfo: [AnyHashable: Any] = ["room_id": "", "event_id": 3]
+    #expect(PushPayload.roomId(in: userInfo) == nil)
+    #expect(PushPayload.eventId(in: userInfo) == nil)
+    #expect(PushPayload.threadId(in: userInfo) == nil)
   }
 }
