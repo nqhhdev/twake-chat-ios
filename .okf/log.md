@@ -102,3 +102,4 @@
 * **Change**: Adding a phone number in Settings (`/account/3pid/msisdn/requestToken`, SMS code, `/account/3pid/add`), e-mail and phone rows in the people search, third-party invites and phone-contact matching are built (`IdentityServerProxy`, `IdentityService`, `PhoneContactsViewModel`, `SystemAddressBook`). The Parity Matrix rows are updated.
 * **Change**: Create a space and a sub-space (#177): New Space in the chat list's More menu, New Sub-space in a space's Add menu, with the web's /createRoom body (ADR 0036, Proposed).
 * **Change**: Chat list folders (#176): one chip per folder, create, edit, order and delete, add a chat from its menu; shared with Flutter and the web through `app.twake.chat.folders` and `u.<name>` room tags, read with one filtered `/sync` (ADR 0036).
+* **Decision**: The public web page link of a channel (#189) is not built until the owner asks, as ADR 0026 says (ADR 0036). The Parity Matrix marks #176 and #177 built and #189 off.

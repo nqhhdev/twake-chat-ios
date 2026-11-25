@@ -49,6 +49,14 @@ status: draft
   chips stay the app's own filters: renaming, hiding or moving a built-in on another client does not change them here.
   Colours are kept, not shown.
 
+## Decision: the public web page link (#189)
+- Not built. ADR 0026 keeps the public page of a channel off until the owner asks: it needs twake-chat-side-service and
+  a build setting for its URL (the web's `PUBLIC_PAGES_URL`), and no deployment of that service is known for this app.
+  Building the switch and Copy Public Link behind an empty setting would ship code no build can run (ADR 0011's rule
+  against code for a deferred feature), so #189 stays open and the channel info keeps copying the matrix.to link.
+- New spaces already carry what the web needs to publish a room later: only an owner may send
+  `app.twake.chat.public_page` (power level 100).
+
 ## Consequences
 **Good.** A space made on iOS is the same on the web and in Flutter; a folder made on one client shows on the others.
 **Costly.** Reading tags costs one filtered `/sync` when the list opens and on each return to the foreground, and a
