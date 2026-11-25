@@ -28,8 +28,31 @@ status: draft
 - Spaces are created in the clear, as the web creates them; nothing is posted in a new space.
 - The new space opens; a new sub-space appears in its parent's page.
 
+## Decision: chat folders (#176)
+- Folders are stored as Flutter and the web store them, so the three clients share them: the global account data
+  `app.twake.chat.folders` (`{"folders": [...]}`, each a built-in `{builtin, name?, emoji?, color?, hidden?}` or a
+  user folder `{name, emoji?, color?, include?, exclude?}`), and the room tag `u.<name>` on each chat picked one by one
+  (Flutter `folders_content.dart`, web `src/domain/folders.ts`). A chat is in a folder when it is not in `exclude`, and
+  it is tagged or its kind (direct, group, broadcast, bot) is in `include`; spaces are in no folder.
+- Writing keeps what this client does not know: unknown keys of a folder and built-ins of a newer client stay, as
+  Flutter's `writeFolders(current:)` does. What is saved is the folders shown, then the built-ins not shown, hidden.
+- The pinned SDK reads no custom room tag, so the app reads them all in one request: a `/sync` with a filter that
+  keeps only the folders account data and each joined room's `m.tag` (`timeout=0`, no timeline, no state). It runs when
+  the chat list opens and when the app comes back to the foreground. Tags are written with
+  `PUT`/`DELETE /user/{userId}/rooms/{roomId}/tags/u.<name>`; the account data through the SDK.
+- One chip per user folder follows the list's filters, in the saved order; the `+` chip creates one. A folder's chip
+  menu edits, moves it left or right among the folders, or deletes it (asking first; its chats stay, their tags go).
+  The editor has a name, an emoji, the kinds it takes in and the chats, ticked one by one; saving follows Flutter's
+  `planEdit`: a ticked chat of a kind not taken in gets the tag, an unticked one of a kind taken in is excluded, a
+  rename moves the tags. A chat's long-press menu has a Folders submenu to add it or take it out.
+- The built-in folders (unread, broadcasts, directs, spaces, favourites) are kept as read and written back, but the iOS
+  chips stay the app's own filters: renaming, hiding or moving a built-in on another client does not change them here.
+  Colours are kept, not shown.
+
 ## Consequences
-**Good.** A space made on iOS is the same on the web and in Flutter. **Costly.** The create body is the app's, not the
+**Good.** A space made on iOS is the same on the web and in Flutter; a folder made on one client shows on the others.
+**Costly.** Reading tags costs one filtered `/sync` when the list opens and on each return to the foreground, and a
+folder changed on another client shows after that.  The create body is the app's, not the
 SDK's: a change of the web's body has to be copied here. The photo picker is a third copy (Room, Settings, ChatList),
 since a feature cannot import another (ADR 0005).
 

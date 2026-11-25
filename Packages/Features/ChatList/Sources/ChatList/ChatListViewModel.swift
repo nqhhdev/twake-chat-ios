@@ -88,8 +88,10 @@ public final class ChatListViewModel {
     openPerson: (@MainActor (String) async -> Bool)? = nil,
     previewTimeline: (@MainActor (String) -> any TimelineRepository)? = nil,
     presence: (@Sendable (String) async -> Presence?)? = nil,
+    folders: (any FoldersRepository)? = nil,
     logOut: @escaping @MainActor () async -> Bool
   ) {
+    self.foldersRepository = folders
     self.presence = presence
     self.previewTimeline = previewTimeline
     self.people = people
@@ -120,6 +122,9 @@ public final class ChatListViewModel {
   /// The people the search text finds (the user directory and ToM contacts), for the global search.
   public private(set) var peopleResults: [Person] = []
   @ObservationIgnored let presence: (@Sendable (String) async -> Presence?)?
+  @ObservationIgnored let foldersRepository: (any FoldersRepository)?
+  public internal(set) var folderState = FolderState()
+  public internal(set) var selectedFolderId: String?
   var presenceDots: [String: Presence.Dot] = [:]
   @ObservationIgnored var presenceFetchedAt: [String: ContinuousClock.Instant] = [:]
 
@@ -323,7 +328,7 @@ public final class ChatListViewModel {
 
   /// The joined rooms among the visible rooms.
   public var joinedRooms: [RoomSummary] {
-    visibleRooms.filter { !$0.isInvite && filter.includes($0) }
+    visibleRooms.filter { !$0.isInvite && filter.includes($0) && isInSelectedFolder($0) }
   }
 
   /// The joined favourites, shown first.
@@ -347,7 +352,7 @@ public final class ChatListViewModel {
   }
 
   /// Why the last swipe action failed.
-  public private(set) var actionErrorMessage: String?
+  public internal(set) var actionErrorMessage: String?
 
   /// Marks a room as unread, or as read.
   public func setUnread(_ unread: Bool, room: RoomSummary) async {

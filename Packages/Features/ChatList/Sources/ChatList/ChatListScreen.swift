@@ -21,6 +21,8 @@ public struct ChatListScreen: View {
   /// The space opened from the list, pushed over it.
   @State private var openedSpace: SpaceViewModel?
   @State private var newSpace: NewSpaceViewModel?
+  @State private var folderEditor: FolderEditorViewModel?
+  @State private var deletingFolder: Folder?
   @State private var connectivity = Connectivity()
   @Environment(\.scenePhase) private var scenePhase
 
@@ -55,8 +57,12 @@ public struct ChatListScreen: View {
       )
       .task(id: viewModel.query) { await viewModel.searchMessages() }
       .task { await viewModel.refreshDoNotDisturb() }
+      .task { await viewModel.loadFolders() }
       .onChange(of: scenePhase) { _, phase in
-        if phase == .active { Task { await viewModel.refreshDoNotDisturb() } }
+        if phase == .active {
+          Task { await viewModel.refreshDoNotDisturb() }
+          Task { await viewModel.loadFolders() }
+        }
       }
       // Select mode starts from a chat's long-press menu, as in Mail and Files; only then does the bar show Done.
       .toolbar {
@@ -118,6 +124,50 @@ public struct ChatListScreen: View {
       }
       .task { await viewModel.start() }
       .sheet(item: $newSpace) { model in NewSpaceScreen(viewModel: model) }
+      .sheet(item: $folderEditor) { model in FolderEditorScreen(viewModel: model) }
+      .confirmationDialog(
+        deletingFolder.map { "Delete \($0.name)?" } ?? "",
+        isPresented: Binding(
+          get: { deletingFolder != nil }, set: { if !$0 { deletingFolder = nil } }),
+        titleVisibility: .visible
+      ) {
+        Button("Delete Folder", role: .destructive) {
+          if let folder = deletingFolder { Task { await viewModel.deleteFolder(folder) } }
+        }
+      } message: {
+        Text("Its chats stay in your list.")
+      }
+  }
+
+  private func editFolder(_ folder: Folder?) {
+    folderEditor = viewModel.makeFolderEditor(folder) { folderEditor = nil }
+  }
+
+  @ViewBuilder private func folderMenu(_ folder: Folder) -> some View {
+    Button("Edit Folder", systemImage: "pencil") { editFolder(folder) }
+    Button("Move Left", systemImage: "arrow.left") {
+      Task { await viewModel.moveFolder(folder, by: -1) }
+    }
+    Button("Move Right", systemImage: "arrow.right") {
+      Task { await viewModel.moveFolder(folder, by: 1) }
+    }
+    Divider()
+    Button("Delete Folder", systemImage: "trash", role: .destructive) { deletingFolder = folder }
+  }
+
+  @ViewBuilder private func foldersMenu(_ room: RoomSummary) -> some View {
+    if viewModel.hasFolders, !room.isSpace {
+      Menu("Folders", systemImage: "folder") {
+        ForEach(viewModel.userFolders) { folder in
+          Toggle(
+            folder.title,
+            isOn: Binding(
+              get: { viewModel.isRoom(room, in: folder) },
+              set: { _ in Task { await viewModel.toggle(room, in: folder) } }))
+        }
+        Button("New Folder", systemImage: "folder.badge.plus") { editFolder(nil) }
+      }
+    }
   }
 
   private func startNewSpace() {
@@ -151,22 +201,29 @@ public struct ChatListScreen: View {
     ScrollView(.horizontal) {
       HStack(spacing: 8) {
         ForEach(ChatListViewModel.Filter.allCases) { filter in
-          let isOn = viewModel.filter == filter
-          Button {
+          let isOn = viewModel.filter == filter && viewModel.selectedFolderId == nil
+          FilterChip(title: filter.title, isOn: isOn) {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-              viewModel.filter = filter
+              viewModel.select(filter)
             }
-          } label: {
-            Text(filter.title)
-              .font(.subheadline.weight(.medium))
-              .foregroundStyle(isOn ? SysColors.onPrimary : SysColors.onSurface)
-              .padding(.horizontal, 14)
-              .padding(.vertical, 7)
-              .background(isOn ? SysColors.primary : SysColors.surface, in: Capsule())
           }
-          // Several buttons in one list row each need their own tap: a borderless style keeps them apart.
-          .buttonStyle(.borderless)
-          .accessibilityAddTraits(isOn ? .isSelected : [])
+        }
+        ForEach(viewModel.userFolders) { folder in
+          FilterChip(title: folder.title, isOn: viewModel.selectedFolderId == folder.id) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+              viewModel.selectFolder(folder)
+            }
+          }
+          .contextMenu { folderMenu(folder) }
+        }
+        if viewModel.hasFolders {
+          Button("New Folder", systemImage: "plus") { editFolder(nil) }
+            .labelStyle(.iconOnly)
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(SysColors.onSurface)
+            .frame(width: 32, height: 32)
+            .background(SysColors.surface, in: Circle())
+            .buttonStyle(.borderless)
         }
       }
       .padding(.horizontal, 16)
@@ -403,6 +460,7 @@ public struct ChatListScreen: View {
     readButton(room)
     favouriteButton(room)
     muteButton(room)
+    foldersMenu(room)
     Button(
       room.isLowPriority ? "Normal priority" : "Low priority",
       systemImage: room.isLowPriority ? "arrow.up.circle" : "arrow.down.circle"
