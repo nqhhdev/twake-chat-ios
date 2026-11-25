@@ -58,6 +58,8 @@ final class RootCoordinator {
   @ObservationIgnored private let activityReactions: (any ActivityReactionsRepository)?
   @ObservationIgnored private let accountSettings: (any AccountSettingsRepository)?
   @ObservationIgnored private let people: (any PeopleRepository)?
+  /// Meet calls of the account (#92).
+  @ObservationIgnored let meetCalls: (any MeetCallRepository)?
   /// Push notifications of the signed-in account.
   @ObservationIgnored let push: PushCenter
   /// Pauses sync in the background and resumes it on return.
@@ -111,6 +113,7 @@ final class RootCoordinator {
     verification: (any VerificationRepository)? = nil, devices: (any DevicesRepository)? = nil,
     chatDisplay: (any ChatDisplaySettingsStore)? = nil, appLock: AppLock? = nil,
     sync: (any SyncLifecycle)? = nil, sessionExpiry: (any SessionExpiry)? = nil,
+    meetCalls: (any MeetCallRepository)? = nil,
     signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator
   ) {
     let pushCenter = PushCenter(repository: push)
@@ -136,6 +139,7 @@ final class RootCoordinator {
     self.threadPrefs = threadPrefs
     self.activityReactions = activityReactions
     self.accountSettings = accountSettings
+    self.meetCalls = meetCalls
     self.deviceUnlock = deviceUnlock
     self.people = people
     self.signInConfiguration = signInConfiguration
@@ -459,7 +463,8 @@ struct RootView: View {
             push: coordinator.push, links: coordinator.links, shares: coordinator.shares,
             makePeopleSearch: coordinator.peopleSearch(mode:onOpen:),
             makeRoom: coordinator.room(for:onLeft:),
-            checkSession: coordinator.sessionCheckAfterUnlock()
+            checkSession: coordinator.sessionCheckAfterUnlock(),
+            meetCalls: coordinator.meetCalls
           )
           // Signed in: ask for notifications and register this device.
           .task { await coordinator.push.start() }

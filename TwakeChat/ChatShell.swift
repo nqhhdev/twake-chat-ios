@@ -35,6 +35,8 @@ struct ChatShell: View {
   let makeRoom: (RoomSummary, @escaping @MainActor () -> Void) -> RoomViewModel
   /// Whether this session can read encrypted messages; asked once after sign-in, to offer the way to fix it.
   var checkSession: (@Sendable () async -> SessionWarning?)?
+  /// Meet calls of the account (#92); without it a room offers no call and shows call links as plain text.
+  var meetCalls: (any MeetCallRepository)?
 
   /// How the shell lays out a screen of `width` points (safe areas included, as Flutter measures).
   struct Layout: Equatable {
@@ -257,7 +259,7 @@ struct ChatShell: View {
         Rectangle().fill(SysColors.surface).frame(width: 1)
         NavigationStack {
           if let room {
-            RoomScreen(viewModel: room).id(room.roomId)
+            RoomScreen(viewModel: room, meetCalls: meetCalls).id(room.roomId)
               .onAppear { push.openRoomId = room.roomId }
               .onDisappear { if push.openRoomId == room.roomId { push.openRoomId = nil } }
           } else {
@@ -276,7 +278,7 @@ struct ChatShell: View {
           .navigationDestination(isPresented: $isRoomPushed) {
             if let room {
               // The composer takes the bottom of the screen, so the tab bar steps aside, as in Messages.
-              RoomScreen(viewModel: room).id(room.roomId)
+              RoomScreen(viewModel: room, meetCalls: meetCalls).id(room.roomId)
                 .onAppear { push.openRoomId = room.roomId }
                 .onDisappear { if push.openRoomId == room.roomId { push.openRoomId = nil } }
                 .toolbar(.hidden, for: .tabBar)

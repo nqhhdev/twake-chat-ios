@@ -58,11 +58,17 @@ enum TimelineItemMapper {
         return .init(id: id, kind: .stateNotice("\(sender) changed their avatar"))
       }
       return nil
+    case .callInvite:
+      // The call of Element before MatrixRTC: one line, as the Flutter app shows it.
+      return .init(id: id, kind: .stateNotice("\(sender) started a call"))
+    case .state(_, .custom(let eventType)) where CallEvents.isCallEvent(eventType):
+      return nil
     case .state(_, let content):
       return state(content, sender: sender).map {
         .init(id: id, kind: .stateNotice($0.text), visibility: $0.visibility)
       }
     case .failedToParseMessageLike(let eventType, _), .failedToParseState(let eventType, _, _):
+      if CallEvents.isCallEvent(eventType) { return nil }
       return .init(id: id, kind: .stateNotice(unknown(eventType)), visibility: .unknown)
     default:
       return nil
@@ -119,7 +125,15 @@ enum TimelineItemMapper {
       replyToEventId: content.inReplyTo?.eventId(), formatted: formatted,
       uploadProgress: uploadProgress(event.localSendState), poll: poll,
       thread: content.threadSummary.map(thread), threadRootId: content.threadRoot,
-      batchId: batchId(body, event), transactionId: transactionId)
+      batchId: batchId(body, event), transactionId: transactionId, call: call(body, event))
+  }
+
+  /// The call a text message starts (`CallEvents`), read from the event's original JSON; other messages skip it.
+  private static func call(_ body: TimelineMessage.Body, _ event: EventTimelineItem)
+    -> TimelineMessage.Call?
+  {
+    guard case .text = body else { return nil }
+    return CallEvents.mark(inOriginalJSON: event.lazyProvider.debugInfo().originalJson)
   }
 
   /// The album key of a picture (`MediaBatch`), read from the event's original JSON; only pictures form albums, so

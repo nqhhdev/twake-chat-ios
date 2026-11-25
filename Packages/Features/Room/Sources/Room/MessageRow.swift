@@ -15,6 +15,8 @@ struct MessageRow: View {
   var album: AlbumRowModel?
   /// Drawn in the long-press layer: no gestures, no menu.
   var isPreview = false
+  /// The room's Meet calls, which tell the call messages to show as cards (#92).
+  @Environment(MeetCallViewModel.self) private var calls: MeetCallViewModel?
 
   /// How far the bubble is dragged for swipe-to-reply.
   @State private var swipe: CGFloat = 0
@@ -193,6 +195,13 @@ struct MessageRow: View {
       } else if let poll = message.poll {
         PollView(poll: poll, message: message, viewModel: viewModel)
           .frame(width: contentWidth)
+      } else if message.call == .threadRoot {
+        // The time each reader sees is their own, as in the Flutter app.
+        Text("Meeting started at \(message.date.formatted(.dateTime.hour().minute()))")
+          .textStyle(TextStyles.bodyMedium)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      } else if let link = calls?.link(of: message.call) {
+        CallLinkCard(link: link, isPreview: isPreview)
       } else {
         MessageBody(
           content: message.body, formatted: message.formatted,
