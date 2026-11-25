@@ -49,6 +49,7 @@ public protocol SpacesRepository: Sendable {
   func createChannel(named name: String, in spaceId: String) async throws(SpacesError) -> String
   /// The page style of a space or room (`app.twake.chat.page_style`), or `nil` when it has none or it cannot be read.
   func pageStyle(of roomId: String) async -> PageStyle?
+  func createSpace(_ space: NewSpace, picture: PictureUpload?) async throws(SpacesError) -> String
 }
 
 extension SpacesRepository {
@@ -59,4 +60,9 @@ extension SpacesRepository {
     throw .requestFailed
   }
   public func pageStyle(of roomId: String) async -> PageStyle? { nil }
+  public func createSpace(_ space: NewSpace, picture: PictureUpload?) async throws(SpacesError)
+    -> String
+  {
+    throw .requestFailed
+  }
 }
