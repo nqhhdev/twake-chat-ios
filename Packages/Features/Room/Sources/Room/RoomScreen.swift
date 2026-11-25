@@ -178,7 +178,7 @@ public struct RoomScreen: View {
     .animation(.spring(response: 0.4, dampingFraction: 0.85), value: viewModel.pinned)
     .task { await viewModel.refreshSessionWarning() }
     .onChange(of: scenePhase) { _, phase in
-      if phase == .active {
+      if phase == ScenePhase.active {
         Task { await viewModel.refreshSessionWarning() }
         Task { await viewModel.retryDecryption() }
       }
@@ -292,7 +292,7 @@ public struct RoomScreen: View {
     .task(id: viewModel.roomId) { await viewModel.start() }
     // Cancels the 15 s poll when the scene leaves the foreground (issue #111).
     .task(id: presenceTaskID) {
-      guard scenePhase == .active else { return }
+      guard isSceneActive else { return }
       await viewModel.watchPresence()
     }
     .sheet(isPresented: $isPickingDate) {
@@ -319,10 +319,9 @@ public struct RoomScreen: View {
     }
   }
 
-  private var presenceTaskID: String {
-    let isActive: Bool = scenePhase == ScenePhase.active
-    return "\(viewModel.roomId)-\(isActive)"
-  }
+  private var isSceneActive: Bool { scenePhase == ScenePhase.active }
+
+  private var presenceTaskID: String { "\(viewModel.roomId)-\(isSceneActive)" }
 
   @ViewBuilder private func timeline(bubbleWidth: CGFloat) -> some View {
     switch viewModel.state {
