@@ -60,6 +60,7 @@ final class RootCoordinator {
   @ObservationIgnored private let people: (any PeopleRepository)?
   /// Meet calls of the account (#92).
   @ObservationIgnored let meetCalls: (any MeetCallRepository)?
+  @ObservationIgnored private let gifs: (any GifRepository)?
   /// Push notifications of the signed-in account.
   @ObservationIgnored let push: PushCenter
   /// Pauses sync in the background and resumes it on return.
@@ -116,8 +117,10 @@ final class RootCoordinator {
     chatDisplay: (any ChatDisplaySettingsStore)? = nil, appLock: AppLock? = nil,
     sync: (any SyncLifecycle)? = nil, sessionExpiry: (any SessionExpiry)? = nil,
     meetCalls: (any MeetCallRepository)? = nil,
+    gifs: (any GifRepository)? = nil,
     signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator
   ) {
+    self.gifs = gifs
     let pushCenter = PushCenter(repository: push, actions: notificationActions)
     self.sessionExpiry = sessionExpiry
     self.push = pushCenter
@@ -204,7 +207,7 @@ final class RootCoordinator {
       checkSession: sessionCheck(), display: displaySettings(), blocking: blocking(),
       saved: savedMessages,
       threadTimeline: { [makeThreadTimeline] root in makeThreadTimeline(summary.id, root) },
-      threadPrefs: threadPrefs, scrollMemory: scrollMemory)
+      threadPrefs: threadPrefs, scrollMemory: scrollMemory, gifs: gifs)
     shareSuggestions.follow(room)
     return room
   }
