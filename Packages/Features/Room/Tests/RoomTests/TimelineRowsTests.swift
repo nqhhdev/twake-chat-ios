@@ -4,6 +4,7 @@ import Testing
 
 @testable import Room
 
+@MainActor
 struct TimelineRowsTests {
   private let start = Date(timeIntervalSince1970: 1_700_000_000)
 
@@ -279,7 +280,7 @@ struct TimelineRowsTests {
     #expect(prepended.messages.map(\.eventId) == ["$1", "$2", "$3"])
   }
 
-  @Test @MainActor func aPictureJustSentShowsFromTheUploadedCopy() {
+  @Test func aPictureJustSentShowsFromTheUploadedCopy() {
     func picture(own: Bool, age: TimeInterval, _ body: TimelineMessage.Body = .image(caption: nil))
       -> TimelineMessage
     {
@@ -302,7 +303,7 @@ struct TimelineRowsTests {
 
   /// A scroll offset left outside the content (after the SDK refilled the list, or the keyboard resized the view)
   /// shows an empty screen; the timeline then returns to the newest message.
-  @Test @MainActor func aViewportOutsideTheContentShowsNothing() {
+  @Test func aViewportOutsideTheContentShowsNothing() {
     func visible(from y: CGFloat) -> CGRect { CGRect(x: 0, y: y, width: 400, height: 600) }
     #expect(TimelineScroll.showsNothing(visible: visible(from: 900), contentHeight: 800))
     #expect(TimelineScroll.showsNothing(visible: visible(from: -700), contentHeight: 800))
