@@ -3,6 +3,34 @@ import DesignSystem
 import Domain
 import SwiftUI
 
+/// The speeds the audio player's button turns through, in the web client's order.
+enum PlaybackSpeed: Float, CaseIterable, Sendable {
+  case normal = 1
+  case faster = 1.5
+  case fastest = 2
+  case slower = 0.5
+
+  /// The speed after this one; the last turns back to the first.
+  var next: PlaybackSpeed {
+    let all = Self.allCases
+    let index = all.firstIndex(of: self) ?? 0
+    return all[(index + 1) % all.count]
+  }
+
+  /// "1×", "1.5×", "2×", "0.5×".
+  var label: String { String(format: "%g×", rawValue) }
+}
+
+/// The speed every voice and audio message plays at, kept until the app quits so the next message plays at it too.
+@MainActor @Observable
+final class PlaybackSpeedSetting {
+  static let shared = PlaybackSpeedSetting()
+
+  private(set) var speed: PlaybackSpeed = .normal
+
+  func turn() { speed = speed.next }
+}
+
 /// A voice message or audio file, played in the bubble as Telegram and iMessage play them: a round play/pause button,
 /// bars that fill as it plays and dance while playing, and the time left. The file downloads on the first tap.
 struct AudioMessageRow: View {
@@ -14,6 +42,7 @@ struct AudioMessageRow: View {
   @State private var isPlaying = false
   @State private var progress: Double = 0
   @State private var duration: TimeInterval = 0
+  private let speedSetting = PlaybackSpeedSetting.shared
 
   /// Fixed bar heights from the message id, so each message keeps its own shape.
   private var bars: [CGFloat] {
@@ -61,6 +90,17 @@ struct AudioMessageRow: View {
           .foregroundStyle(SysColors.textSecondary)
           .monospacedDigit()
       }
+      Button(action: turnSpeed) {
+        Text(speedSetting.speed.label)
+          .textStyle(TextStyles.labelSmall)
+          .foregroundStyle(SysColors.primary)
+          .monospacedDigit()
+          .frame(minWidth: 36, minHeight: 24)
+          .background(SysColors.primaryContainer, in: Capsule())
+      }
+      .buttonStyle(PressScaleButtonStyle())
+      .accessibilityLabel("Playback speed")
+      .accessibilityValue(speedSetting.speed.label)
     }
     .task(id: isPlaying) {
       // Follows the player while it plays.
@@ -82,6 +122,8 @@ struct AudioMessageRow: View {
         player.pause()
         isPlaying = false
       } else {
+        // Another message may have changed the speed since this one paused.
+        player.rate = speedSetting.speed.rawValue
         player.play()
         isPlaying = true
       }
@@ -94,11 +136,18 @@ struct AudioMessageRow: View {
         let loaded = try? AVAudioPlayer(contentsOf: url)
       else { return }
       try? AVAudioSession.sharedInstance().setCategory(.playback)
+      loaded.enableRate = true
+      loaded.rate = speedSetting.speed.rawValue
       player = loaded
       duration = loaded.duration
       loaded.play()
       isPlaying = true
     }
+  }
+
+  private func turnSpeed() {
+    speedSetting.turn()
+    player?.rate = speedSetting.speed.rawValue
   }
 
   static func time(_ seconds: TimeInterval) -> String {
