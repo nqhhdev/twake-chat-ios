@@ -25,7 +25,8 @@ struct KeychainClientSessionDelegateTests {
     StoredSession(
       userId: "@alice:example.org", deviceId: deviceId,
       homeserverURL: URL(string: "https://matrix.example.org")!,
-      accessToken: accessToken, refreshToken: "refresh-\(accessToken)", slidingSyncVersion: "native")
+      accessToken: accessToken, refreshToken: "refresh-\(accessToken)", slidingSyncVersion: "native"
+    )
   }
 
   @Test func retrieveReturnsTheSavedSessionOfThatUser() throws {
@@ -56,16 +57,35 @@ struct KeychainClientSessionDelegateTests {
     #expect(try store.load() == refreshed)
   }
 
+  /// Refreshed tokens keep the SSO issuer of a token sign-in, which the SDK session does not carry (ADR 0021).
+  @Test func savedRefreshedTokensKeepTheAuthenticationIssuer() throws {
+    defer { try? store.delete() }
+    let issuer = URL(string: "https://sign-up.example.org/")!
+    let saved = stored(accessToken: "token-1")
+    try store.save(
+      StoredSession(
+        userId: saved.userId, deviceId: saved.deviceId, homeserverURL: saved.homeserverURL,
+        accessToken: saved.accessToken, refreshToken: saved.refreshToken,
+        slidingSyncVersion: saved.slidingSyncVersion, authenticationIssuer: issuer))
+    delegate.saveSessionInKeychain(
+      session: UserSessionMapper.sdkSession(from: stored(accessToken: "token-2")))
+    let loaded = try #require(try store.load())
+    #expect(loaded.accessToken == "token-2")
+    #expect(loaded.authenticationIssuer == issuer)
+  }
+
   /// A refresh after sign-out deleted the item, or one of another device, never re-creates or replaces a session.
   @Test func savedTokensNeverRecreateADeletedSessionOrReplaceAnotherDevice() throws {
     defer { try? store.delete() }
-    delegate.saveSessionInKeychain(session: UserSessionMapper.sdkSession(from: stored(accessToken: "token-2")))
+    delegate.saveSessionInKeychain(
+      session: UserSessionMapper.sdkSession(from: stored(accessToken: "token-2")))
     #expect(try store.load() == nil)
 
     let saved = stored(accessToken: "token-1")
     try store.save(saved)
     delegate.saveSessionInKeychain(
-      session: UserSessionMapper.sdkSession(from: stored(accessToken: "token-3", deviceId: "OTHER")))
+      session: UserSessionMapper.sdkSession(from: stored(accessToken: "token-3", deviceId: "OTHER"))
+    )
     #expect(try store.load() == saved)
   }
 }

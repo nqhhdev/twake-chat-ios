@@ -347,8 +347,15 @@ final class KeychainClientSessionDelegate: ClientSessionDelegate {
     return UserSessionMapper.sdkSession(from: stored)
   }
 
+  /// Keeps the SSO issuer of the saved record of that device: the SDK session does not hold it (ADR 0021).
   func saveSessionInKeychain(session: Session) {
-    guard let stored = try? UserSessionMapper.storedSession(from: session) else { return }
+    let saved = try? sessionStore.load()
+    let sameDevice = saved?.userId == session.userId && saved?.deviceId == session.deviceId
+    let issuer = sameDevice ? saved?.authenticationIssuer : nil
+    guard
+      let stored = try? UserSessionMapper.storedSession(
+        from: session, authenticationIssuer: issuer)
+    else { return }
     _ = try? sessionStore.saveRefreshedTokens(stored)
   }
 }

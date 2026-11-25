@@ -94,6 +94,22 @@ struct AuthenticationCoordinatorTests {
     #expect(welcome(coordinator) != nil)
   }
 
+  /// A restored token (SSO) session logs out through the SSO logout page in the coordinator's web authenticator.
+  @Test func loggingOutOfATokenSignInOpensTheSSOLogoutPage() async throws {
+    let repository = FakeAuthenticationRepository()
+    let web = FakeWebAuthenticator()
+    let ssoSession = UserSession(
+      userId: "@alice:example.org", deviceId: "DEVICE", homeserverURL: homeserver,
+      accessToken: "token", refreshToken: nil,
+      authenticationIssuer: URL(string: "https://sign-up.example.org/")!)
+    let coordinator = coordinator(repository, session: ssoSession, web: web)
+
+    try await #require(signedIn(coordinator)).logOut()
+    #expect(repository.logoutCallCount == 1)
+    #expect(web.calls.map(\.url) == [URL(string: "https://sign-up.example.org/?logout=1")!])
+    #expect(welcome(coordinator) != nil)
+  }
+
   /// The screens shown after a logout must sign in again: their callbacks are wired again.
   @Test func signingInAgainAfterLoggingOutShowsTheSignedInScreen() async throws {
     let repository = FakeAuthenticationRepository()

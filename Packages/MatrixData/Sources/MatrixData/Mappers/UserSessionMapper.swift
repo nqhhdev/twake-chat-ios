@@ -10,25 +10,33 @@ enum UserSessionMapper {
   static let slidingSyncNative = "native"
   static let slidingSyncNone = "none"
 
-  static func userSession(from session: Session) throws(AuthenticationError) -> UserSession {
+  /// `authenticationIssuer` is the SSO issuer of a token sign-in, which the SDK session does not hold.
+  static func userSession(from session: Session, authenticationIssuer: URL? = nil)
+    throws(AuthenticationError) -> UserSession
+  {
     UserSession(
       userId: session.userId, deviceId: session.deviceId,
       homeserverURL: try homeserverURL(session.homeserverUrl),
-      accessToken: session.accessToken, refreshToken: session.refreshToken)
+      accessToken: session.accessToken, refreshToken: session.refreshToken,
+      authenticationIssuer: authenticationIssuer)
   }
 
   static func userSession(from stored: StoredSession) -> UserSession {
     UserSession(
       userId: stored.userId, deviceId: stored.deviceId, homeserverURL: stored.homeserverURL,
-      accessToken: stored.accessToken, refreshToken: stored.refreshToken)
+      accessToken: stored.accessToken, refreshToken: stored.refreshToken,
+      authenticationIssuer: stored.authenticationIssuer)
   }
 
-  static func storedSession(from session: Session) throws(AuthenticationError) -> StoredSession {
+  static func storedSession(from session: Session, authenticationIssuer: URL? = nil)
+    throws(AuthenticationError) -> StoredSession
+  {
     StoredSession(
       userId: session.userId, deviceId: session.deviceId,
       homeserverURL: try homeserverURL(session.homeserverUrl),
       accessToken: session.accessToken, refreshToken: session.refreshToken,
-      slidingSyncVersion: slidingSyncName(session.slidingSyncVersion))
+      slidingSyncVersion: slidingSyncName(session.slidingSyncVersion),
+      authenticationIssuer: authenticationIssuer)
   }
 
   /// The SDK session to restore. Only password login exists, so there is no OIDC data.

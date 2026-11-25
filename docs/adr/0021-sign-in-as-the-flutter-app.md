@@ -43,10 +43,16 @@ The pinned SDK ([ADR 0015](0015-pin-matrix-rust-components-swift-26-04-01.md)) h
   the Twake SaaS ones. The app registers the `twake.chat` and `matrix` URL schemes.
 - `ASWebAuthenticationSession` lives in the app target behind the feature's `WebAuthenticator` protocol, because a
   feature imports only what [ADR 0005](0005-layered-local-swift-packages.md) allows.
+- SSO sign-out, as `connect_page_mixin.dart` `tryLogoutSso` (TWAK-74): after a token (SSO) sign-in, MatrixData reads
+  the `m.authentication` issuer from the homeserver's `.well-known/matrix/client` and keeps it with the session (the
+  Keychain record and `UserSession`; it is not a secret). Log out signs out of Matrix first, then opens
+  `<issuer>?logout=1` in the web session with callback scheme `twake.chat`; closing that page still ends signed out.
+  A password sign-in keeps no issuer and logs out as before.
 
 ## Consequences
 **Good.** Sign-in matches what Twake Chat users know, on staging and SaaS, and Release can sign in. **Costly.** The
 app holds a password in every build (only for servers without SSO), and discovery is a second HTTP client beside the
 SDK. **Open, to verify by hand:** that the registration site's `loginToken` finishes a handler started on the
-workplace homeserver (the SDK reads only the token from the callback); the SSO sign-out of
-`connect_page_mixin.dart:95-100` (`<issuer>?logout=1`) is not built yet.
+workplace homeserver (the SDK reads only the token from the callback); that the SSO sign-out page
+(`<issuer>?logout=1`) ends the web session's SSO cookies on staging. A session saved before the issuer was kept has
+none, so its log out does not open the page; signing in again fixes that.
