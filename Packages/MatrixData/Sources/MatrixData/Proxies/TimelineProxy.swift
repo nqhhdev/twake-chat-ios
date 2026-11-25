@@ -356,8 +356,10 @@ public actor TimelineProxy: TimelineRepository {
   }
 
   public func editHistory(of eventId: String) async -> [MessageVersion]? {
-    guard let opened, (try? await opened.room.latestEncryptionState()) == .notEncrypted else {
-      return nil
+    guard let opened else { return nil }
+    guard (try? await opened.room.latestEncryptionState()) == .notEncrypted else {
+      return await EncryptedEditHistory.versions(
+        of: eventId, roomId: roomId, room: opened.room, client: opened.client.client)
     }
     let room = ClientServerRequest.encode(roomId)
     let event = ClientServerRequest.encode(eventId)
