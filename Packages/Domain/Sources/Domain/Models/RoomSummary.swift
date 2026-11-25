@@ -52,6 +52,7 @@ public struct RoomSummary: Sendable, Equatable, Identifiable {
   /// Who is typing in the room, other than the user; the row shows it in place of the last message.
   public var typingNames: [String]
   public let directUserId: String?
+  public let isPublic: Bool
 
   /// What a room's last message is.
   public enum MessageKind: Sendable, Equatable {
@@ -72,10 +73,11 @@ public struct RoomSummary: Sendable, Equatable, Identifiable {
     isFavourite: Bool = false, isDirect: Bool = false, isMuted: Bool = false,
     isArchived: Bool = false, isSpace: Bool = false, isLowPriority: Bool = false,
     draft: String? = nil, isBroadcast: Bool = false, isEncrypted: Bool = false,
-    typingNames: [String] = [], directUserId: String? = nil
+    typingNames: [String] = [], directUserId: String? = nil, isPublic: Bool = false
   ) {
     self.typingNames = typingNames
     self.directUserId = directUserId
+    self.isPublic = isPublic
     self.lastMessageKind = lastMessageKind
     self.isLastMessageOwn = isLastMessageOwn
     self.lastMessageSendState = lastMessageSendState

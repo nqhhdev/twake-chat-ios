@@ -443,6 +443,11 @@ struct ChatListRow: View {
         .overlay(alignment: .bottomTrailing) {
           if let dot = viewModel.presenceDot(of: room) {
             AvatarPresenceDot(AvatarPresence(dot), avatarSize: 52).offset(x: 2, y: 2)
+          } else if let kind = room.kindBadge {
+            AvatarKindBadge(
+              systemImage: kind.systemImage, label: kind.accessibilityLabel, avatarSize: 52
+            )
+            .offset(x: 3, y: 3)
           }
         }
         .task(id: room.directUserId) { await viewModel.refreshPresence(of: room) }

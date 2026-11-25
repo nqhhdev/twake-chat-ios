@@ -40,3 +40,14 @@ again. **Alternatives rejected.** Polling every shown row like the web: more req
 ## When to revisit
 When the pinned SDK exposes presence from sync, switch the dot to it and remove the request. When #111 changes how the
 chat screen reads presence, use the same source for the row.
+
+## Addendum: room kind badge (#144), 2026-11-25
+- The avatar of a row carries the web's badge (`src/ui/roomBadgeKind.ts`), in this order: a space shows a cube; a
+  Broadcast (only moderators post, `RoomSummary.isBroadcast`) a megaphone; a direct chat nothing; a group whose join
+  rule is public (`RoomInfo.isPublic`) a globe; any other group two people. VoiceOver reads "Space", "Broadcast",
+  "Public group" or "Group".
+- The web's voice-room badge is left out: the app has no voice rooms.
+- The pinned SDK gives no `m.room.create` type on `RoomInfo`, so a Broadcast is found by its power levels, as the rest
+  of the app already does, not by the `app.twake.chat.page` type.
+- The badge and the presence dot sit in the same corner; they never meet, since only a direct chat has a dot and a
+  direct chat has no badge.
