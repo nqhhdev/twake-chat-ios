@@ -76,6 +76,7 @@ public struct RoomScreen: View {
           ComposerView(viewModel: viewModel)
         }
       }
+      .attachmentDrop(viewModel)
       .overlay {
         if let focus = viewModel.focus {
           MessageActionsOverlay(
