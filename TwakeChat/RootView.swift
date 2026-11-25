@@ -55,6 +55,7 @@ final class RootCoordinator {
   @ObservationIgnored private let roomSearch: (any RoomSearchRepository)?
   @ObservationIgnored private let savedMessages: (any SavedMessagesRepository)?
   @ObservationIgnored private let threadPrefs: (any ThreadPrefsRepository)?
+  @ObservationIgnored private let activityReactions: (any ActivityReactionsRepository)?
   @ObservationIgnored private let accountSettings: (any AccountSettingsRepository)?
   @ObservationIgnored private let people: (any PeopleRepository)?
   /// Push notifications of the signed-in account.
@@ -102,6 +103,7 @@ final class RootCoordinator {
     roomSearch: (any RoomSearchRepository)? = nil,
     savedMessages: (any SavedMessagesRepository)? = nil,
     threadPrefs: (any ThreadPrefsRepository)? = nil,
+    activityReactions: (any ActivityReactionsRepository)? = nil,
     roomLinks: (any RoomLinkRepository)? = nil,
     accountSettings: (any AccountSettingsRepository)? = nil,
     deviceUnlock: DeviceUnlocker? = nil,
@@ -132,6 +134,7 @@ final class RootCoordinator {
     self.roomSearch = roomSearch
     self.savedMessages = savedMessages
     self.threadPrefs = threadPrefs
+    self.activityReactions = activityReactions
     self.accountSettings = accountSettings
     self.deviceUnlock = deviceUnlock
     self.people = people
@@ -152,7 +155,8 @@ final class RootCoordinator {
     let viewModel = ChatListViewModel(
       repository: roomList, media: media, archive: archive, publicRooms: publicRooms,
       spaces: spaces, messageSearch: roomSearch, doNotDisturb: doNotDisturb(),
-      saved: savedMessages, threadPrefs: threadPrefs, people: people,
+      saved: savedMessages, threadPrefs: threadPrefs, activityReactions: activityReactions,
+      people: people,
       openPerson: openDirectChat(),
       previewTimeline: { [makeTimeline] roomId in makeTimeline(roomId, nil) },
       logOut: { [weak signedIn, push] in
