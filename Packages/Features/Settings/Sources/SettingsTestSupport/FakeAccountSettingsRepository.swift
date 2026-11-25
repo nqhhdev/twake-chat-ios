@@ -66,6 +66,35 @@ public final class FakeAccountSettingsRepository: AccountSettingsRepository, @un
     return nil
   }
 
+  public var phoneConfirmationError: SettingsError?
+  public var correctCode = "123456"
+  public private(set) var phoneRegions: [String?] = []
+
+  public func sendPhoneConfirmation(to number: String, regionCode: String?)
+    async throws(SettingsError) -> PendingPhoneLink
+  {
+    phoneRegions.append(regionCode)
+    if let phoneConfirmationError { throw phoneConfirmationError }
+    return PendingPhoneLink(
+      phone: number, clientSecret: "secret", sessionId: "sid",
+      submitURL: URL(string: "https://matrix.example.org/submit")!)
+  }
+
+  public func confirmPhone(_ pending: PendingPhoneLink, code: String) async throws(SettingsError) {
+    if code != correctCode { throw .wrongCode }
+  }
+
+  public func linkPhone(_ pending: PendingPhoneLink, auth: DeviceAuth?) async throws(SettingsError)
+    -> DeviceAuthChallenge?
+  {
+    linkAuths.append(auth)
+    if !linkAnswers.isEmpty, let challenge = try linkAnswers.removeFirst().get() {
+      return challenge
+    }
+    addresses.append(LinkedAddress(kind: .phone, address: pending.phone))
+    return nil
+  }
+
   public func removeLinkedAddress(_ address: LinkedAddress) async throws(SettingsError) {
     if removalFails { throw .requestFailed }
     addresses.removeAll { $0 == address }

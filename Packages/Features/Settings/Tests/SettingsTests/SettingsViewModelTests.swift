@@ -275,12 +275,12 @@ struct ChatDisplaySettingsPageTests {
     #expect(settings.emailNotConfirmed)
     #expect(settings.pendingEmail != nil)
     await settings.finishLinkingEmail()
-    #expect(settings.emailChallenge == challenge)
-    await settings.confirmLinkingEmail()
+    #expect(settings.linkChallenge == challenge)
+    await settings.confirmLinking()
 
     #expect(repository.linkAuths == [nil, nil, .confirmedOnWeb(session: "uia")])
     #expect(settings.pendingEmail == nil)
-    #expect(settings.emailChallenge == nil)
+    #expect(settings.linkChallenge == nil)
     #expect(settings.linkedAddresses == [LinkedAddress(kind: .email, address: "bob@example.org")])
     #expect(settings.errorMessage == nil)
   }
@@ -292,7 +292,7 @@ struct ChatDisplaySettingsPageTests {
     let settings = SettingsViewModel(userId: "@alice:example.org", repository: repository) { true }
     await settings.addEmail("bob@example.org")
     await settings.finishLinkingEmail()
-    await settings.confirmLinkingEmail(password: "wrong")
+    await settings.confirmLinking(password: "wrong")
     #expect(repository.linkAuths.last == .password("wrong", session: "uia"))
     #expect(settings.pendingEmail == nil)
     #expect(settings.errorMessage == "Could not confirm it is you. Please try again.")
@@ -305,6 +305,56 @@ struct ChatDisplaySettingsPageTests {
     await settings.addEmail("bob@example.org")
     #expect(settings.pendingEmail == nil)
     #expect(settings.errorMessage == "This e-mail is already used by another account.")
+  }
+
+  @Test func aPhoneIsLinkedAfterTheSmsCodeAndThePassword() async {
+    let repository = FakeAccountSettingsRepository()
+    let challenge = DeviceAuthChallenge(session: "uia", webURL: nil, acceptsPassword: true)
+    repository.linkAnswers = [.success(challenge)]
+    let settings = SettingsViewModel(userId: "@alice:example.org", repository: repository) { true }
+    settings.regionCode = "FR"
+
+    await settings.addPhone(" 06 12 34 56 78 ")
+    #expect(repository.phoneRegions == ["FR"])
+    #expect(settings.pendingPhone?.phone == "06 12 34 56 78")
+    await settings.submitPhoneCode("000000")
+    #expect(settings.phoneCodeRejected)
+    #expect(settings.pendingPhone != nil)
+    #expect(repository.linkAuths.isEmpty)
+
+    await settings.submitPhoneCode("123456")
+    #expect(!settings.phoneCodeRejected)
+    #expect(settings.linkChallenge == challenge)
+    await settings.confirmLinking(password: "secret")
+
+    #expect(repository.linkAuths == [nil, .password("secret", session: "uia")])
+    #expect(settings.pendingPhone == nil)
+    #expect(settings.linkChallenge == nil)
+    #expect(settings.linkedAddresses == [LinkedAddress(kind: .phone, address: "06 12 34 56 78")])
+    #expect(settings.errorMessage == nil)
+  }
+
+  @Test func aPhoneTheServerCannotTakeSaysSo() async {
+    let repository = FakeAccountSettingsRepository()
+    repository.phoneConfirmationError = .phoneNotSupported
+    let settings = SettingsViewModel(userId: "@alice:example.org", repository: repository) { true }
+    await settings.addPhone("12")
+    #expect(settings.pendingPhone == nil)
+    #expect(settings.errorMessage?.hasPrefix("This phone number cannot be added.") == true)
+    repository.phoneConfirmationError = .addressInUse
+    await settings.addPhone("+33612345678")
+    #expect(settings.errorMessage == "This phone number is already used by another account.")
+  }
+
+  @Test func startingAPhoneDropsAPendingEmail() async {
+    let repository = FakeAccountSettingsRepository()
+    let settings = SettingsViewModel(userId: "@alice:example.org", repository: repository) { true }
+    await settings.addEmail("bob@example.org")
+    await settings.addPhone("+33612345678")
+    #expect(settings.pendingEmail == nil)
+    #expect(settings.pendingPhone != nil)
+    settings.cancelLinking()
+    #expect(settings.pendingPhone == nil)
   }
 
   @Test func removingAnAddressTakesItOffUnlessTheServerRefuses() async {

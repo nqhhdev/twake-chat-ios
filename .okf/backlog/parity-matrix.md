@@ -104,7 +104,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | New direct chat, new group, invite members | `new_private_chat`, `new_group` | Phase 3 | Built: `People/PeopleScreens.swift`, `PeopleProxy.swift` | Matrix | — |
 | Contacts through the ToM directory | `contacts_tab`, `domain/contact` | Phase 3, D79 | Built: `MatrixData/Discovery/TwakeContactLookup.swift` | ToM | — |
 | ToM address book: add, edit | `add_contact_dialog`, `tom_address_book_source` | — | Not built | ToM | #187 |
-| Invite by e-mail (3pid) and phone contacts | `contacts_invitation`, `phonebook_contact_repository` | `InviteDialog.tsx` | Not built | Matrix (identity server, ADR 0029) | #95 |
+| Invite by e-mail (3pid) and phone contacts | `contacts_invitation`, `phonebook_contact_repository` | `InviteDialog.tsx` | Built: `IdentityServerProxy.swift`, `PhoneContactsViewModel.swift`, `ThirdPartyInviteViews.swift` (search rows, third-party invites, phone contacts after permission and terms) | Matrix (identity server, ADR 0029) | #95 |
 | Invitation link and status through ToM | `contacts_invitation_view_model`, `invitation_api` | — | Not built | ToM | #188 |
 | Chat details, members, roles, remove, ban, access, encryption | `chat_details`, `assign_roles`, `room_access` | Phase 3 | Built: `Room/RoomDetailsScreen.swift`, `MemberProfile.swift` | Matrix | — |
 | Person card, groups in common, status message | `profile_info`, `chat_profile_info` | Phase 3, 10, 11 | Built: `Room/MemberProfile.swift` | Matrix | #111 (polling) |
@@ -146,7 +146,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Profile name and picture | `settings_profile` | Phase 3 | Built: `Settings/EditProfileSheet.swift` | Matrix | — |
 | Chat display: hide room events | `settings_chat` | — | Built: `TwakeChat/ChatDisplayDefaults.swift` | Device | — |
 | Blocked users | `settings_blocked_users` | Phase 2b | Built: `SettingsScreen.swift` (ignored users) | Matrix | — |
-| Data and storage, linked e-mails and phones | `settings_data_and_storage`, `settings_3pid` | D78 | Built read-only: `SettingsScreen.swift` | Matrix | #98 |
+| Data and storage, linked e-mails and phones | `settings_data_and_storage`, `settings_3pid` | D78 | Built: add and remove an e-mail (link) or a phone (SMS code) with user-interactive auth, `SettingsScreen.swift`, `AccountSettingsProxy.swift` | Matrix | #98 |
 | Contacts visibility | `settings_contacts_visibility` | D78 | Built: `TwakeContactLookup.swift` | ToM | #98 |
 | App language, translations | `settings_app_language`, `assets/l10n` | D67 | Not built: one string localised | Device; ToM for D67 | #90, #172 |
 | Analytics with consent | — | D24, D26 | Not built | ToM | #173 |
