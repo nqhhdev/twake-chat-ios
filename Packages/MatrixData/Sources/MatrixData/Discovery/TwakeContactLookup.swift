@@ -18,14 +18,37 @@ struct TwakeContactLookup: Sendable {
 
   /// The ToM server of the user's server name (the part of the Matrix id after the colon), or `nil`.
   func tomServer(forUserId userId: String) async -> (baseURL: URL, serverName: String)? {
+    await twakeServer(forUserId: userId).map { ($0.baseURL, $0.serverName) }
+  }
+
+  func twakeServer(forUserId userId: String) async -> TwakeServer? {
     guard let serverName = userId.split(separator: ":", maxSplits: 1).last.map(String.init),
       let url = URL(string: "https://\(serverName)/.well-known/matrix/client"),
       case (let data, let response)? = try? await session.data(from: url),
-      (response as? HTTPURLResponse)?.statusCode == 200,
-      let wellKnown = try? JSONDecoder().decode(WellKnown.self, from: data),
+      (response as? HTTPURLResponse)?.statusCode == 200
+    else { return nil }
+    return Self.twakeServer(fromWellKnown: data, serverName: serverName)
+  }
+
+  static func twakeServer(fromWellKnown data: Data, serverName: String) -> TwakeServer? {
+    guard let wellKnown = try? JSONDecoder().decode(WellKnown.self, from: data),
       let tom = wellKnown.tServer, let base = URL(string: tom.baseURL)
     else { return nil }
-    return (base, tom.serverName ?? serverName)
+    return TwakeServer(
+      baseURL: base, serverName: tom.serverName ?? serverName,
+      invitationsEnabled: Self.invitationsEnabled(inWellKnown: data))
+  }
+
+  static func invitationsEnabled(inWellKnown data: Data) -> Bool {
+    let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    let twakeChat = object?["app.twake.chat"] as? [String: Any]
+    return twakeChat?["enable_invitations"] as? Bool ?? false
+  }
+
+  struct TwakeServer: Sendable, Equatable {
+    let baseURL: URL
+    let serverName: String
+    let invitationsEnabled: Bool
   }
 
   func search(_ text: String, limit: Int, tom: URL, serverName: String, accessToken: String)

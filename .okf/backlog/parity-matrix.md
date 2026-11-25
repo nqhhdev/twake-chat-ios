@@ -103,9 +103,9 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 |---|---|---|---|---|---|
 | New direct chat, new group, invite members | `new_private_chat`, `new_group` | Phase 3 | Built: `People/PeopleScreens.swift`, `PeopleProxy.swift` | Matrix | — |
 | Contacts through the ToM directory | `contacts_tab`, `domain/contact` | Phase 3, D79 | Built: `MatrixData/Discovery/TwakeContactLookup.swift` | ToM | — |
-| ToM address book: add, edit | `add_contact_dialog`, `tom_address_book_source` | — | Not built | ToM | #187 |
+| ToM address book: add, edit | `add_contact_dialog`, `tom_address_book_source` | — | Built: `TomContactsProxy.swift`, `TomContactsAPI.swift`, `TwakeContactsViewModel.swift`, `TwakeContactsViews.swift` (list, add, rename, remove; ADR 0037) | ToM | #187 |
 | Invite by e-mail (3pid) and phone contacts | `contacts_invitation`, `phonebook_contact_repository` | `InviteDialog.tsx` | Built: `IdentityServerProxy.swift`, `PhoneContactsViewModel.swift`, `ThirdPartyInviteViews.swift` (search rows, third-party invites, phone contacts after permission and terms) | Matrix (identity server, ADR 0029) | #95 |
-| Invitation link and status through ToM | `contacts_invitation_view_model`, `invitation_api` | — | Not built | ToM | #188 |
+| Invitation link and status through ToM | `contacts_invitation_view_model`, `invitation_api` | — | Built: phone contacts invited through ToM, shared invitation link, Invitations page with status (`TwakeContactsViews.swift`; ADR 0037) | ToM | #188 |
 | Chat details, members, roles, remove, ban, access, encryption | `chat_details`, `assign_roles`, `room_access` | Phase 3 | Built: `Room/RoomDetailsScreen.swift`, `MemberProfile.swift` | Matrix | — |
 | Person card, groups in common, status message | `profile_info`, `chat_profile_info` | Phase 3, 10, 11 | Built: `Room/MemberProfile.swift` | Matrix | #111 (polling) |
 | Matrix links open in the app | `invitation_link_web` (dropped) | Phase 5 | Built: `Domain/Models/MatrixLink.swift`, `TwakeChat/LinkRouter.swift` | Matrix | — |

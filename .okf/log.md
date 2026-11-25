@@ -108,3 +108,5 @@
 * **Change**: Chat list folders (#176): one chip per folder, create, edit, order and delete, add a chat from its menu; shared with Flutter and the web through `app.twake.chat.folders` and `u.<name>` room tags, read with one filtered `/sync` (ADR 0036).
 * **Decision**: The public web page link of a channel (#189) is not built until the owner asks, as ADR 0026 says (ADR 0036). The Parity Matrix marks #176 and #177 built and #189 off.
 * **Change**: The chat row's long-press menu starts with Open (#132); a tap on the preview itself cannot open the chat with SwiftUI's context menu, recorded in ADR 0036.
+* **Decision**: ADR 0037 (Proposed): on a server announcing `t.server` the Contacts tab keeps contacts in ToM's `/_twake/addressbook`; with `app.twake.chat.enable_invitations` phone contacts are invited through `/_twake/v1/invite`, a sign-up link is shared and the invitations' status is read from ToM (#187, #188).
+* **Change**: ToM address book and invitations built (`TomContactsProxy`, `TomContactsAPI`, `TwakeContactsViewModel`, `TwakeContactsViews`); the Parity Matrix rows are updated.

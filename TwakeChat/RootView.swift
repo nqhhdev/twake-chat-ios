@@ -61,6 +61,7 @@ final class RootCoordinator {
   @ObservationIgnored private let people: (any PeopleRepository)?
   @ObservationIgnored private let identity: (any IdentityRepository)?
   @ObservationIgnored private let addressBook: (any AddressBook)?
+  @ObservationIgnored private let twakeContactsRepository: (any TwakeContactsRepository)?
   /// Meet calls of the account (#92).
   @ObservationIgnored let meetCalls: (any MeetCallRepository)?
   @ObservationIgnored let roomCalls: (any RoomCallRepository)?
@@ -123,11 +124,13 @@ final class RootCoordinator {
     sync: (any SyncLifecycle)? = nil, sessionExpiry: (any SessionExpiry)? = nil,
     meetCalls: (any MeetCallRepository)? = nil, roomCalls: (any RoomCallRepository)? = nil,
     identity: (any IdentityRepository)? = nil, addressBook: (any AddressBook)? = nil,
+    twakeContacts: (any TwakeContactsRepository)? = nil,
     gifs: (any GifRepository)? = nil,
     signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator
   ) {
     self.identity = identity
     self.addressBook = addressBook
+    self.twakeContactsRepository = twakeContacts
     self.gifs = gifs
     let pushCenter = PushCenter(repository: push, actions: notificationActions)
     self.sessionExpiry = sessionExpiry
@@ -394,6 +397,10 @@ final class RootCoordinator {
       mode: mode, repository: people ?? UnavailablePeople(), onOpen: onOpen, identity: identity)
   }
 
+  func twakeContacts() -> TwakeContactsViewModel? {
+    twakeContactsRepository.map(TwakeContactsViewModel.init)
+  }
+
   func phoneContacts() -> PhoneContactsViewModel? {
     guard let identity, let addressBook else { return nil }
     return PhoneContactsViewModel(addressBook: addressBook, identity: identity)
@@ -519,7 +526,8 @@ struct RootView: View {
             makeRoom: coordinator.room(for:onLeft:),
             checkSession: coordinator.sessionCheckAfterUnlock(),
             meetCalls: coordinator.meetCalls, roomCalls: coordinator.roomCalls,
-            makePhoneContacts: coordinator.phoneContacts
+            makePhoneContacts: coordinator.phoneContacts,
+            makeTwakeContacts: coordinator.twakeContacts
           )
           // Signed in: ask for notifications and register this device.
           .task { await coordinator.push.start() }
