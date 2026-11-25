@@ -9,6 +9,11 @@ struct ComposerView: View {
   @Bindable var viewModel: RoomViewModel
   @FocusState private var isFocused: Bool
   @State private var recorder = VoiceRecorder()
+  @State private var selection: TextSelection?
+  /// The link the « Add a link » dialog writes, with the text and address typed in it.
+  @State private var link: LinkTarget?
+  @State private var linkText = ""
+  @State private var linkAddress = ""
   /// How far the mic is dragged to the leading side; past `cancelDistance` the recording is dropped.
   @State private var dragOffset: CGFloat = 0
   private static let cancelDistance: CGFloat = 100
@@ -19,6 +24,14 @@ struct ComposerView: View {
       if !commands.isEmpty {
         CommandSuggestions(commands: commands) { command in
           viewModel.pick(command)
+          isFocused = true
+        }
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+      }
+      let emojis = viewModel.emojiSuggestions
+      if !emojis.isEmpty {
+        EmojiSuggestions(suggestions: emojis) { emoji in
+          viewModel.pickEmoji(emoji)
           isFocused = true
         }
         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -41,6 +54,10 @@ struct ComposerView: View {
           .textStyle(TextStyles.bodySmall)
           .padding(.vertical, 4)
           .transition(.opacity)
+      }
+      if let range = selectedRange, !recorder.isRecording {
+        FormatBar { format in apply(format, to: range) }
+          .transition(.move(edge: .bottom).combined(with: .opacity))
       }
       HStack(alignment: .bottom, spacing: 8) {
         if recorder.isRecording {
@@ -67,6 +84,7 @@ struct ComposerView: View {
     .sensoryFeedback(.impact(weight: .medium), trigger: recorder.isRecording)
     .animation(.spring(response: 0.3, dampingFraction: 0.8), value: viewModel.typingText)
     .animation(.easeInOut(duration: 0.2), value: viewModel.uploadCount)
+    .animation(.easeInOut(duration: 0.2), value: selectedRange == nil)
     .onChange(of: viewModel.draft) { old, new in
       Task {
         await viewModel.draftDidChange(from: old, to: new)
@@ -75,6 +93,7 @@ struct ComposerView: View {
     }
     .animation(.spring(response: 0.3, dampingFraction: 0.85), value: viewModel.mentionSuggestions)
     .animation(.spring(response: 0.3, dampingFraction: 0.85), value: viewModel.commandSuggestions)
+    .animation(.spring(response: 0.3, dampingFraction: 0.85), value: viewModel.emojiSuggestions)
     .onChange(of: viewModel.composerMode) { _, mode in
       if mode != .new { isFocused = true }
     }
@@ -86,10 +105,53 @@ struct ComposerView: View {
     } message: {
       Text("Allow Twake Chat to use the microphone in Settings to record voice messages.")
     }
+    .alert(
+      "Add a link",
+      isPresented: Binding(get: { link != nil }, set: { if !$0 { link = nil } })
+    ) {
+      TextField("Text", text: $linkText)
+      TextField("Address", text: $linkAddress)
+        .keyboardType(.URL)
+        .textInputAutocapitalization(.never)
+        .autocorrectionDisabled()
+      Button("Cancel", role: .cancel) {}
+      Button("Add", action: addLink)
+        .disabled(TextFormatting.webAddress(linkAddress) == nil)
+    } message: {
+      Text("The address of a web page, starting with https:// or www.")
+    }
+  }
+
+  /// The selected text of the field while it is focused; `nil` for a caret or several ranges.
+  private var selectedRange: Range<String.Index>? {
+    guard isFocused, case .selection(let range) = selection?.indices, !range.isEmpty else {
+      return nil
+    }
+    return range
+  }
+
+  /// Formats the selection and keeps the formatted text selected; a link opens the dialog first.
+  private func apply(_ format: TextFormat, to range: Range<String.Index>) {
+    guard format == .link else {
+      selection = TextSelection(range: viewModel.format(format, selection: range))
+      return
+    }
+    let target = viewModel.linkTarget(selection: range)
+    linkText = target.text
+    linkAddress = target.url
+    link = target
+  }
+
+  private func addLink() {
+    guard let target = link,
+      let caret = viewModel.addLink(target, label: linkText, url: linkAddress)
+    else { return }
+    isFocused = true
+    selection = TextSelection(insertionPoint: caret.lowerBound)
   }
 
   private var field: some View {
-    TextField("Type a message", text: $viewModel.draft, axis: .vertical)
+    TextField("Type a message", text: $viewModel.draft, selection: $selection, axis: .vertical)
       .textStyle(TextStyles.bodyLarge)
       .lineLimit(1...6)
       .focused($isFocused)
@@ -225,6 +287,36 @@ private struct ComposerBanner: View {
     .padding(.horizontal, 16)
     .padding(.vertical, 8)
     .background(SysColors.surface)
+  }
+}
+
+/// The formats of the selected text, above the field while text is selected, as Telegram offers them. Each button
+/// writes its Markdown around the selection, or takes it off.
+private struct FormatBar: View {
+  let apply: (TextFormat) -> Void
+
+  var body: some View {
+    HStack(spacing: 0) {
+      ForEach(TextFormat.allCases, id: \.self) { format in
+        Button {
+          apply(format)
+        } label: {
+          Image(systemName: format.systemImage)
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(SysColors.onSurface)
+            .frame(maxWidth: .infinity, minHeight: 40)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressScaleButtonStyle())
+        .accessibilityLabel(format.label)
+      }
+    }
+    .padding(.horizontal, 8)
+    .background(SysColors.surface, in: .rect(cornerRadius: 14))
+    .padding(.horizontal, 12)
+    .padding(.top, 6)
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("Formatting")
   }
 }
 

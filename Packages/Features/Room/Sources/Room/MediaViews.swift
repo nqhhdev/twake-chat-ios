@@ -279,24 +279,31 @@ extension RemoteImage {
 }
 
 /// Pictures full screen, as the Flutter image viewer: swipe between the pictures of an album, pinch or double-tap to
-/// zoom, Close and Share. Both are toolbar buttons, so iOS places them: Close in the navigation bar and Share in the
-/// bottom bar on a phone, both in the side rail on the unfolded Duo, as Photos does.
+/// zoom, Close, Share and Save to Photos. They are toolbar buttons, so iOS places them: Close in the navigation bar,
+/// Share and Save in the bottom bar on a phone, all in the side rail on the unfolded Duo, as Photos does.
 struct ImageViewer: View {
   let pictures: [MediaReference]
   let repository: any MediaRepository
   let title: String
+  let library: any PhotoLibrarySaving
 
   let startIndex: Int
 
   @Environment(\.dismiss) private var dismiss
   @State private var index: Int?
   @State private var images: [Int: UIImage] = [:]
+  @State private var isSaving = false
+  /// What the last Save to Photos did, shown as a toast for two seconds.
+  @State private var saveOutcome: SaveToPhotosOutcome?
 
-  init(pictures: [MediaReference], startIndex: Int, repository: any MediaRepository, title: String)
-  {
+  init(
+    pictures: [MediaReference], startIndex: Int, repository: any MediaRepository, title: String,
+    library: any PhotoLibrarySaving = SystemPhotoLibrary()
+  ) {
     self.pictures = pictures
     self.repository = repository
     self.title = title
+    self.library = library
     self.startIndex = startIndex
     // The scroll view reads its first page from here; set later, in `onAppear`, a long list of lazy pages could land
     // on another one.
@@ -346,9 +353,40 @@ struct ImageViewer: View {
             }
             .accessibilityLabel("Share")
           }
+          ToolbarItem(placement: .bottomBar) {
+            Button("Save to Photos", systemImage: "square.and.arrow.down") {
+              Task { await save(pictures[currentIndex]) }
+            }
+            .disabled(isSaving)
+          }
         }
       }
     }
+    .overlay(alignment: .top) {
+      if let saveOutcome {
+        Toast(
+          text: saveOutcome.text,
+          systemImage: saveOutcome.isSaved ? "checkmark.circle.fill" : "exclamationmark.circle.fill"
+        )
+      }
+    }
+    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: saveOutcome)
+    .sensoryFeedback(trigger: saveOutcome) { _, new in
+      guard let new else { return nil }
+      return new.isSaved ? .success : .error
+    }
+    .task(id: saveOutcome) {
+      guard saveOutcome != nil else { return }
+      try? await Task.sleep(for: .seconds(2))
+      if !Task.isCancelled { saveOutcome = nil }
+    }
+  }
+
+  private func save(_ picture: MediaReference) async {
+    guard !isSaving else { return }
+    isSaving = true
+    defer { isSaving = false }
+    saveOutcome = await .saving(picture: picture, from: repository, to: library)
   }
 }
 

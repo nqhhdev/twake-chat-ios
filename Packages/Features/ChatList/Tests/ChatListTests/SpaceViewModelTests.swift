@@ -14,6 +14,14 @@ struct SpaceViewModelTests {
     private(set) var joined: [String] = []
 
     func set(_ children: [SpaceChild]) { self.children = children }
+    var styles: [String: PageStyle] = [:]
+    private(set) var styleRequests: [String] = []
+    func setStyles(_ styles: [String: PageStyle]) { self.styles = styles }
+
+    func pageStyle(of roomId: String) async -> PageStyle? {
+      styleRequests.append(roomId)
+      return styles[roomId]
+    }
     private(set) var created: [String] = []
 
     func canAddChannel(to spaceId: String) async -> Bool { true }
@@ -37,12 +45,40 @@ struct SpaceViewModelTests {
     id: "!space", name: "Team", lastMessageText: nil, lastMessageSender: nil, lastActivity: nil,
     isSpace: true)
 
-  private func child(_ id: String, _ name: String, joined: Bool, space: Bool = false)
-    -> SpaceChild
-  {
+  private func child(
+    _ id: String, _ name: String, joined: Bool, space: Bool = false, broadcast: Bool = false
+  ) -> SpaceChild {
     SpaceChild(
       id: id, name: name, topic: nil, avatar: nil, memberCount: 2, isJoined: joined,
-      isSpace: space, via: ["example.org"])
+      isSpace: space, via: ["example.org"], isBroadcast: broadcast)
+  }
+
+  @Test func readsThePageStyleOfTheSpaceAndOfItsBroadcastsOnly() async {
+    let spaces = Spaces()
+    let cover = PageStyle(cover: MediaReference(source: "mxc://s/c"), accentColor: "#3f51b5")
+    let accent = PageStyle(cover: nil, accentColor: "#ff0000")
+    await spaces.set([
+      child("!news", "News", joined: true, broadcast: true),
+      child("!quiet", "Quiet", joined: true, broadcast: true),
+      child("!chat", "Chat", joined: true),
+    ])
+    await spaces.setStyles(["!space": cover, "!news": accent, "!chat": accent])
+    let viewModel = SpaceViewModel(
+      space: space, repository: spaces, picture: { _ in nil }, onOpen: { _ in })
+    await viewModel.load()
+    #expect(viewModel.pageStyle == cover)
+    #expect(viewModel.childStyles == ["!news": accent])
+    #expect(await Set(spaces.styleRequests) == ["!space", "!news", "!quiet"])
+  }
+
+  @Test func aSpaceWithoutPageStyleKeepsThePlainHeader() async {
+    let spaces = Spaces()
+    await spaces.set([child("!a", "Alpha", joined: true)])
+    let viewModel = SpaceViewModel(
+      space: space, repository: spaces, picture: { _ in nil }, onOpen: { _ in })
+    await viewModel.load()
+    #expect(viewModel.pageStyle == nil)
+    #expect(viewModel.childStyles.isEmpty)
   }
 
   @Test func subSpacesComeFirstThenJoinedRoomsThenByName() async {

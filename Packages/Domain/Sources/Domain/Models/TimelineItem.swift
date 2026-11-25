@@ -95,6 +95,16 @@ public struct TimelineMessage: Sendable, Equatable {
     }
   }
 
+  /// What makes a message part of a call (#92).
+  public enum Call: Sendable, Equatable {
+    /// A Meet call started from the Flutter or iOS app: the message carries its link under `call_url`. The room
+    /// shows it as a call card only when the link is on the account's Meet server (`MeetLink.callLink`).
+    case link(String)
+    /// The message the web client posts when a call starts, which opens the call's thread
+    /// (`app.twake.chat.call_thread`); shown as "Meeting started at" its time.
+    case threadRoot
+  }
+
   public struct Reply: Sendable, Equatable {
     public let senderName: String
     public let text: String?
@@ -146,6 +156,8 @@ public struct TimelineMessage: Sendable, Equatable {
   /// The id of the local echo while the message has no server event id yet; it names a message that is still
   /// sending or failed to send, to send it again or to discard it. `nil` once the server has the event.
   public let transactionId: String?
+  /// The call this message starts, `nil` for any other message.
+  public let call: Call?
 
   public init(
     eventId: String?, senderId: String, senderName: String, isOwn: Bool, date: Date, body: Body,
@@ -154,8 +166,10 @@ public struct TimelineMessage: Sendable, Equatable {
     senderAvatar: MediaReference? = nil, readCount: Int = 0, readerIds: [String] = [],
     replyToEventId: String? = nil, formatted: AttributedString? = nil,
     uploadProgress: Double? = nil, poll: Poll? = nil, thread: ThreadPreview? = nil,
-    threadRootId: String? = nil, batchId: String? = nil, transactionId: String? = nil
+    threadRootId: String? = nil, batchId: String? = nil, transactionId: String? = nil,
+    call: Call? = nil
   ) {
+    self.call = call
     self.transactionId = transactionId
     self.batchId = batchId
     self.thread = thread

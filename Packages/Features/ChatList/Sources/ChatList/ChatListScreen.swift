@@ -83,6 +83,11 @@ public struct ChatListScreen: View {
               Button("New chat", systemImage: "square.and.pencil", action: onCompose)
             }
           }
+          ToolbarItem(placement: .topBarTrailing) {
+            Menu("More", systemImage: "ellipsis.circle") {
+              MarkAllReadButton(viewModel: viewModel, rooms: viewModel.unreadRooms)
+            }
+          }
         }
       }
       .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
@@ -366,27 +371,35 @@ public struct ChatListScreen: View {
       favouriteButton(room).tint(.orange)
       muteButton(room).tint(.indigo)
     }
-    .contextMenu {
-      Button("Select", systemImage: "checkmark.circle") {
-        withAnimation {
-          isSelecting = true
-          viewModel.selection = [room.id]
-        }
+    // A pointer on iPad highlights the row; a secondary click opens the same menu and preview.
+    .hoverEffect(.highlight)
+    .modifier(
+      RoomContextMenu(
+        room: room, viewModel: viewModel, menu: { menuItems(room) },
+        hasPreview: viewModel.hasPreview(room)))
+  }
+
+  /// The long-press menu of a chat row.
+  @ViewBuilder private func menuItems(_ room: RoomSummary) -> some View {
+    Button("Select", systemImage: "checkmark.circle") {
+      withAnimation {
+        isSelecting = true
+        viewModel.selection = [room.id]
       }
-      Divider()
-      readButton(room)
-      favouriteButton(room)
-      muteButton(room)
-      Button(
-        room.isLowPriority ? "Normal priority" : "Low priority",
-        systemImage: room.isLowPriority ? "arrow.up.circle" : "arrow.down.circle"
-      ) {
-        Task { await viewModel.setLowPriority(!room.isLowPriority, room: room) }
-      }
-      Divider()
-      Button("Leave", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
-        leaving = room
-      }
+    }
+    Divider()
+    readButton(room)
+    favouriteButton(room)
+    muteButton(room)
+    Button(
+      room.isLowPriority ? "Normal priority" : "Low priority",
+      systemImage: room.isLowPriority ? "arrow.up.circle" : "arrow.down.circle"
+    ) {
+      Task { await viewModel.setLowPriority(!room.isLowPriority, room: room) }
+    }
+    Divider()
+    Button("Leave", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
+      leaving = room
     }
   }
 

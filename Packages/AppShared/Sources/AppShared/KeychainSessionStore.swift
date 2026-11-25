@@ -13,10 +13,13 @@ public struct StoredSession: Codable, Sendable, Equatable {
   /// The sliding sync version the session was created with, as MatrixData names it, so a restore uses the same one.
   /// `nil` in a record saved before the field existed.
   public let slidingSyncVersion: String?
+  /// The SSO issuer whose `?logout=1` page log out opens, kept only for a token (SSO) sign-in. Not a secret. `nil`
+  /// after a password sign-in and in a record saved before the field existed.
+  public let authenticationIssuer: URL?
 
   public init(
     userId: String, deviceId: String, homeserverURL: URL, accessToken: String,
-    refreshToken: String?, slidingSyncVersion: String? = nil
+    refreshToken: String?, slidingSyncVersion: String? = nil, authenticationIssuer: URL? = nil
   ) {
     self.userId = userId
     self.deviceId = deviceId
@@ -24,6 +27,7 @@ public struct StoredSession: Codable, Sendable, Equatable {
     self.accessToken = accessToken
     self.refreshToken = refreshToken
     self.slidingSyncVersion = slidingSyncVersion
+    self.authenticationIssuer = authenticationIssuer
   }
 }
 

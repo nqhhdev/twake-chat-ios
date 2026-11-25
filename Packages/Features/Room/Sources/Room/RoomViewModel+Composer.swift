@@ -2,7 +2,8 @@ import Domain
 import Foundation
 import SwiftUI
 
-/// The composer: the draft, mentions, bot commands, reply and edit modes, and sending text and attachments.
+/// The composer: the draft, its formatting, mentions, bot commands, reply and edit modes, and sending text and
+/// attachments.
 extension RoomViewModel {
   /// The commands the draft's "/" word may become.
   public var commandSuggestions: [BotCommand] {
@@ -196,6 +197,39 @@ extension RoomViewModel {
       composerMode = mode
       errorMessage = "Could not send your message. Please try again."
     }
+  }
+
+  /// Writes the format's Markdown around the selected part of the draft, or takes it off; returns what to select
+  /// after.
+  func format(_ format: TextFormat, selection: Range<String.Index>) -> Range<String.Index> {
+    let result = TextFormatting.apply(format, to: draft, selection: offsets(of: selection))
+    draft = result.text
+    return indices(of: result.selection)
+  }
+
+  /// The link the « Add a link » dialog starts from: the one the selection is in, or the selected text.
+  func linkTarget(selection: Range<String.Index>) -> LinkTarget {
+    TextFormatting.linkTarget(in: draft, selection: offsets(of: selection))
+  }
+
+  /// Writes the link over its target and returns the caret after it; `nil`, and the draft unchanged, when `url` is not
+  /// a web address.
+  func addLink(_ target: LinkTarget, label: String, url: String) -> Range<String.Index>? {
+    guard let address = TextFormatting.webAddress(url) else { return nil }
+    let result = TextFormatting.link(target, in: draft, label: label, url: address)
+    draft = result.text
+    return indices(of: result.selection)
+  }
+
+  private func offsets(of range: Range<String.Index>) -> Range<Int> {
+    let range = range.clamped(to: draft.startIndex..<draft.endIndex)
+    let start = draft.distance(from: draft.startIndex, to: range.lowerBound)
+    return start..<(start + draft.distance(from: range.lowerBound, to: range.upperBound))
+  }
+
+  private func indices(of range: Range<Int>) -> Range<String.Index> {
+    let start = draft.index(draft.startIndex, offsetBy: range.lowerBound)
+    return start..<draft.index(start, offsetBy: range.count)
   }
 
   public func reply(to message: TimelineMessage) {

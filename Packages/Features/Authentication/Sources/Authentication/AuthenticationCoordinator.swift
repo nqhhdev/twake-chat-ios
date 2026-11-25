@@ -84,7 +84,7 @@ public final class AuthenticationCoordinator {
   private func showSignedIn(_ session: UserSession) {
     screen = .signedIn(
       SignedInViewModel(
-        session: session, repository: repository,
+        session: session, repository: repository, webAuthenticator: webAuthenticator,
         onLoggedOut: { [weak self] in self?.showWelcome() }))
   }
 }

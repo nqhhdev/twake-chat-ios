@@ -52,17 +52,40 @@ public struct HomeserverDiscovery: Sendable {
 
   /// `m.homeserver.base_url` of the server's `.well-known/matrix/client`, or `nil` when it has none.
   private func wellKnownHomeserver(for url: URL) async -> URL? {
+    guard let data = await wellKnown(for: url),
+      let wellKnown = try? JSONDecoder().decode(WellKnown.self, from: data),
+      let base = URL(string: wellKnown.homeserver.baseURL), base.host() != nil
+    else { return nil }
+    return base
+  }
+
+  /// The `m.authentication` issuer of `homeserver`'s `.well-known/matrix/client`, which the Flutter app keeps as
+  /// `authUrl` for its SSO sign-out (`Matrix._setupAuthUrl`), or `nil` when there is none or it cannot be read.
+  public func authenticationIssuer(homeserver: URL) async -> URL? {
+    guard let data = await wellKnown(for: homeserver) else { return nil }
+    return Self.authenticationIssuer(wellKnown: data)
+  }
+
+  /// The `m.authentication.issuer` of a `.well-known/matrix/client` body, when it is an http(s) URL.
+  static func authenticationIssuer(wellKnown data: Data) -> URL? {
+    guard let wellKnown = try? JSONDecoder().decode(WellKnownAuthentication.self, from: data),
+      let issuer = wellKnown.authentication?.issuer, let url = URL(string: issuer),
+      let scheme = url.scheme, ["https", "http"].contains(scheme), url.host() != nil
+    else { return nil }
+    return url
+  }
+
+  /// The body of the `.well-known/matrix/client` at `url`'s origin, or `nil` without a 200 answer.
+  private func wellKnown(for url: URL) async -> Data? {
     guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
       return nil
     }
     components.path = "/.well-known/matrix/client"
     components.query = nil
     guard let wellKnownURL = components.url,
-      case (let status, let data)? = await fetch(URLRequest(url: wellKnownURL)), status == 200,
-      let wellKnown = try? JSONDecoder().decode(WellKnown.self, from: data),
-      let base = URL(string: wellKnown.homeserver.baseURL), base.host() != nil
+      case (let status, let data)? = await fetch(URLRequest(url: wellKnownURL)), status == 200
     else { return nil }
-    return base
+    return data
   }
 
   private func loginFlows(homeserver: URL) async throws(AuthenticationError) -> [LoginFlows.Flow] {
@@ -100,6 +123,14 @@ private struct WellKnown: Decodable {
   }
   let homeserver: Homeserver
   enum CodingKeys: String, CodingKey { case homeserver = "m.homeserver" }
+}
+
+private struct WellKnownAuthentication: Decodable {
+  struct Authentication: Decodable {
+    let issuer: String?
+  }
+  let authentication: Authentication?
+  enum CodingKeys: String, CodingKey { case authentication = "m.authentication" }
 }
 
 private struct LoginFlows: Decodable {

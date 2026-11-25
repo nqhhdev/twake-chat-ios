@@ -18,10 +18,16 @@ public struct RoomScreen: View {
   @State private var reporting: TimelineMessage?
   @State private var reportReason = ""
   @State private var blocking: TimelineMessage?
+  /// The room's Meet calls (#92); `nil` when the app gave no call repository.
+  @State private var calls: MeetCallViewModel?
   @Environment(\.scenePhase) private var scenePhase
+  private let meetCalls: (any MeetCallRepository)?
 
-  public init(viewModel: RoomViewModel) {
+  public init(viewModel: RoomViewModel, meetCalls: (any MeetCallRepository)? = nil) {
     self.viewModel = viewModel
+    self.meetCalls = meetCalls
+    _calls = State(
+      initialValue: meetCalls.map { MeetCallViewModel(roomId: viewModel.roomId, repository: $0) })
   }
 
   public var body: some View {
@@ -76,6 +82,7 @@ public struct RoomScreen: View {
           ComposerView(viewModel: viewModel)
         }
       }
+      .attachmentDrop(viewModel)
       .overlay {
         if let focus = viewModel.focus {
           MessageActionsOverlay(
@@ -180,6 +187,15 @@ public struct RoomScreen: View {
       Task { await viewModel.retryDecryption() }
     }
     .sensoryFeedback(.success, trigger: viewModel.toast) { _, new in new != nil }
+    .environment(calls)
+    .task(id: viewModel.roomId) { await calls?.load() }
+    .alert(
+      calls?.errorMessage ?? "",
+      isPresented: Binding(
+        get: { calls?.errorMessage != nil }, set: { if !$0 { calls?.errorMessage = nil } })
+    ) {
+      Button("OK", role: .cancel) {}
+    }
     .navigationTitle(viewModel.threadRootId == nil ? viewModel.roomName : "Thread")
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
@@ -235,6 +251,10 @@ public struct RoomScreen: View {
           .buttonStyle(.plain)
           .accessibilityHint("Shows the chat details")
         }
+        // As in the Flutter chat: a call needs a Meet server and the right to post, since it is a message.
+        if let calls, calls.baseURL != nil, viewModel.canSendMessages, !viewModel.isArchived {
+          ToolbarItem(placement: .topBarTrailing) { MeetCallButton(calls: calls) }
+        }
         ToolbarItem(placement: .topBarTrailing) {
           Menu("More", systemImage: "ellipsis.circle") {
             if viewModel.canSearch {
@@ -258,7 +278,8 @@ public struct RoomScreen: View {
         }
       }
     }
-    .navigationDestination(item: $viewModel.openedThread) { thread in RoomScreen(viewModel: thread)
+    .navigationDestination(item: $viewModel.openedThread) { thread in
+      RoomScreen(viewModel: thread, meetCalls: meetCalls)
     }
     .navigationDestination(item: $details) { details in RoomDetailsScreen(viewModel: details) }
     .navigationDestination(item: $search) { search in

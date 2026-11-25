@@ -179,6 +179,46 @@ extension RoomViewModel {
     return nil
   }
 
+  /// Keeps where the chat is left: on the newest message, or the message at the top of the screen (the first one at
+  /// or after `topRowId`, which may be a day divider). Nothing is kept for a thread.
+  public func rememberScroll(isAtBottom: Bool, topRowId: String?) {
+    guard let scrollMemory, case .loaded = state else { return }
+    let position: TimelineScrollMemory.Position =
+      if !isAtBottom, let topRowId, let eventId = firstEventId(atOrAfterRow: topRowId) {
+        .message(eventId: eventId)
+      } else {
+        .bottom
+      }
+    scrollMemory.remember(position, ofRoom: roomId)
+  }
+
+  /// When the first messages show, puts the message the chat was left on back at the top of the screen. A link to
+  /// a message opens there instead, and a message no longer loaded leaves the chat on its newest message, as on the
+  /// web.
+  func restoreScroll(in list: [TimelineItem]) {
+    guard !didRestoreScroll, !list.isEmpty else { return }
+    didRestoreScroll = true
+    guard pendingEventId == nil,
+      case .message(let eventId)? = scrollMemory?.position(ofRoom: roomId)
+    else { return }
+    restoreTarget = rowId(containingEvent: eventId)
+  }
+
+  /// The event id of the first message shown in or after the row `rowId`.
+  private func firstEventId(atOrAfterRow rowId: String) -> String? {
+    let rows = rows
+    guard let start = rows.firstIndex(where: { $0.id == rowId }) else { return nil }
+    for row in rows[start...] {
+      switch row {
+      case .message(let model): if let eventId = model.message.eventId { return eventId }
+      case .album(let model):
+        if let eventId = model.messages.lazy.compactMap(\.eventId).first { return eventId }
+      case .other, .notices: continue
+      }
+    }
+    return nil
+  }
+
   /// The row that shows `eventId`: its own, or the album it belongs to.
   private func rowId(containingEvent eventId: String) -> String? {
     for row in rows {

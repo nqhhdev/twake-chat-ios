@@ -69,3 +69,6 @@ jobs:
 
       - name: Architecture check tests
         run: scripts/tests/check_architecture_test.sh
+
+      - name: No-comments check tests (ADR 0025)
+        run: scripts/tests/check_no_comments_test.sh

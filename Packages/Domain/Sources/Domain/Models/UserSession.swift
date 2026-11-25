@@ -8,15 +8,22 @@ public struct UserSession: Sendable, Equatable {
   public let homeserverURL: URL
   public let accessToken: String
   public let refreshToken: String?
+  /// The `m.authentication` issuer of the homeserver's `.well-known` when the session came from a token (SSO)
+  /// sign-in, as the Flutter app keeps `authUrl` with `LoginType.mLoginToken`; `nil` after a password sign-in. Log out
+  /// opens its `?logout=1` page to end the SSO session too.
+  public let authenticationIssuer: URL?
 
   public init(
-    userId: String, deviceId: String, homeserverURL: URL, accessToken: String, refreshToken: String?
+    userId: String, deviceId: String, homeserverURL: URL, accessToken: String,
+    refreshToken: String?,
+    authenticationIssuer: URL? = nil
   ) {
     self.userId = userId
     self.deviceId = deviceId
     self.homeserverURL = homeserverURL
     self.accessToken = accessToken
     self.refreshToken = refreshToken
+    self.authenticationIssuer = authenticationIssuer
   }
 }
 

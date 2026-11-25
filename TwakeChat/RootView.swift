@@ -55,8 +55,11 @@ final class RootCoordinator {
   @ObservationIgnored private let roomSearch: (any RoomSearchRepository)?
   @ObservationIgnored private let savedMessages: (any SavedMessagesRepository)?
   @ObservationIgnored private let threadPrefs: (any ThreadPrefsRepository)?
+  @ObservationIgnored private let activityReactions: (any ActivityReactionsRepository)?
   @ObservationIgnored private let accountSettings: (any AccountSettingsRepository)?
   @ObservationIgnored private let people: (any PeopleRepository)?
+  /// Meet calls of the account (#92).
+  @ObservationIgnored let meetCalls: (any MeetCallRepository)?
   /// Push notifications of the signed-in account.
   @ObservationIgnored let push: PushCenter
   /// Pauses sync in the background and resumes it on return.
@@ -103,6 +106,7 @@ final class RootCoordinator {
     roomSearch: (any RoomSearchRepository)? = nil,
     savedMessages: (any SavedMessagesRepository)? = nil,
     threadPrefs: (any ThreadPrefsRepository)? = nil,
+    activityReactions: (any ActivityReactionsRepository)? = nil,
     roomLinks: (any RoomLinkRepository)? = nil,
     accountSettings: (any AccountSettingsRepository)? = nil,
     deviceUnlock: DeviceUnlocker? = nil,
@@ -110,6 +114,7 @@ final class RootCoordinator {
     verification: (any VerificationRepository)? = nil, devices: (any DevicesRepository)? = nil,
     chatDisplay: (any ChatDisplaySettingsStore)? = nil, appLock: AppLock? = nil,
     sync: (any SyncLifecycle)? = nil, sessionExpiry: (any SessionExpiry)? = nil,
+    meetCalls: (any MeetCallRepository)? = nil,
     signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator
   ) {
     let pushCenter = PushCenter(repository: push)
@@ -133,7 +138,9 @@ final class RootCoordinator {
     self.roomSearch = roomSearch
     self.savedMessages = savedMessages
     self.threadPrefs = threadPrefs
+    self.activityReactions = activityReactions
     self.accountSettings = accountSettings
+    self.meetCalls = meetCalls
     self.deviceUnlock = deviceUnlock
     self.people = people
     self.signInConfiguration = signInConfiguration
@@ -153,16 +160,17 @@ final class RootCoordinator {
     let viewModel = ChatListViewModel(
       repository: roomList, media: media, archive: archive, publicRooms: publicRooms,
       spaces: spaces, messageSearch: roomSearch, doNotDisturb: doNotDisturb(),
-      saved: savedMessages, threadPrefs: threadPrefs, people: people,
-      openPerson: openDirectChat()
-    ) {
-      [weak signedIn, push, shareSuggestions] in
-      guard let signedIn else { return false }
-      await push.stop()
-      shareSuggestions.forgetAll()
-      await signedIn.logOut()
-      return signedIn.errorMessage == nil
-    }
+      saved: savedMessages, threadPrefs: threadPrefs, activityReactions: activityReactions,
+      people: people,
+      openPerson: openDirectChat(),
+      previewTimeline: { [makeTimeline] roomId in makeTimeline(roomId, nil) },
+      logOut: { [weak signedIn, push, shareSuggestions] in
+        guard let signedIn else { return false }
+        await push.stop()
+        shareSuggestions.forgetAll()
+        await signedIn.logOut()
+        return signedIn.errorMessage == nil
+      })
     chatList = (signedIn, viewModel)
     lifecycle.unreadCount = { [weak viewModel] in
       viewModel.map { RoomSummary.appBadge(for: $0.allJoinedRooms) } ?? 0
@@ -188,10 +196,13 @@ final class RootCoordinator {
       checkSession: sessionCheck(), display: displaySettings(), blocking: blocking(),
       saved: savedMessages,
       threadTimeline: { [makeThreadTimeline] root in makeThreadTimeline(summary.id, root) },
-      threadPrefs: threadPrefs)
+      threadPrefs: threadPrefs, scrollMemory: scrollMemory)
     shareSuggestions.follow(room)
     return room
   }
+
+  /// Where each chat was left, for this run of the app (issue #138).
+  @ObservationIgnored private let scrollMemory = TimelineScrollMemory()
 
   /// The account's do not disturb, for the chat list's banner.
   private func doNotDisturb() -> ChatListViewModel.DoNotDisturb? {
@@ -463,7 +474,8 @@ struct RootView: View {
             push: coordinator.push, links: coordinator.links, shares: coordinator.shares,
             makePeopleSearch: coordinator.peopleSearch(mode:onOpen:),
             makeRoom: coordinator.room(for:onLeft:),
-            checkSession: coordinator.sessionCheckAfterUnlock()
+            checkSession: coordinator.sessionCheckAfterUnlock(),
+            meetCalls: coordinator.meetCalls
           )
           // Signed in: ask for notifications and register this device.
           .task { await coordinator.push.start() }

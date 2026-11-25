@@ -31,6 +31,16 @@ public struct SignInConfiguration: Sendable, Equatable {
   /// Whether the Twake ID buttons show: the Flutter welcome shows them only on the SaaS platform, which has both URLs.
   public var offersTwakeID: Bool { registrationURL != nil && workplaceHomeserver != nil }
 
+  /// The page that ends the SSO session of `issuer`: `<issuer>?logout=1` (connect_page_mixin.dart `_getLogoutUrl`).
+  public static func ssoLogoutURL(issuer: URL) -> URL? {
+    guard var components = URLComponents(url: issuer, resolvingAgainstBaseURL: false) else {
+      return nil
+    }
+    components.queryItems =
+      (components.queryItems ?? []) + [URLQueryItem(name: "logout", value: "1")]
+    return components.url
+  }
+
   /// The registration-site URL for Sign in (`post_login_redirect_url`) or Create Twake ID
   /// (`post_registered_redirect_url`), with `app=chat` (twake_welcome.dart:62-139).
   public func registrationSiteURL(signUp: Bool) -> URL? {

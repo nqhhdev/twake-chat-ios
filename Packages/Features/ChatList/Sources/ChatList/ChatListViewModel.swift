@@ -83,14 +83,18 @@ public final class ChatListViewModel {
     doNotDisturb: DoNotDisturb? = nil,
     saved: (any SavedMessagesRepository)? = nil,
     threadPrefs: (any ThreadPrefsRepository)? = nil,
+    activityReactions: (any ActivityReactionsRepository)? = nil,
     people: (any PeopleRepository)? = nil,
     openPerson: (@MainActor (String) async -> Bool)? = nil,
+    previewTimeline: (@MainActor (String) -> any TimelineRepository)? = nil,
     logOut: @escaping @MainActor () async -> Bool
   ) {
+    self.previewTimeline = previewTimeline
     self.people = people
     self.openPerson = openPerson
     self.saved = saved
     self.threadPrefs = threadPrefs
+    self.activityReactions = activityReactions
     self.doNotDisturb = doNotDisturb
     self.messageSearch = messageSearch
     self.spaces = spaces
@@ -106,6 +110,9 @@ public final class ChatListViewModel {
   @ObservationIgnored let threadPrefs: (any ThreadPrefsRepository)?
   /// The threads the user follows by choice, for the Activity (`Activity.swift`).
   public internal(set) var followedThreads: [FollowedThread] = []
+  @ObservationIgnored let activityReactions: (any ActivityReactionsRepository)?
+  /// The reactions of other people on the user's messages, for the Activity (`Activity.swift`).
+  public internal(set) var reactions: [ActivityReaction] = []
   @ObservationIgnored private let people: (any PeopleRepository)?
   @ObservationIgnored private let openPerson: (@MainActor (String) async -> Bool)?
   /// The people the search text finds (the user directory and ToM contacts), for the global search.
@@ -217,6 +224,20 @@ public final class ChatListViewModel {
       picture: { @Sendable [weak self] reference in await self?.picture(reference) },
       onOpen: onOpen,
       markRead: { [repository] roomId in try? await repository.setUnread(false, roomId: roomId) })
+  }
+
+  /// The timeline of a room by its id, for the long-press preview; `nil` shows the menu without a preview.
+  @ObservationIgnored private let previewTimeline: (@MainActor (String) -> any TimelineRepository)?
+
+  /// Whether a long press on `room` shows its latest messages above the menu. Spaces and invitations keep the plain menu.
+  public func hasPreview(_ room: RoomSummary) -> Bool {
+    previewTimeline != nil && !room.isSpace && !room.isInvite
+  }
+
+  /// The preview's model on a new timeline of `room`, or `nil` when `hasPreview(room)` is false.
+  public func makePreview(_ room: RoomSummary) -> ChatPreviewViewModel? {
+    guard hasPreview(room), let previewTimeline else { return nil }
+    return ChatPreviewViewModel(room: room, repository: previewTimeline(room.id))
   }
 
   /// The public groups screen's model; joining a group opens it through `onJoined`.

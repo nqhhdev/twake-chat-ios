@@ -258,4 +258,67 @@ struct ChatDisplaySettingsPageTests {
     #expect(settings.statusMessage == nil)
     #expect(repository.statusText == nil)
   }
+
+  @Test func anEmailIsLinkedAfterTheLinkIsOpenedAndTheUserConfirmsOnTheWeb() async {
+    let repository = FakeAccountSettingsRepository()
+    let challenge = DeviceAuthChallenge(
+      session: "uia", webURL: URL(string: "https://matrix.example.org/sso"),
+      acceptsPassword: false)
+    repository.linkAnswers = [.failure(.addressNotConfirmed), .success(challenge)]
+    let settings = SettingsViewModel(userId: "@alice:example.org", repository: repository) { true }
+    await settings.loadLinkedAddresses()
+    #expect(settings.canChangeLinkedAddresses)
+
+    await settings.addEmail("  bob@example.org ")
+    #expect(settings.pendingEmail?.email == "bob@example.org")
+    await settings.finishLinkingEmail()
+    #expect(settings.emailNotConfirmed)
+    #expect(settings.pendingEmail != nil)
+    await settings.finishLinkingEmail()
+    #expect(settings.emailChallenge == challenge)
+    await settings.confirmLinkingEmail()
+
+    #expect(repository.linkAuths == [nil, nil, .confirmedOnWeb(session: "uia")])
+    #expect(settings.pendingEmail == nil)
+    #expect(settings.emailChallenge == nil)
+    #expect(settings.linkedAddresses == [LinkedAddress(kind: .email, address: "bob@example.org")])
+    #expect(settings.errorMessage == nil)
+  }
+
+  @Test func aRefusedConfirmationGivesUpAndSaysSo() async {
+    let repository = FakeAccountSettingsRepository()
+    let challenge = DeviceAuthChallenge(session: "uia", webURL: nil, acceptsPassword: true)
+    repository.linkAnswers = [.success(challenge), .success(challenge)]
+    let settings = SettingsViewModel(userId: "@alice:example.org", repository: repository) { true }
+    await settings.addEmail("bob@example.org")
+    await settings.finishLinkingEmail()
+    await settings.confirmLinkingEmail(password: "wrong")
+    #expect(repository.linkAuths.last == .password("wrong", session: "uia"))
+    #expect(settings.pendingEmail == nil)
+    #expect(settings.errorMessage == "Could not confirm it is you. Please try again.")
+  }
+
+  @Test func anEmailAlreadyInUseIsNotSent() async {
+    let repository = FakeAccountSettingsRepository()
+    repository.emailConfirmationError = .addressInUse
+    let settings = SettingsViewModel(userId: "@alice:example.org", repository: repository) { true }
+    await settings.addEmail("bob@example.org")
+    #expect(settings.pendingEmail == nil)
+    #expect(settings.errorMessage == "This e-mail is already used by another account.")
+  }
+
+  @Test func removingAnAddressTakesItOffUnlessTheServerRefuses() async {
+    let repository = FakeAccountSettingsRepository()
+    let email = LinkedAddress(kind: .email, address: "a@b.org")
+    let phone = LinkedAddress(kind: .phone, address: "+33612345678")
+    repository.addresses = [email, phone]
+    let settings = SettingsViewModel(userId: "@alice:example.org", repository: repository) { true }
+    await settings.loadLinkedAddresses()
+    await settings.removeLinkedAddress(phone)
+    #expect(settings.linkedAddresses == [email])
+    repository.removalFails = true
+    await settings.removeLinkedAddress(email)
+    #expect(settings.linkedAddresses == [email])
+    #expect(settings.errorMessage == "Could not remove a@b.org. Please try again.")
+  }
 }

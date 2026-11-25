@@ -19,6 +19,19 @@ struct StoredSessionSlidingSyncTests {
           homeserverURL: URL(string: "https://matrix.example.org")!,
           accessToken: "access-secret", refreshToken: "refresh-secret"))
     #expect(decoded.slidingSyncVersion == nil)
+    #expect(decoded.authenticationIssuer == nil)
+  }
+
+  /// The SSO issuer of a token sign-in is kept for log out (ADR 0021).
+  @Test func authenticationIssuerRoundTrips() throws {
+    let value = StoredSession(
+      userId: "@alice:example.org", deviceId: "DEVICE",
+      homeserverURL: URL(string: "https://matrix.example.org")!,
+      accessToken: "access-secret", refreshToken: nil, slidingSyncVersion: "native",
+      authenticationIssuer: URL(string: "https://sign-up.example.org/")!)
+    let decoded = try JSONDecoder().decode(StoredSession.self, from: JSONEncoder().encode(value))
+    #expect(decoded == value)
+    #expect(decoded.authenticationIssuer == URL(string: "https://sign-up.example.org/"))
   }
 
   @Test(arguments: ["native", "none"])

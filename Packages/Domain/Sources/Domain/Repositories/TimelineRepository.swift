@@ -104,7 +104,7 @@ public protocol TimelineRepository: Sendable {
   func send(command: BotCommand, text: String) async throws(TimelineError)
 
   /// The versions of the message `eventId`, the original first (its `m.replace` edits, spec "Event replacements");
-  /// `nil` in an encrypted room, whose edits the server cannot read.
+  /// in an encrypted room the device decrypts them. `nil` when they cannot be loaded.
   func editHistory(of eventId: String) async -> [MessageVersion]?
 
   /// The room's threads, the most recently active first (`/threads`); empty when it has none or they cannot load.
