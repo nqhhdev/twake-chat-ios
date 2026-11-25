@@ -39,6 +39,14 @@ enum ClientServerRequest {
     return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
   }
 
+  /// The status code and body of the answer, whatever the status; `nil` when no answer came.
+  static func answer(_ request: URLRequest) async -> (Int, Data)? {
+    guard let (data, response) = try? await URLSession.shared.data(for: request),
+      let http = response as? HTTPURLResponse
+    else { return nil }
+    return (http.statusCode, data)
+  }
+
   /// Whether the request answered 200.
   static func succeeds(_ request: URLRequest) async -> Bool {
     guard let (_, response) = try? await URLSession.shared.data(for: request) else { return false }
