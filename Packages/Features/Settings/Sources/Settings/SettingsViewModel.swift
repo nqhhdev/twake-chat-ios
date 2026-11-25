@@ -183,21 +183,19 @@ public final class SettingsViewModel {
     canChangeLinkedAddresses = await canChange
   }
 
-  /// The e-mail waiting for the user to open the link sent to it; `nil` when none is.
   public private(set) var pendingEmail: PendingEmailLink?
-  /// The confirmation the server asks for before linking `pendingEmail`: the web page or the password.
-  public private(set) var emailChallenge: DeviceAuthChallenge?
-  /// The user said they opened the link, but the server has not seen it yet.
+  public private(set) var pendingPhone: PendingPhoneLink?
+  public private(set) var linkChallenge: DeviceAuthChallenge?
   public private(set) var emailNotConfirmed = false
+  public private(set) var phoneCodeRejected = false
   public private(set) var isChangingAddresses = false
-  /// The confirmation already given, sent again when the user retries after opening the link.
-  @ObservationIgnored private var emailAuth: DeviceAuth?
+  @ObservationIgnored public var regionCode: String? = Locale.current.region?.identifier
+  @ObservationIgnored private var linkAuth: DeviceAuth?
 
-  /// Sends a confirmation link to `email`; then `pendingEmail` waits for the user to open it.
   public func addEmail(_ email: String) async {
     let email = email.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !email.isEmpty, !isChangingAddresses else { return }
-    cancelLinkingEmail()
+    cancelLinking()
     errorMessage = nil
     isChangingAddresses = true
     defer { isChangingAddresses = false }
@@ -210,56 +208,105 @@ public final class SettingsViewModel {
     }
   }
 
-  /// The user opened the link: links the e-mail, or asks for the confirmation the server wants first.
-  public func finishLinkingEmail() async {
-    await linkEmail(auth: emailAuth, isNewConfirmation: false)
-  }
-
-  /// Sends the user's confirmation for `emailChallenge`: `password`, or none after the web page.
-  public func confirmLinkingEmail(password: String? = nil) async {
-    guard let challenge = emailChallenge else { return }
-    emailChallenge = nil
-    let auth: DeviceAuth =
-      if let password { .password(password, session: challenge.session) } else {
-        .confirmedOnWeb(session: challenge.session)
-      }
-    await linkEmail(auth: auth, isNewConfirmation: true)
-  }
-
-  public func cancelLinkingEmail() {
-    pendingEmail = nil
-    emailChallenge = nil
-    emailNotConfirmed = false
-    emailAuth = nil
-  }
-
-  private func linkEmail(auth: DeviceAuth?, isNewConfirmation: Bool) async {
-    guard let pending = pendingEmail, !isChangingAddresses else { return }
+  public func addPhone(_ number: String) async {
+    let number = number.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !number.isEmpty, !isChangingAddresses else { return }
+    cancelLinking()
     errorMessage = nil
     isChangingAddresses = true
     defer { isChangingAddresses = false }
     do {
-      guard let challenge = try await repository.linkEmail(pending, auth: auth) else {
-        cancelLinkingEmail()
+      pendingPhone = try await repository.sendPhoneConfirmation(to: number, regionCode: regionCode)
+    } catch .addressInUse {
+      errorMessage = "This phone number is already used by another account."
+    } catch .phoneNotSupported {
+      errorMessage =
+        "This phone number cannot be added. Check the number, with its country code, or ask your server's administrator."
+    } catch {
+      errorMessage = "Could not send the code. Please try again."
+    }
+  }
+
+  public func submitPhoneCode(_ code: String) async {
+    guard let pending = pendingPhone, !isChangingAddresses,
+      !code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    else { return }
+    errorMessage = nil
+    isChangingAddresses = true
+    do {
+      try await repository.confirmPhone(pending, code: code)
+    } catch .wrongCode {
+      isChangingAddresses = false
+      phoneCodeRejected = true
+      return
+    } catch {
+      isChangingAddresses = false
+      cancelLinking()
+      errorMessage = "Could not check the code. Please try again."
+      return
+    }
+    isChangingAddresses = false
+    phoneCodeRejected = false
+    await link(auth: nil, isNewConfirmation: false)
+  }
+
+  public func finishLinkingEmail() async {
+    await link(auth: linkAuth, isNewConfirmation: false)
+  }
+
+  public func confirmLinking(password: String? = nil) async {
+    guard let challenge = linkChallenge else { return }
+    linkChallenge = nil
+    let auth: DeviceAuth =
+      if let password { .password(password, session: challenge.session) } else {
+        .confirmedOnWeb(session: challenge.session)
+      }
+    await link(auth: auth, isNewConfirmation: true)
+  }
+
+  public func cancelLinking() {
+    pendingEmail = nil
+    pendingPhone = nil
+    linkChallenge = nil
+    emailNotConfirmed = false
+    phoneCodeRejected = false
+    linkAuth = nil
+  }
+
+  private func link(auth: DeviceAuth?, isNewConfirmation: Bool) async {
+    guard pendingEmail != nil || pendingPhone != nil, !isChangingAddresses else { return }
+    let noun = pendingPhone == nil ? "e-mail" : "phone number"
+    errorMessage = nil
+    isChangingAddresses = true
+    defer { isChangingAddresses = false }
+    do {
+      var answer: DeviceAuthChallenge?
+      if let pending = pendingEmail {
+        answer = try await repository.linkEmail(pending, auth: auth)
+      } else if let pending = pendingPhone {
+        answer = try await repository.linkPhone(pending, auth: auth)
+      }
+      guard let challenge = answer else {
+        cancelLinking()
         linkedAddresses = await repository.linkedAddresses()
         return
       }
       if isNewConfirmation || (challenge.webURL == nil && !challenge.acceptsPassword) {
-        cancelLinkingEmail()
+        cancelLinking()
         errorMessage = "Could not confirm it is you. Please try again."
       } else {
         emailNotConfirmed = false
-        emailChallenge = challenge
+        linkChallenge = challenge
       }
-    } catch .addressNotConfirmed {
-      emailAuth = auth
+    } catch .addressNotConfirmed where pendingEmail != nil {
+      linkAuth = auth
       emailNotConfirmed = true
     } catch .addressInUse {
-      cancelLinkingEmail()
-      errorMessage = "This e-mail is already used by another account."
+      cancelLinking()
+      errorMessage = "This \(noun) is already used by another account."
     } catch {
-      cancelLinkingEmail()
-      errorMessage = "Could not add the e-mail. Please try again."
+      cancelLinking()
+      errorMessage = "Could not add the \(noun). Please try again."
     }
   }
 

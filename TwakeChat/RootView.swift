@@ -58,6 +58,8 @@ final class RootCoordinator {
   @ObservationIgnored private let activityReactions: (any ActivityReactionsRepository)?
   @ObservationIgnored private let accountSettings: (any AccountSettingsRepository)?
   @ObservationIgnored private let people: (any PeopleRepository)?
+  @ObservationIgnored private let identity: (any IdentityRepository)?
+  @ObservationIgnored private let addressBook: (any AddressBook)?
   /// Meet calls of the account (#92).
   @ObservationIgnored let meetCalls: (any MeetCallRepository)?
   /// Push notifications of the signed-in account.
@@ -115,8 +117,11 @@ final class RootCoordinator {
     chatDisplay: (any ChatDisplaySettingsStore)? = nil, appLock: AppLock? = nil,
     sync: (any SyncLifecycle)? = nil, sessionExpiry: (any SessionExpiry)? = nil,
     meetCalls: (any MeetCallRepository)? = nil,
+    identity: (any IdentityRepository)? = nil, addressBook: (any AddressBook)? = nil,
     signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator
   ) {
+    self.identity = identity
+    self.addressBook = addressBook
     let pushCenter = PushCenter(repository: push)
     self.sessionExpiry = sessionExpiry
     self.push = pushCenter
@@ -311,7 +316,7 @@ final class RootCoordinator {
   /// The People search in invite mode, shown from a room's details (the app joins the features, ADR 0005).
   private func invitePeople() -> InvitePeople? {
     guard let people, let roomDetails else { return nil }
-    return InvitePeople { roomId, onInvited in
+    return InvitePeople { [identity] roomId, onInvited in
       let search = PeopleSearchViewModel(
         mode: .invite, repository: people, onOpen: { _, _ in },
         invite: { userIds in
@@ -322,6 +327,20 @@ final class RootCoordinator {
           } catch {
             return userIds
           }
+        },
+        identity: identity,
+        inviteAddresses: { addresses in
+          guard let identity else { return addresses }
+          var failed: [ContactAddress] = []
+          for address in addresses {
+            do {
+              try await identity.invite(address, roomId: roomId)
+            } catch {
+              failed.append(address)
+            }
+          }
+          if failed.count < addresses.count { onInvited() }
+          return failed
         })
       return AnyView(InviteScreen(viewModel: search))
     }
@@ -353,7 +372,13 @@ final class RootCoordinator {
   func peopleSearch(
     mode: PeopleSearchViewModel.Mode, onOpen: @escaping @MainActor (String, String) -> Void
   ) -> PeopleSearchViewModel {
-    PeopleSearchViewModel(mode: mode, repository: people ?? UnavailablePeople(), onOpen: onOpen)
+    PeopleSearchViewModel(
+      mode: mode, repository: people ?? UnavailablePeople(), onOpen: onOpen, identity: identity)
+  }
+
+  func phoneContacts() -> PhoneContactsViewModel? {
+    guard let identity, let addressBook else { return nil }
+    return PhoneContactsViewModel(addressBook: addressBook, identity: identity)
   }
 
   @ObservationIgnored private var started = false
@@ -475,7 +500,8 @@ struct RootView: View {
             makePeopleSearch: coordinator.peopleSearch(mode:onOpen:),
             makeRoom: coordinator.room(for:onLeft:),
             checkSession: coordinator.sessionCheckAfterUnlock(),
-            meetCalls: coordinator.meetCalls
+            meetCalls: coordinator.meetCalls,
+            makePhoneContacts: coordinator.phoneContacts
           )
           // Signed in: ask for notifications and register this device.
           .task { await coordinator.push.start() }

@@ -87,3 +87,7 @@
 
 ## 2026-11-24
 * **Decision (owner, 2026-11-24)**: no comments in Swift code. ADR 0025 (Proposed) records it, with the `swift-tools-version` line as the only exception; `scripts/check-no-comments.sh` and its tests are added. CI runs only the check's tests for now; the check itself is turned on once the existing comments are removed, after the open pull requests merge.
+
+## 2026-11-25
+* **Decision**: ADR 0029 (Proposed) records how the app finds and invites people by e-mail or phone: the identity server from `m.identity_server` (account data, then the well-known), terms accepted first, `sha256` hashed lookups, hidden without a server (issues #95, #98).
+* **Change**: Adding a phone number in Settings (`/account/3pid/msisdn/requestToken`, SMS code, `/account/3pid/add`), e-mail and phone rows in the people search, third-party invites and phone-contact matching are built (`IdentityServerProxy`, `IdentityService`, `PhoneContactsViewModel`, `SystemAddressBook`). Deferred Features is updated.

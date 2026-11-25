@@ -3,6 +3,7 @@ import Authentication
 import Domain
 import Foundation
 import MatrixData
+import People
 import SwiftUI
 
 @main
@@ -70,6 +71,8 @@ struct TwakeChatApp: App {
         devices: DevicesProxy(authentication: repository), chatDisplay: ChatDisplayDefaults(),
         appLock: AppLock(), sync: repository, sessionExpiry: repository,
         meetCalls: MeetCallProxy(authentication: repository),
+        identity: IdentityServerProxy(authentication: repository),
+        addressBook: SystemAddressBook(),
         signInConfiguration: configuration, webAuthenticator: SystemWebAuthenticator()))
     AppDelegate.push = root.push
   }

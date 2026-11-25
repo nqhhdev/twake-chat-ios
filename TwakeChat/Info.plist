@@ -24,6 +24,8 @@
 	<string>Twake Chat uses the camera to take pictures and videos you send in a chat.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Twake Chat records voice messages with the microphone while you hold the record button.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Twake Chat checks your contacts' e-mails and phone numbers, in hashed form, with your server's identity service to show who you can chat with. Contacts are never stored or shared otherwise.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Twake Chat saves the pictures and videos you choose to Photos.</string>
 	<key>CFBundleURLTypes</key>

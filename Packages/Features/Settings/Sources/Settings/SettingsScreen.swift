@@ -519,6 +519,8 @@ struct StorageSettingsScreen: View {
   @State private var isConfirming = false
   @State private var isAddingEmail = false
   @State private var newEmail = ""
+  @State private var isAddingPhone = false
+  @State private var newPhone = ""
   @State private var removing: LinkedAddress?
 
   var body: some View {
@@ -538,6 +540,8 @@ struct StorageSettingsScreen: View {
           }
           if viewModel.canChangeLinkedAddresses {
             Button("Add e-mail", systemImage: "plus") { isAddingEmail = true }
+              .disabled(viewModel.isChangingAddresses)
+            Button("Add phone number", systemImage: "plus") { isAddingPhone = true }
               .disabled(viewModel.isChangingAddresses)
           }
         } header: {
@@ -616,6 +620,19 @@ struct StorageSettingsScreen: View {
     } message: {
       Text("We will send a link to this address to confirm it is yours.")
     }
+    .alert("Add a phone number", isPresented: $isAddingPhone) {
+      TextField("+33 6 12 34 56 78", text: $newPhone)
+        .keyboardType(.phonePad)
+        .textContentType(.telephoneNumber)
+      Button("Cancel", role: .cancel) { newPhone = "" }
+      Button("Send code") {
+        let typed = newPhone
+        newPhone = ""
+        Task { await viewModel.addPhone(typed) }
+      }
+    } message: {
+      Text("We will send a code to this number by text message to confirm it is yours.")
+    }
     .confirmationDialog(
       "Remove \(removing?.address ?? "")?",
       isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
@@ -635,19 +652,45 @@ struct StorageSettingsScreen: View {
 private struct LinkedAddressDialogs: ViewModifier {
   let viewModel: SettingsViewModel
   @State private var password = ""
+  @State private var code = ""
 
   func body(content: Content) -> some View {
     content
       .alert(
+        "Enter the code",
+        isPresented: Binding(
+          get: {
+            viewModel.pendingPhone != nil && viewModel.linkChallenge == nil
+              && !viewModel.isChangingAddresses
+          },
+          set: { if !$0 { code = "" } })
+      ) {
+        TextField("Code", text: $code)
+          .keyboardType(.numberPad)
+          .textContentType(.oneTimeCode)
+        Button("Cancel", role: .cancel) { viewModel.cancelLinking() }
+        Button("Confirm") {
+          let typed = code
+          code = ""
+          Task { await viewModel.submitPhoneCode(typed) }
+        }
+      } message: {
+        let phone = viewModel.pendingPhone?.phone ?? ""
+        Text(
+          viewModel.phoneCodeRejected
+            ? "This code is not right. Check the text message sent to \(phone) and try again."
+            : "We sent a code to \(phone). Enter it to confirm the number is yours.")
+      }
+      .alert(
         "Check your inbox",
         isPresented: Binding(
           get: {
-            viewModel.pendingEmail != nil && viewModel.emailChallenge == nil
+            viewModel.pendingEmail != nil && viewModel.linkChallenge == nil
               && !viewModel.isChangingAddresses
           },
           set: { _ in })
       ) {
-        Button("Cancel", role: .cancel) { viewModel.cancelLinkingEmail() }
+        Button("Cancel", role: .cancel) { viewModel.cancelLinking() }
         Button("I opened the link") { Task { await viewModel.finishLinkingEmail() } }
       } message: {
         let email = viewModel.pendingEmail?.email ?? ""
@@ -658,10 +701,10 @@ private struct LinkedAddressDialogs: ViewModifier {
       }
       .sheet(
         isPresented: Binding(
-          get: { viewModel.emailChallenge?.webURL != nil },
-          set: { if !$0 { Task { await viewModel.confirmLinkingEmail() } } })
+          get: { viewModel.linkChallenge?.webURL != nil },
+          set: { if !$0 { Task { await viewModel.confirmLinking() } } })
       ) {
-        if let url = viewModel.emailChallenge?.webURL {
+        if let url = viewModel.linkChallenge?.webURL {
           SafariView(url: url).ignoresSafeArea()
         }
       }
@@ -669,19 +712,22 @@ private struct LinkedAddressDialogs: ViewModifier {
         "Confirm it is you",
         isPresented: Binding(
           get: {
-            viewModel.emailChallenge.map { $0.webURL == nil && $0.acceptsPassword } ?? false
+            viewModel.linkChallenge.map { $0.webURL == nil && $0.acceptsPassword } ?? false
           },
           set: { if !$0 { password = "" } })
       ) {
         SecureField("Password", text: $password)
-        Button("Cancel", role: .cancel) { viewModel.cancelLinkingEmail() }
+        Button("Cancel", role: .cancel) { viewModel.cancelLinking() }
         Button("Add") {
           let typed = password
           password = ""
-          Task { await viewModel.confirmLinkingEmail(password: typed) }
+          Task { await viewModel.confirmLinking(password: typed) }
         }
       } message: {
-        Text("Enter your account password to add the e-mail.")
+        Text(
+          viewModel.pendingPhone == nil
+            ? "Enter your account password to add the e-mail."
+            : "Enter your account password to add the phone number.")
       }
   }
 }
