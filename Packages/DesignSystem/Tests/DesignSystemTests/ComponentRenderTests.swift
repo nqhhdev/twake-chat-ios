@@ -28,6 +28,12 @@ struct ComponentRenderTests {
   }
 
   @Test(arguments: [ColorScheme.light, .dark])
+  func presenceDots(scheme: ColorScheme) {
+    expectRenders(AvatarPresenceDot(.online, avatarSize: 52), scheme, width: nil)
+    expectRenders(AvatarPresenceDot(.away, avatarSize: 32), scheme, width: nil)
+  }
+
+  @Test(arguments: [ColorScheme.light, .dark])
   func appBar(scheme: ColorScheme) {
     expectRenders(TwakeAppBar("Chats"), scheme)
   }

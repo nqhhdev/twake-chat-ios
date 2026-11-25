@@ -87,3 +87,6 @@
 
 ## 2026-11-24
 * **Decision (owner, 2026-11-24)**: no comments in Swift code. ADR 0025 (Proposed) records it, with the `swift-tools-version` line as the only exception; `scripts/check-no-comments.sh` and its tests are added. CI runs only the check's tests for now; the check itself is turned on once the existing comments are removed, after the open pull requests merge.
+
+## 2026-11-25
+* **Decision**: ADR 0031 (Proposed): the chat list shows a presence dot on a direct chat's avatar (#136), read with one request when the row shows and kept a minute per person, never on a timer, since the pinned SDK syncs no presence.

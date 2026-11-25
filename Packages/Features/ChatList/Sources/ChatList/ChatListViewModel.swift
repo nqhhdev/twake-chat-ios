@@ -87,8 +87,10 @@ public final class ChatListViewModel {
     people: (any PeopleRepository)? = nil,
     openPerson: (@MainActor (String) async -> Bool)? = nil,
     previewTimeline: (@MainActor (String) -> any TimelineRepository)? = nil,
+    presence: (@Sendable (String) async -> Presence?)? = nil,
     logOut: @escaping @MainActor () async -> Bool
   ) {
+    self.presence = presence
     self.previewTimeline = previewTimeline
     self.people = people
     self.openPerson = openPerson
@@ -117,6 +119,9 @@ public final class ChatListViewModel {
   @ObservationIgnored private let openPerson: (@MainActor (String) async -> Bool)?
   /// The people the search text finds (the user directory and ToM contacts), for the global search.
   public private(set) var peopleResults: [Person] = []
+  @ObservationIgnored let presence: (@Sendable (String) async -> Presence?)?
+  var presenceDots: [String: Presence.Dot] = [:]
+  @ObservationIgnored var presenceFetchedAt: [String: ContinuousClock.Instant] = [:]
 
   /// Opens the direct chat with someone the search found, creating it when needed.
   public func open(_ person: Person) async {

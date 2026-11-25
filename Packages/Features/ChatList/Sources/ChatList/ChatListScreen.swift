@@ -440,6 +440,12 @@ struct ChatListRow: View {
   var body: some View {
     HStack(alignment: .top, spacing: 12) {
       RoomAvatar(room: room, viewModel: viewModel, size: 52)
+        .overlay(alignment: .bottomTrailing) {
+          if let dot = viewModel.presenceDot(of: room) {
+            AvatarPresenceDot(AvatarPresence(dot), avatarSize: 52).offset(x: 2, y: 2)
+          }
+        }
+        .task(id: room.directUserId) { await viewModel.refreshPresence(of: room) }
       VStack(alignment: .leading, spacing: 2) {
         HStack(alignment: .firstTextBaseline) {
           Text(room.name)
