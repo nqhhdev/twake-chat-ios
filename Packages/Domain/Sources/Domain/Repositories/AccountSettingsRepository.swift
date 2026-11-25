@@ -28,6 +28,8 @@ public enum SettingsError: Error, Sendable, Equatable {
   /// The link in the confirmation e-mail was not opened yet.
   case addressNotConfirmed
   case requestFailed
+  case wrongCode
+  case phoneNotSupported
 }
 
 /// What the Settings tab needs about the signed-in account: its display name, its encryption recovery, and its default
@@ -100,6 +102,14 @@ public protocol AccountSettingsRepository: Sendable {
   func linkEmail(_ pending: PendingEmailLink, auth: DeviceAuth?) async throws(SettingsError)
     -> DeviceAuthChallenge?
 
+  func sendPhoneConfirmation(to number: String, regionCode: String?) async throws(SettingsError)
+    -> PendingPhoneLink
+
+  func confirmPhone(_ pending: PendingPhoneLink, code: String) async throws(SettingsError)
+
+  func linkPhone(_ pending: PendingPhoneLink, auth: DeviceAuth?) async throws(SettingsError)
+    -> DeviceAuthChallenge?
+
   /// Unlinks an e-mail or phone from the account (`POST /account/3pid/delete`).
   func removeLinkedAddress(_ address: LinkedAddress) async throws(SettingsError)
 
@@ -143,6 +153,19 @@ extension AccountSettingsRepository {
     throw .requestFailed
   }
   public func removeLinkedAddress(_ address: LinkedAddress) async throws(SettingsError) {
+    throw .requestFailed
+  }
+  public func sendPhoneConfirmation(to number: String, regionCode: String?)
+    async throws(SettingsError) -> PendingPhoneLink
+  {
+    throw .phoneNotSupported
+  }
+  public func confirmPhone(_ pending: PendingPhoneLink, code: String) async throws(SettingsError) {
+    throw .requestFailed
+  }
+  public func linkPhone(_ pending: PendingPhoneLink, auth: DeviceAuth?) async throws(SettingsError)
+    -> DeviceAuthChallenge?
+  {
     throw .requestFailed
   }
   public func cacheSize() async -> Int? { nil }
@@ -222,6 +245,20 @@ public struct PendingEmailLink: Sendable, Equatable {
     self.email = email
     self.clientSecret = clientSecret
     self.sessionId = sessionId
+  }
+}
+
+public struct PendingPhoneLink: Sendable, Equatable {
+  public let phone: String
+  public let clientSecret: String
+  public let sessionId: String
+  public let submitURL: URL
+
+  public init(phone: String, clientSecret: String, sessionId: String, submitURL: URL) {
+    self.phone = phone
+    self.clientSecret = clientSecret
+    self.sessionId = sessionId
+    self.submitURL = submitURL
   }
 }
 

@@ -37,6 +37,7 @@ struct ChatShell: View {
   var checkSession: (@Sendable () async -> SessionWarning?)?
   /// Meet calls of the account (#92); without it a room offers no call and shows call links as plain text.
   var meetCalls: (any MeetCallRepository)?
+  var makePhoneContacts: (() -> PhoneContactsViewModel?)?
 
   /// How the shell lays out a screen of `width` points (safe areas included, as Flutter measures).
   struct Layout: Equatable {
@@ -55,6 +56,7 @@ struct ChatShell: View {
   /// The draft chat with someone picked on a member's profile or in the chat list search.
   @State private var draftChat: PeopleSearchViewModel?
   @State private var contacts: PeopleSearchViewModel?
+  @State private var phoneContacts: PhoneContactsViewModel?
   @State private var settingsPage: SettingsPage? = .security
   /// Privacy & Security over the chat, from the banner that warns encrypted messages may not show.
   @State private var isFixingSession = false
@@ -249,10 +251,15 @@ struct ChatShell: View {
   /// The Contacts tab keeps its search while the app runs; a contact opens their chat in the Chats tab.
   private var contactsContent: some View {
     Group {
-      if let contacts { ContactsScreen(viewModel: contacts) } else { Color.clear }
+      if let contacts {
+        ContactsScreen(viewModel: contacts, phoneContacts: phoneContacts)
+      } else {
+        Color.clear
+      }
     }
     .task {
       guard contacts == nil else { return }
+      phoneContacts = makePhoneContacts?()
       contacts = makePeopleSearch(.direct) { roomId, name in
         destination = .chats
         open(
