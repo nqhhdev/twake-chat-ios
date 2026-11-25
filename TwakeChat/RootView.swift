@@ -347,6 +347,7 @@ final class RootCoordinator {
       await signedIn.logOut()
       return signedIn.errorMessage == nil
     }
+    viewModel.personalQR.openLink = { [weak self] url in _ = self?.links.handle(url) }
     settings = (signedIn, viewModel)
     return viewModel
   }
