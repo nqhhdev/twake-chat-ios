@@ -119,6 +119,13 @@ struct MessageActionsOverlay: View {
             Task { await viewModel.share(focus.album?.messages ?? [message]) }
           })
       }
+      let media = focus.album?.messages ?? [message]
+      if RoomViewModel.canSaveToPhotos(media) {
+        list.append(
+          .init(title: "Save to Photos", icon: "square.and.arrow.down") {
+            Task { await viewModel.saveToPhotos(media) }
+          })
+      }
       list.append(.init(title: "Copy Link", icon: "link") { viewModel.copyLink(to: message) })
       if viewModel.canSave {
         let saved = viewModel.isSaved(message)

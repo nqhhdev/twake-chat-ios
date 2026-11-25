@@ -59,9 +59,10 @@ struct PinnedBanner: View {
 /// A short confirmation that drops in from the top and fades away.
 struct Toast: View {
   let text: String
+  var systemImage = "checkmark.circle.fill"
 
   var body: some View {
-    Label(text, systemImage: "checkmark.circle.fill")
+    Label(text, systemImage: systemImage)
       .textStyle(TextStyles.labelLarge)
       .foregroundStyle(.white)
       .padding(.horizontal, 16)
