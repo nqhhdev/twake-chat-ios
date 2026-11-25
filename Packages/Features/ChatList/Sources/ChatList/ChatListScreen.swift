@@ -83,6 +83,11 @@ public struct ChatListScreen: View {
               Button("New chat", systemImage: "square.and.pencil", action: onCompose)
             }
           }
+          ToolbarItem(placement: .topBarTrailing) {
+            Menu("More", systemImage: "ellipsis.circle") {
+              MarkAllReadButton(viewModel: viewModel, rooms: viewModel.unreadRooms)
+            }
+          }
         }
       }
       .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
