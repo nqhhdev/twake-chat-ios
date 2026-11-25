@@ -14,8 +14,9 @@ Twake Chat for iOS is a native Swift chat client for the [Matrix](https://spec.m
 counterpart of the Flutter Twake Chat app (`twake-on-matrix`) and talks to the same servers. It runs on iPhone, on
 iOS 18 and iOS 26 ([ADR 0002](../../docs/adr/0002-ios-18-minimum-ios-26-styling.md)).
 
-Version 1 covers core chat only: sign-in, chat list, room timeline, end-to-end encryption with recovery, and push
-notifications ([ADR 0011](../../docs/adr/0011-v1-scope-core-chat.md)).
+The scope is parity with the Flutter app and the Twake web client on any Matrix homeserver; features that need a Twake
+service show only where the server announces it ([ADR 0026](../../docs/adr/0026-matrix-first-client-server-features.md),
+Proposed, to supersede [ADR 0011](../../docs/adr/0011-v1-scope-core-chat.md)'s core-chat v1).
 
 ## Who uses it
 | Actor | Interaction |

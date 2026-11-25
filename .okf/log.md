@@ -87,3 +87,7 @@
 
 ## 2026-11-24
 * **Decision (owner, 2026-11-24)**: no comments in Swift code. ADR 0025 (Proposed) records it, with the `swift-tools-version` line as the only exception; `scripts/check-no-comments.sh` and its tests are added. CI runs only the check's tests for now; the check itself is turned on once the existing comments are removed, after the open pull requests merge.
+
+## 2026-11-25
+* **Decision (owner, 2026-11-25)**: the app is a Matrix-first client aiming at 100 % of `twake-on-matrix` and `twake-space-chat`; features that depend on another server get an ADR that enables or disables them. ADR 0026 (Proposed) records it, with one row per Twake-dependent feature and how the app detects it; it proposes to supersede ADR 0011's v1 scope (#65).
+* **Change**: The Parity Matrix lists every user-facing feature of both reference clients with its iOS state on `39cef02`, file evidence, server dependency and issue; Deferred Features now points to it. Constraints, Context and Add a Feature cite ADR 0026 instead of ADR 0011. New gap issues #170 to #192.
