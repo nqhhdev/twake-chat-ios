@@ -9,7 +9,7 @@ status: draft
 
 **Status:** Proposed, 2026-11-25, from the project owner's direction of that day; for the owner's review. Covers issues
 #95 (invite by e-mail or phone, phone contacts) and #98 (add a phone number in Settings). It applies the
-server-dependent rule of ADR 0026 (Proposed, in review at the time of writing).
+server-dependent rule of [ADR 0026](0026-matrix-first-client-server-features.md) (Proposed).
 
 ## Context
 The owner's direction of 2026-11-25, verbatim:
@@ -42,7 +42,7 @@ The owner's direction of 2026-11-25, verbatim:
    special-cased for Twake.
 2. **No identity server, no feature.** When neither names a server, or the server does not answer its terms, or does
    not offer the `sha256` lookup algorithm, the e-mail and phone rows in search, the invite by e-mail and the phone
-   contacts section are not shown (ADR 0026 "absent means hidden"). Search by name and Matrix id still works.
+   contacts section are not shown ([ADR 0026](0026-matrix-first-client-server-features.md) rule 4, "absent means hidden"). Search by name and Matrix id still works.
    Adding an e-mail or phone in Settings does not depend on this: it is homeserver API, shown when the
    `m.3pid_changes` capability allows it.
 3. **Consent first.** Before the first lookup, invite or contact upload, the app shows the server's name and its

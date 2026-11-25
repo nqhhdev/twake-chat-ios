@@ -112,6 +112,16 @@ public struct SettingsScreen: View {
           }
         }
         .animation(.easeInOut, value: viewModel.statusMessage)
+        NavigationLink {
+          PersonalQRScreen(settings: viewModel)
+        } label: {
+          Label {
+            Text("Your personal QR").foregroundStyle(SysColors.onSurface)
+          } icon: {
+            Image(systemName: "qrcode").foregroundStyle(SysColors.primary)
+          }
+        }
+        .accessibilityIdentifier(A11yIdentifiers.settings.personalQR)
       }
       Section {
         if viewModel.hasChatPage {

@@ -197,4 +197,12 @@ struct MessageVersionTests {
     #expect(presence == Presence(isOnline: true, lastActive: 12, statusMessage: nil))
     #expect(!Presence.from(["presence": "online", "last_active_ago": 900_000]).isOnline)
   }
+
+  @Test func theAvatarDotIsGreenOnlineAmberAwayAndNoneOffline() {
+    #expect(Presence.from(["presence": "online", "currently_active": true]).dot == .online)
+    #expect(Presence.from(["presence": "unavailable"]).dot == .away)
+    #expect(Presence.from(["presence": "online", "last_active_ago": 900_000]).dot == .away)
+    #expect(Presence.from(["presence": "offline"]).dot == nil)
+    #expect(Presence.from([:]).dot == nil)
+  }
 }
