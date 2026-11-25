@@ -16,6 +16,12 @@
 	<string>$(TWAKE_WORKPLACE_HOMESERVER)</string>
 	<key>PushGatewayURL</key>
 	<string>$(TWAKE_PUSH_GATEWAY_URL)</string>
+	<key>ElementCallURL</key>
+	<string>$(TWAKE_ELEMENT_CALL_URL)</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	<key>PrivacyURL</key>
 	<string>$(TWAKE_PRIVACY_URL)</string>
 	<key>TwakeProxyURL</key>

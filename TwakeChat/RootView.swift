@@ -63,6 +63,7 @@ final class RootCoordinator {
   @ObservationIgnored private let addressBook: (any AddressBook)?
   /// Meet calls of the account (#92).
   @ObservationIgnored let meetCalls: (any MeetCallRepository)?
+  @ObservationIgnored let roomCalls: (any RoomCallRepository)?
   @ObservationIgnored private let gifs: (any GifRepository)?
   /// Push notifications of the signed-in account.
   @ObservationIgnored let push: PushCenter
@@ -120,7 +121,7 @@ final class RootCoordinator {
     verification: (any VerificationRepository)? = nil, devices: (any DevicesRepository)? = nil,
     chatDisplay: (any ChatDisplaySettingsStore)? = nil, appLock: AppLock? = nil,
     sync: (any SyncLifecycle)? = nil, sessionExpiry: (any SessionExpiry)? = nil,
-    meetCalls: (any MeetCallRepository)? = nil,
+    meetCalls: (any MeetCallRepository)? = nil, roomCalls: (any RoomCallRepository)? = nil,
     identity: (any IdentityRepository)? = nil, addressBook: (any AddressBook)? = nil,
     gifs: (any GifRepository)? = nil,
     signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator
@@ -153,6 +154,7 @@ final class RootCoordinator {
     self.activityReactions = activityReactions
     self.accountSettings = accountSettings
     self.meetCalls = meetCalls
+    self.roomCalls = roomCalls
     self.deviceUnlock = deviceUnlock
     self.people = people
     self.signInConfiguration = signInConfiguration
@@ -516,7 +518,7 @@ struct RootView: View {
             makePeopleSearch: coordinator.peopleSearch(mode:onOpen:),
             makeRoom: coordinator.room(for:onLeft:),
             checkSession: coordinator.sessionCheckAfterUnlock(),
-            meetCalls: coordinator.meetCalls,
+            meetCalls: coordinator.meetCalls, roomCalls: coordinator.roomCalls,
             makePhoneContacts: coordinator.phoneContacts
           )
           // Signed in: ask for notifications and register this device.
