@@ -4,7 +4,6 @@ import Testing
 
 @testable import TwakeChat
 
-/// Push: permission once signed in, the device token to the homeserver, and the pusher removed before logout.
 @MainActor
 struct PushCenterTests {
   private actor RecordingPush: PushRepository {
@@ -62,7 +61,6 @@ struct PushCenterTests {
     #expect(center.isAllowed == nil)
   }
 
-  /// A build signed for development has a sandbox token, whatever its build configuration.
   @Test func theSigningProfileDecidesTheApnsServer() {
     func profile(_ entitlements: String) -> Data {
       Data(
