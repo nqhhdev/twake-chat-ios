@@ -38,7 +38,7 @@ runs:
       run: |
         prefix="dd-${{ inputs.cache-name }}-${{ runner.os }}-xcode${{ inputs.xcode-version }}-${{ hashFiles('**/Package.resolved') }}-"
         echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
-        echo "key=$prefix${{ github.sha }}" >> "$GITHUB_OUTPUT"
+        echo "key=${prefix}${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
     - name: Restore DerivedData
       uses: actions/cache/restore@v4
