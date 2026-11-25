@@ -51,3 +51,16 @@ chat screen reads presence, use the same source for the row.
   of the app already does, not by the `app.twake.chat.page` type.
 - The badge and the presence dot sit in the same corner; they never meet, since only a direct chat has a dot and a
   direct chat has no badge.
+
+## Addendum: unread on a space row (#145), 2026-11-25
+- A space row shows its own unread plus that of the rooms and sub-spaces under it, as the web's folded space row does
+  (`src/ui/foldedSpaceUnread.ts`). A favourite room is left out: it shows in Favourites with its own count. A room
+  marked unread counts one, as on the app icon badge.
+- Muted rooms count as the app badge treats them: their unread goes into a quiet count and their mentions are
+  dropped. The row shows the loud count in the accent colour; when only muted rooms are unread, it shows their count
+  in grey, as a muted chat does.
+- Which rooms are under a space comes from the SDK's space graph (`SpaceService.spaceFilters`), built locally from the
+  joined rooms' `m.space.child` and `m.space.parent` state, with no request, and followed with
+  `subscribeToSpaceFilters`. The SDK keeps two levels: direct children of a top-level space, and every descendant of a
+  first-level sub-space; the app joins them into the whole tree. A space deeper than that, or one the graph does not
+  know, counts only the rooms the graph gives.

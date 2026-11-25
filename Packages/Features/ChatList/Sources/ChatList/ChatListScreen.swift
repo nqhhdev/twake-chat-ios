@@ -438,6 +438,8 @@ struct ChatListRow: View {
   let viewModel: ChatListViewModel
 
   var body: some View {
+    let spaceUnread = viewModel.spaceUnread(of: room)
+    let isUnread = spaceUnread.map { $0.badgeCount > 0 } ?? room.isUnread
     HStack(alignment: .top, spacing: 12) {
       RoomAvatar(room: room, viewModel: viewModel, size: 52)
         .overlay(alignment: .bottomTrailing) {
@@ -454,7 +456,7 @@ struct ChatListRow: View {
       VStack(alignment: .leading, spacing: 2) {
         HStack(alignment: .firstTextBaseline) {
           Text(room.name)
-            .font(.headline.weight(room.isUnread ? .bold : .semibold))
+            .font(.headline.weight(isUnread ? .bold : .semibold))
             .foregroundStyle(SysColors.onSurface)
             .lineLimit(1)
           if room.isEncrypted {
@@ -474,7 +476,7 @@ struct ChatListRow: View {
           if let date = room.lastActivity {
             Text(ChatListViewModel.timeText(date))
               .font(.subheadline)
-              .foregroundStyle(room.isUnread ? SysColors.primary : SysColors.textSecondary)
+              .foregroundStyle(isUnread ? SysColors.primary : SysColors.textSecondary)
           }
         }
         HStack(alignment: .top) {
@@ -501,9 +503,15 @@ struct ChatListRow: View {
           .contentTransition(.opacity)
           .animation(.easeInOut(duration: 0.25), value: room.draft)
           Spacer(minLength: 4)
-          UnreadBadge(
-            unread: room.unreadCount, mentions: room.mentionCount, isMuted: room.isMuted,
-            isMarkedUnread: room.isMarkedUnread)
+          if let spaceUnread {
+            UnreadBadge(
+              unread: spaceUnread.badgeCount, mentions: spaceUnread.mentions,
+              isMuted: room.isMuted || spaceUnread.isQuiet)
+          } else {
+            UnreadBadge(
+              unread: room.unreadCount, mentions: room.mentionCount, isMuted: room.isMuted,
+              isMarkedUnread: room.isMarkedUnread)
+          }
         }
       }
       // The separator starts under the text, as in Messages.
