@@ -32,6 +32,8 @@ and the E2E suite needs Docker, which `macos-26` cannot run.
   stay `build` and `unit tests`, because `main` requires them.
 - The Swift package checkouts are cached, keyed on the `Package.resolved`, `Package.swift` and project files.
   DerivedData is cached per job, keyed on `Package.resolved`; only a green push to `main` saves it.
+- Code must compile on both CI's Xcode (26.6) and the Xcode on the developers' Macs (27.2). A pull request that
+  builds locally can still fail `build` or `unit tests`; CI's result is the one that counts.
 - Staging integration tests run in the test plan and skip there, since CI holds no credentials (ADR 0020).
   `e2e.yml` stays manual and outside the gate.
 

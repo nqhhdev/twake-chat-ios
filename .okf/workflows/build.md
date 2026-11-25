@@ -64,7 +64,14 @@ the older one. `main` requires every job below; keep the names stable.
 - Build and unit tests: Xcode and the simulator are pinned once at the top of the workflow, `XCODE_VERSION`
   (`26.6`) and `SIMULATOR_DESTINATION` (`platform=iOS Simulator,OS=26.5,name=iPhone 17`). To move them, pick a pair
   the image lists ([runner image readme](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md)).
-  CI's Xcode is older than the one on developers' Macs (27.2), so code needing a newer SDK fails CI.
+  CI's Xcode (26.6) is older than the one on developers' Macs (27.2), and code must compile on both: a local build
+  that passes does not prove CI passes. Swift 6.2 in Xcode 26.6 rejects code that 27.2 accepts; seen so far:
+  - Static helpers of SwiftUI views are main-actor isolated, so a test that calls one needs `@MainActor` on its suite.
+  - A long SwiftUI modifier chain can hit "unable to type-check this expression in reasonable time". Give implicit
+    members an explicit type (`ScenePhase.active`) or move the expression into a typed property.
+  - `for (a, b) in optional.map(f) ?? [] where …` over labeled tuples fails with "pattern cannot match values of
+    type". Bind the tuple (`for pair in … where pair.a …`) and read its labels.
+  - Any API from the iOS 27 SDK.
 - Both macOS jobs use `.github/actions/xcode-setup`: it selects Xcode, restores `build/SourcePackages` (keyed on the
   `Package.resolved`, `Package.swift` and project files) and `build/DerivedData` (per job, keyed on
   `Package.resolved`), then runs `xcodebuild -resolvePackageDependencies`. Only a green push to `main` saves
