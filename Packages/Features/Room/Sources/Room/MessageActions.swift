@@ -31,6 +31,7 @@ struct MessageActionsOverlay: View {
 
   @State private var appeared = false
   @State private var isPickingReaction = false
+  @State private var isSelectingText = false
 
   private static let tapbackHeight: CGFloat = 52
   private static let rowHeight: CGFloat = 44
@@ -88,6 +89,9 @@ struct MessageActionsOverlay: View {
         close()
       }
     }
+    .sheet(isPresented: $isSelectingText, onDismiss: close) {
+      if let text = selectableText { SelectTextSheet(text: text) }
+    }
     .onAppear {
       withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) { appeared = true }
     }
@@ -95,6 +99,10 @@ struct MessageActionsOverlay: View {
   }
 
   // MARK: Layout
+
+  private var selectableText: AttributedString? {
+    MessageBody.selectableText(of: message.body, formatted: message.formatted)
+  }
 
   private var actions: [Action] {
     var list: [Action] = []
@@ -110,6 +118,12 @@ struct MessageActionsOverlay: View {
     }
     if let text = RoomViewModel.text(of: message.body) {
       list.append(.init(title: "Copy", icon: "doc.on.doc") { UIPasteboard.general.string = text })
+    }
+    if selectableText != nil {
+      list.append(
+        .init(title: "Select Text", icon: "selection.pin.in.out", keepsLayerOpen: true) {
+          isSelectingText = true
+        })
     }
     if message.eventId != nil {
       list.append(.init(title: "Forward", icon: "arrowshape.turn.up.right") { onForward(message) })
@@ -276,7 +290,7 @@ struct MessageActionsOverlay: View {
       ForEach(Array(actions.enumerated()), id: \.offset) { index, action in
         if index > 0 { Divider().padding(.leading, 16) }
         Button {
-          close()
+          if !action.keepsLayerOpen { close() }
           action.perform()
         } label: {
           HStack {
@@ -304,6 +318,8 @@ struct MessageActionsOverlay: View {
     let title: String
     let icon: String
     var isDestructive = false
+    /// The action shows a sheet over the layer, which closes the layer itself when it goes.
+    var keepsLayerOpen = false
     let perform: @MainActor () -> Void
   }
 }

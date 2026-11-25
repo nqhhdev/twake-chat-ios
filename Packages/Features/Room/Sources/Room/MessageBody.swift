@@ -63,6 +63,21 @@ struct MessageBody: View {
     return line
   }
 
+  /// The text "Select Text" opens, formatted as the bubble shows it but with its spoilers uncovered; `nil` for a
+  /// message without text of its own to select (media, a deleted or an undecryptable message), or an empty one.
+  static func selectableText(of content: TimelineMessage.Body, formatted: AttributedString?)
+    -> AttributedString?
+  {
+    let text: AttributedString
+    switch content {
+    case .text(let plain), .notice(let plain): text = formatted ?? Self.plain(plain)
+    case .emote(let plain): text = Self.emote(formatted ?? Self.plain(plain))
+    default: return nil
+    }
+    return String(text.characters).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      ? nil : text
+  }
+
   var body: some View {
     Group {
       switch content {
