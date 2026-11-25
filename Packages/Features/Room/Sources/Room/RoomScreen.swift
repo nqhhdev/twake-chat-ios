@@ -291,7 +291,7 @@ public struct RoomScreen: View {
     }
     .task(id: viewModel.roomId) { await viewModel.start() }
     // Cancels the 15 s poll when the scene leaves the foreground (issue #111).
-    .task(id: "\(viewModel.roomId)-\(scenePhase == .active)") {
+    .task(id: presenceTaskID) {
       guard scenePhase == .active else { return }
       await viewModel.watchPresence()
     }
@@ -317,6 +317,11 @@ public struct RoomScreen: View {
       }
       .presentationDetents([.medium, .large])
     }
+  }
+
+  private var presenceTaskID: String {
+    let isActive: Bool = scenePhase == ScenePhase.active
+    return "\(viewModel.roomId)-\(isActive)"
   }
 
   @ViewBuilder private func timeline(bubbleWidth: CGFloat) -> some View {
