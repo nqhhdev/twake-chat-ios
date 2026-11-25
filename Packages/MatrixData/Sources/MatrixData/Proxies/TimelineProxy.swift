@@ -665,9 +665,18 @@ public actor TimelineProxy: TimelineRepository {
   static func content(_ text: String, isEmote: Bool = false)
     -> RoomMessageEventContentWithoutRelation
   {
-    let content =
-      isEmote
-      ? messageEventContentFromMarkdownAsEmote(md: text) : messageEventContentFromMarkdown(md: text)
+    let content: RoomMessageEventContentWithoutRelation
+    if let spoiler = SpoilerMarkdown.content(text) {
+      content =
+        isEmote
+        ? messageEventContentFromHtmlAsEmote(body: spoiler.body, htmlBody: spoiler.html)
+        : messageEventContentFromHtml(body: spoiler.body, htmlBody: spoiler.html)
+    } else {
+      content =
+        isEmote
+        ? messageEventContentFromMarkdownAsEmote(md: text)
+        : messageEventContentFromMarkdown(md: text)
+    }
     let userIds = mentionedUserIds(in: text)
     let room = mentionsRoom(text)
     return userIds.isEmpty && !room

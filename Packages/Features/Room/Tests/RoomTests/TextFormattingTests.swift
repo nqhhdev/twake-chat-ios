@@ -21,6 +21,15 @@ struct TextFormattingTests {
       apply(.code, "say hi now", 4..<6) == FormattedText(text: "say `hi` now", selection: 5..<7))
   }
 
+  @Test func aSpoilerWrapsTheSelectionInBarsAndComesOffAgain() {
+    let wrapped = apply(.spoiler, "the end is near", 4..<7)
+    #expect(wrapped == FormattedText(text: "the ||end|| is near", selection: 6..<9))
+    #expect(
+      apply(.spoiler, wrapped.text, wrapped.selection)
+        == FormattedText(text: "the end is near", selection: 4..<7))
+    #expect(TextFormat.spoiler.label == "Spoiler")
+  }
+
   @Test func leavesTheSpacesAroundTheSelectionOutsideTheMarks() {
     #expect(
       apply(.bold, "say hi now", 3..<7) == FormattedText(text: "say **hi** now", selection: 6..<8))
