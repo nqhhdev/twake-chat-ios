@@ -1,13 +1,34 @@
 import Foundation
 
-/// Reads the push gateway's payload (ADR 0009, keys kept as the Flutter app's pusher asks for them, ADR 0017).
 public enum PushPayload {
-  /// The homeserver's unread count the gateway adds to every push (`unread_count`), for the app icon badge; `nil` when
-  /// the push has none or it is not a count, so the badge stays as it is.
   public static func unreadCount(in userInfo: [AnyHashable: Any]) -> Int? {
     guard let count = (userInfo["unread_count"] as? NSNumber)?.intValue, count >= 0 else {
       return nil
     }
     return count
+  }
+
+  public static let roomIdKey = "room_id"
+  public static let eventIdKey = "event_id"
+  public static let threadIdKey = "thread_id"
+  public static let messageCategory = "message"
+  public static let replyAction = "inline-reply"
+  public static let markAsReadAction = "mark-as-read"
+
+  public static func roomId(in userInfo: [AnyHashable: Any]) -> String? {
+    nonEmpty(userInfo[roomIdKey])
+  }
+
+  public static func eventId(in userInfo: [AnyHashable: Any]) -> String? {
+    nonEmpty(userInfo[eventIdKey])
+  }
+
+  public static func threadId(in userInfo: [AnyHashable: Any]) -> String? {
+    nonEmpty(userInfo[threadIdKey])
+  }
+
+  private static func nonEmpty(_ value: Any?) -> String? {
+    guard let text = value as? String, !text.isEmpty else { return nil }
+    return text
   }
 }

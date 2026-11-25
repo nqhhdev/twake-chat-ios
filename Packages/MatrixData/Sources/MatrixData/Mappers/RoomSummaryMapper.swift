@@ -25,7 +25,9 @@ enum RoomSummaryMapper {
         .trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
       isBroadcast: !info.isDirect && !info.isSpace
         && (info.powerLevels?.values().eventsDefault ?? 0) >= 50,
-      isEncrypted: info.encryptionState == .encrypted)
+      isEncrypted: info.encryptionState == .encrypted,
+      directUserId: info.isDirect && info.heroes.count == 1 ? info.heroes[0].userId : nil,
+      isPublic: info.isPublic ?? false)
   }
 
   /// - Name: the display name, or the room id when the room has none.
