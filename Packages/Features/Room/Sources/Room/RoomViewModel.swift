@@ -67,6 +67,8 @@ public final class RoomViewModel {
   @ObservationIgnored let gifs: (any GifRepository)?
   public internal(set) var gifsAvailable = false
   public internal(set) var stickerPacks: [StickerPack] = []
+  var presenceDots: [String: Presence.Dot] = [:]
+  @ObservationIgnored var presenceFetchedAt: [String: ContinuousClock.Instant] = [:]
 
   /// The message whose edit history the sheet shows.
   public var historyMessage: TimelineMessage?

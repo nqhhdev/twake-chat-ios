@@ -37,7 +37,18 @@ struct MessageRow: View {
               name: message.senderName, size: 32, pictureID: message.senderAvatar?.source,
               load: message.senderAvatar.map { reference in
                 { @Sendable [viewModel] in await viewModel.picture(reference) }
-              })
+              }
+            )
+            .overlay(alignment: .bottomTrailing) {
+              if let dot = viewModel.presenceDot(of: message.senderId) {
+                AvatarPresenceDot(dot == .online ? .online : .away, avatarSize: 32)
+                  .offset(x: 3, y: 3)
+              }
+            }
+            .task(id: message.senderId) {
+              guard !isPreview else { return }
+              await viewModel.refreshPresence(of: message.senderId)
+            }
           } else {
             Color.clear.frame(width: 32, height: 1)
           }
