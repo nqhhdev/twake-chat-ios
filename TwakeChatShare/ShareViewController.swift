@@ -1,4 +1,5 @@
 import AppShared
+import Intents
 import ObjectiveC
 import UIKit
 import UniformTypeIdentifiers
@@ -29,7 +30,8 @@ final class ShareViewController: UIViewController {
       }
     }
     let items = SharedItems(
-      text: texts.isEmpty ? nil : texts.joined(separator: "\n"), files: files)
+      text: texts.isEmpty ? nil : texts.joined(separator: "\n"), files: files,
+      roomId: (extensionContext?.intent as? INSendMessageIntent)?.conversationIdentifier)
     guard !items.isEmpty, (try? inbox.finish(items)) != nil else {
       inbox.clear()
       return close()

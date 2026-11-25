@@ -12,6 +12,7 @@ import SwiftUI
 final class ShareCenter {
   /// The share waiting for a chat; the shell shows the chat picker while it is set.
   var pending: SharedItems?
+  var suggested: SharedItems?
 
   @ObservationIgnored private let inbox: SharedInbox?
 
@@ -22,13 +23,39 @@ final class ShareCenter {
   /// Reads the share the extension left, if any.
   func load() {
     guard let items = inbox?.pending(), !items.isEmpty else { return }
-    pending = items
+    if items.roomId != nil {
+      pending = nil
+      suggested = items
+    } else {
+      suggested = nil
+      pending = items
+    }
   }
 
   /// The share for one chat; its files are deleted once the chat sent them.
   func take() -> IncomingShare? {
-    guard let items = pending, let inbox else { return nil }
+    guard let items = pending, let share = share(of: items) else { return nil }
     pending = nil
+    return share
+  }
+
+  func takeSuggested(for roomId: String) -> IncomingShare? {
+    guard let items = suggested, items.roomId == roomId, let share = share(of: items) else {
+      return nil
+    }
+    suggested = nil
+    return share
+  }
+
+  func pickInstead(of roomId: String) {
+    guard var items = suggested, items.roomId == roomId else { return }
+    suggested = nil
+    items.roomId = nil
+    pending = items
+  }
+
+  private func share(of items: SharedItems) -> IncomingShare? {
+    guard let inbox else { return nil }
     return IncomingShare(
       text: items.text, files: items.files.map(inbox.url(of:)), done: { inbox.clear() })
   }
@@ -36,6 +63,7 @@ final class ShareCenter {
   /// The user closed the picker: the share is dropped.
   func cancel() {
     pending = nil
+    suggested = nil
     inbox?.clear()
   }
 }

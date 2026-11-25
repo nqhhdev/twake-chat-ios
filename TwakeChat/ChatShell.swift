@@ -122,6 +122,18 @@ struct ChatShell: View {
           DraftChatScreen(person: person, viewModel: search)
         }
       }
+      .onChange(of: shares.suggested?.roomId, initial: true) { _, roomId in
+        guard let roomId else { return }
+        destination = .chats
+        Task {
+          guard let summary = await chatList.summary(for: roomId) else {
+            return shares.pickInstead(of: roomId)
+          }
+          guard let share = shares.takeSuggested(for: roomId) else { return }
+          open(summary)
+          room?.receive(share)
+        }
+      }
       .onChange(of: links.opening) { _, opening in
         guard let opening else { return }
         links.opening = nil

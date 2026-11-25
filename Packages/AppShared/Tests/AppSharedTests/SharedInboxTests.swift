@@ -32,6 +32,22 @@ struct SharedInboxTests {
     inbox.clear()
   }
 
+  @Test func aShareFromASuggestionKeepsItsChat() throws {
+    let inbox = inbox()
+    _ = try inbox.begin()
+    try inbox.finish(SharedItems(text: "hi", roomId: "!room:example.org"))
+    #expect(inbox.pending()?.roomId == "!room:example.org")
+    inbox.clear()
+  }
+
+  @Test func aShareSavedBeforeSuggestionsHasNoChat() throws {
+    let inbox = inbox()
+    let folder = try inbox.begin()
+    try Data(#"{"text":"hi","files":[]}"#.utf8).write(to: folder.appending(path: "manifest.json"))
+    #expect(inbox.pending() == SharedItems(text: "hi"))
+    inbox.clear()
+  }
+
   @Test func aShareWithNothingIsEmpty() {
     #expect(SharedItems().isEmpty)
     #expect(SharedItems(text: "").isEmpty)
