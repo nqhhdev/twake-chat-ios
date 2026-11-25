@@ -58,6 +58,7 @@ struct ChatShell: View {
   @State private var isFixingSession = false
   /// What the prompt after sign-in asks the user to do, as the Flutter app asks for recovery right after login.
   @State private var sessionPrompt: SessionWarning?
+  @State private var quickSwitcher: QuickSwitcherViewModel?
 
   var body: some View {
     GeometryReader { geometry in
@@ -126,6 +127,13 @@ struct ChatShell: View {
         Task { await openWhenKnown(opening.roomId, name: "…", at: opening.eventId) }
       }
       .sheet(item: $links.joining) { joining in JoinRoomSheet(joining: joining, router: links) }
+      .quickSwitcher($quickSwitcher) {
+        QuickSwitcherViewModel(list: chatList) { summary in
+          quickSwitcher = nil
+          destination = .chats
+          open(summary)
+        }
+      }
       .task { await promptForSessionFix() }
       .alert(
         "Unlock your encrypted messages",
