@@ -1,0 +1,162 @@
+import Domain
+import Foundation
+import Testing
+
+@testable import Room
+
+private let hangUpMessage = #"{"api":"fromWidget","action":"im.vector.hangup","data":{}}"#
+private let closeMessage = #"{"api":"fromWidget","action":"io.element.close","data":{}}"#
+private let joinedMessage = #"{"api":"fromWidget","action":"io.element.join","data":{}}"#
+
+@MainActor
+struct RoomCallViewModelTests {
+  private final class FakeSession: CallWidgetSession, @unchecked Sendable {
+    let url = URL(string: "https://call.example.org/room")!
+    let userId = "@me:example.org"
+    private(set) var received: [String] = []
+    private(set) var ended = false
+
+    func messagesToWidget() async -> AsyncStream<String> { AsyncStream { $0.finish() } }
+    func receiveFromWidget(_ message: String) async { received.append(message) }
+    func end() async { ended = true }
+  }
+
+  private actor FakeCalls: RoomCallRepository {
+    var available = true
+    var failure: RoomCallError?
+    var states: [RoomCallState] = []
+    private(set) var opened: [CallIntent] = []
+    let session = FakeSession()
+
+    init(available: Bool = true, failure: RoomCallError? = nil, states: [RoomCallState] = []) {
+      self.available = available
+      self.failure = failure
+      self.states = states
+    }
+
+    func isAvailable() async -> Bool { available }
+
+    func callStates(roomId: String) async -> AsyncStream<RoomCallState> {
+      let states = states
+      return AsyncStream { continuation in
+        for state in states { continuation.yield(state) }
+        continuation.finish()
+      }
+    }
+
+    func open(roomId: String, intent: CallIntent) async throws(RoomCallError)
+      -> any CallWidgetSession
+    {
+      opened.append(intent)
+      if let failure { throw failure }
+      return session
+    }
+  }
+
+  private final class FakeSystem: CallSystemReporting {
+    var onEndedBySystem: (@MainActor (UUID) -> Void)?
+    private(set) var events: [String] = []
+
+    func reportStarted(_ id: UUID, title: String) async { events.append("started \(title)") }
+    func reportConnected(_ id: UUID) { events.append("connected") }
+    func reportEnded(_ id: UUID) async { events.append("ended") }
+  }
+
+  private static let active = RoomCallState(isActive: true, participants: ["@bob:example.org"])
+
+  @Test func callsAreHiddenWhenTheServerHasNoFocus() async {
+    let viewModel = RoomCallViewModel(roomId: "!r", repository: FakeCalls(available: false))
+    await viewModel.load()
+    #expect(!viewModel.isAvailable)
+    await viewModel.open(title: "Room")
+    #expect(viewModel.activeCall == nil)
+  }
+
+  @Test func startingWithNoCallStartsOneAndReportsIt() async {
+    let calls = FakeCalls()
+    let system = FakeSystem()
+    let viewModel = RoomCallViewModel(roomId: "!r", repository: calls, system: system)
+    await viewModel.load()
+    #expect(viewModel.actionTitle == "Start call")
+    await viewModel.open(title: "Room")
+    #expect(await calls.opened == [.start])
+    #expect(viewModel.activeCall?.url.absoluteString == "https://call.example.org/room")
+    #expect(system.events == ["started Room"])
+  }
+
+  @Test func anActiveCallIsJoined() async {
+    let calls = FakeCalls(states: [Self.active])
+    let viewModel = RoomCallViewModel(roomId: "!r", repository: calls)
+    await viewModel.load()
+    await viewModel.watch()
+    #expect(viewModel.state == Self.active)
+    #expect(viewModel.actionTitle == "Join call")
+    #expect(viewModel.participantCount == 1)
+    await viewModel.open(title: "Room")
+    #expect(await calls.opened == [.join])
+  }
+
+  @Test func widgetMessagesGoToTheDriverAndJoiningConnects() async {
+    let calls = FakeCalls()
+    let system = FakeSystem()
+    let viewModel = RoomCallViewModel(roomId: "!r", repository: calls, system: system)
+    await viewModel.load()
+    await viewModel.open(title: "Room")
+    await viewModel.fromWidget(joinedMessage)
+    #expect(calls.session.received == [joinedMessage])
+    #expect(system.events == ["started Room", "connected"])
+    #expect(viewModel.activeCall != nil)
+  }
+
+  @Test(arguments: [hangUpMessage, closeMessage])
+  func hangingUpInTheWidgetEndsTheCall(_ message: String) async {
+    let calls = FakeCalls()
+    let system = FakeSystem()
+    let viewModel = RoomCallViewModel(roomId: "!r", repository: calls, system: system)
+    await viewModel.load()
+    await viewModel.open(title: "Room")
+    await viewModel.fromWidget(message)
+    #expect(calls.session.received == [message])
+    #expect(calls.session.ended)
+    #expect(viewModel.activeCall == nil)
+    #expect(system.events == ["started Room", "ended"])
+  }
+
+  @Test(.timeLimit(.minutes(1))) func endingFromTheSystemClosesTheCall() async {
+    let calls = FakeCalls()
+    let system = FakeSystem()
+    let viewModel = RoomCallViewModel(roomId: "!r", repository: calls, system: system)
+    await viewModel.load()
+    await viewModel.open(title: "Room")
+    guard let id = viewModel.activeCall?.id else {
+      Issue.record("No call was opened")
+      return
+    }
+    system.onEndedBySystem?(id)
+    while !calls.session.ended { await Task.yield() }
+    #expect(viewModel.activeCall == nil)
+    #expect(system.events == ["started Room", "ended"])
+  }
+
+  @Test(arguments: [
+    (RoomCallError.notAllowed, "You may not join a call in this chat."),
+    (RoomCallError.notJoined, "You are no longer in this chat."),
+    (RoomCallError.failed, "The call could not be started. Please try again."),
+    (RoomCallError.unavailable, "The call could not be started. Please try again."),
+  ])
+  func aFailedOpenSaysWhy(_ failure: RoomCallError, _ message: String) async {
+    let viewModel = RoomCallViewModel(roomId: "!r", repository: FakeCalls(failure: failure))
+    await viewModel.load()
+    await viewModel.open(title: "Room")
+    #expect(viewModel.activeCall == nil)
+    #expect(viewModel.errorMessage == message)
+  }
+
+  @Test func onlyWidgetRequestsCount() {
+    #expect(CallWidgetAction.isHangUp(hangUpMessage))
+    #expect(!CallWidgetAction.isHangUp(#"{"api":"toWidget","action":"im.vector.hangup"}"#))
+    #expect(!CallWidgetAction.isHangUp("not json"))
+    #expect(CallWidgetAction.isJoined(joinedMessage))
+    #expect(!CallWidgetAction.isJoined(hangUpMessage))
+  }
+}

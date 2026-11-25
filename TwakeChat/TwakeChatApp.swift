@@ -72,6 +72,9 @@ struct TwakeChatApp: App {
         devices: DevicesProxy(authentication: repository), chatDisplay: ChatDisplayDefaults(),
         appLock: AppLock(), sync: repository, sessionExpiry: repository,
         meetCalls: MeetCallProxy(authentication: repository),
+        roomCalls: ElementCallProxy(
+          authentication: repository, fallbackURL: url("ElementCallURL"),
+          clientId: Bundle.main.bundleIdentifier ?? "app.twake.ios.chat"),
         identity: IdentityServerProxy(authentication: repository),
         addressBook: SystemAddressBook(),
         gifs: url("TwakeProxyURL").map { GifProxy(baseURL: $0, authentication: repository) },

@@ -137,7 +137,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Feature | Flutter | Web | iOS | Server | Issue |
 |---|---|---|---|---|---|
 | Meet link button and call events in the timeline | `chat_video_call_button`, `domain/video_call` | D30, D105 | Built: `Room/MeetCalls.swift`, `MatrixData/Discovery/TwakeMeet.swift`, `Mappers/CallEvents.swift` (#161) | ToM + Twake (Meet) | — |
-| Calls in the app (MatrixRTC, LiveKit, ringing) | `dialer` | Phase 7, 7 bis | Not built | Matrix + LiveKit focus | #191 |
+| Calls in the app (MatrixRTC, LiveKit, ringing) | `dialer` | Phase 7, 7 bis | Built ([ADR 0038](../../docs/adr/0038-in-app-calls-with-element-call-widget.md)): Element Call in a web view driven by the SDK widget driver (`MatrixData/Proxies/ElementCallProxy.swift`, `Room/RoomCalls.swift`), start or join from the header, active-call banner, CallKit (`Room/CallKitReporter.swift`); shown only with a `livekit_service_url` focus. Incoming ring in the background not built | Matrix + LiveKit token service | #191 |
 
 ## Settings
 
