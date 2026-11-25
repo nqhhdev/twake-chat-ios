@@ -23,6 +23,8 @@ public enum MatrixLink: Sendable, Equatable {
       identifiers = String(text[text.index(after: text.firstIndex(of: "#")!)...].dropFirst())
     } else if lower.hasPrefix("twake.chat://chat/") {
       identifiers = String(text.dropFirst("twake.chat://chat/".count))
+    } else if lower.hasPrefix("https://links.twake.app/chat/") {
+      identifiers = String(text.dropFirst("https://links.twake.app/chat/".count))
     } else {
       return nil
     }

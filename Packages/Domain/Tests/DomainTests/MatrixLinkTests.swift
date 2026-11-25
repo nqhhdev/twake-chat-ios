@@ -24,6 +24,18 @@ struct MatrixLinkTests {
     #expect(link("https://matrix.to/#/@alice:example.org") == .user(id: "@alice:example.org"))
   }
 
+  @Test func theFlutterPersonalQRLinkIsAPerson() {
+    #expect(
+      link("https://links.twake.app/chat/%40alice%3Aexample.org?fallback=https://sign-up.twake.app")
+        == .user(id: "@alice:example.org"))
+  }
+
+  @Test func aLinksTwakeAppRoomAlias() {
+    #expect(
+      link("https://links.twake.app/chat/%23team%3Aexample.org")
+        == .room(idOrAlias: "#team:example.org", eventId: nil, via: []))
+  }
+
   @Test func theAppSchemeIsReadAsMatrixTo() {
     #expect(
       link("twake.chat://chat/%23team:example.org")
