@@ -155,6 +155,10 @@ struct ComposerView: View {
       .textStyle(TextStyles.bodyLarge)
       .lineLimit(1...6)
       .focused($isFocused)
+      .onKeyPress(keys: [.return, .upArrow, .escape], phases: .down) { press in
+        guard let key = ComposerKey(press.key, modifiers: press.modifiers) else { return .ignored }
+        return viewModel.handle(key) ? .handled : .ignored
+      }
       .accessibilityIdentifier(A11yIdentifiers.room.composer)
       .padding(.horizontal, 16)
       .padding(.vertical, 10)
@@ -174,6 +178,7 @@ struct ComposerView: View {
         .background(SysColors.primary, in: Circle())
     }
     .buttonStyle(PressScaleButtonStyle())
+    .keyboardShortcut(.return, modifiers: .command)
     .accessibilityLabel(isEditing ? "Save the edit" : "Send message")
     .accessibilityIdentifier(A11yIdentifiers.room.send)
     .transition(.scale(scale: 0.4).combined(with: .opacity))
@@ -282,6 +287,7 @@ private struct ComposerBanner: View {
       Button(action: cancel) {
         Image(systemName: "xmark").foregroundStyle(SysColors.textSecondary)
       }
+      .keyboardShortcut(.cancelAction)
       .accessibilityLabel("Cancel")
     }
     .padding(.horizontal, 16)

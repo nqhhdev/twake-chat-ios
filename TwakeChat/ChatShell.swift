@@ -96,10 +96,12 @@ struct ChatShell: View {
       .onChange(of: push.pendingRoomId, initial: true) { _, roomId in
         guard let roomId else { return }
         let fallbackName = push.pendingRoomName ?? "…"
+        let threadId = push.pendingThreadId
         push.pendingRoomId = nil
         push.pendingRoomName = nil
+        push.pendingThreadId = nil
         destination = .chats
-        Task { await openWhenKnown(roomId, name: fallbackName) }
+        Task { await openWhenKnown(roomId, name: fallbackName, thread: threadId) }
       }
       .onChange(of: push.pendingDraftUserId, initial: true) { _, userId in
         guard let userId else { return }
@@ -336,12 +338,17 @@ struct ChatShell: View {
   }
 
   /// Waits for the room list to know `roomId` (cold start from a notification or a link), then opens it.
-  private func openWhenKnown(_ roomId: String, name: String, at eventId: String? = nil) async {
+  private func openWhenKnown(
+    _ roomId: String, name: String, at eventId: String? = nil, thread threadId: String? = nil
+  ) async {
     let summary =
       await chatList.summary(for: roomId, waitingUpTo: .seconds(10))
       ?? RoomSummary(
         id: roomId, name: name, lastMessageText: nil, lastMessageSender: nil, lastActivity: nil)
     open(summary, at: eventId)
+    if let threadId, let room, room.roomId == roomId, room.openedThread?.threadRootId != threadId {
+      room.openThread(root: threadId)
+    }
   }
 
   /// Opens a room; with an event, scrolls to that message once the room shows (a link to a message).

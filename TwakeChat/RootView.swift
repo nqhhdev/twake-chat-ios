@@ -62,6 +62,7 @@ final class RootCoordinator {
   @ObservationIgnored private let addressBook: (any AddressBook)?
   /// Meet calls of the account (#92).
   @ObservationIgnored let meetCalls: (any MeetCallRepository)?
+  @ObservationIgnored private let gifs: (any GifRepository)?
   /// Push notifications of the signed-in account.
   @ObservationIgnored let push: PushCenter
   /// Pauses sync in the background and resumes it on return.
@@ -113,16 +114,19 @@ final class RootCoordinator {
     accountSettings: (any AccountSettingsRepository)? = nil,
     deviceUnlock: DeviceUnlocker? = nil,
     people: (any PeopleRepository)? = nil, push: (any PushRepository)? = nil,
+    notificationActions: (any NotificationActionRepository)? = nil,
     verification: (any VerificationRepository)? = nil, devices: (any DevicesRepository)? = nil,
     chatDisplay: (any ChatDisplaySettingsStore)? = nil, appLock: AppLock? = nil,
     sync: (any SyncLifecycle)? = nil, sessionExpiry: (any SessionExpiry)? = nil,
     meetCalls: (any MeetCallRepository)? = nil,
     identity: (any IdentityRepository)? = nil, addressBook: (any AddressBook)? = nil,
+    gifs: (any GifRepository)? = nil,
     signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator
   ) {
     self.identity = identity
     self.addressBook = addressBook
-    let pushCenter = PushCenter(repository: push)
+    self.gifs = gifs
+    let pushCenter = PushCenter(repository: push, actions: notificationActions)
     self.sessionExpiry = sessionExpiry
     self.push = pushCenter
     self.lifecycle = AppLifecycle(sync: sync, push: pushCenter)
@@ -151,6 +155,7 @@ final class RootCoordinator {
     self.signInConfiguration = signInConfiguration
     self.webAuthenticator = webAuthenticator
     self.links = LinkRouter(rooms: roomLinks, openDirectChat: openDirectChat())
+    pushCenter.startSession = { [weak self] in await self?.start() }
   }
 
   /// The chat list of the current signed-in state, kept so the screen keeps its state while it is shown.
@@ -207,7 +212,7 @@ final class RootCoordinator {
       checkSession: sessionCheck(), display: displaySettings(), blocking: blocking(),
       saved: savedMessages,
       threadTimeline: { [makeThreadTimeline] root in makeThreadTimeline(summary.id, root) },
-      threadPrefs: threadPrefs, scrollMemory: scrollMemory)
+      threadPrefs: threadPrefs, scrollMemory: scrollMemory, gifs: gifs)
     shareSuggestions.follow(room)
     return room
   }

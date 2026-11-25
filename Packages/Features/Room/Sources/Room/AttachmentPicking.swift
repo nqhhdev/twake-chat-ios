@@ -139,6 +139,8 @@ struct AttachmentButton: View {
   @State private var preview: PickedBatch?
   @State private var isPollShown = false
   @State private var isCameraShown = false
+  @State private var gifPicker: GifPicker?
+  @State private var isStickerPickerShown = false
 
   var body: some View {
     Menu {
@@ -148,6 +150,12 @@ struct AttachmentButton: View {
       Button("Gallery", systemImage: "photo.on.rectangle") { isGalleryShown = true }
       Button("Documents", systemImage: "paperclip") { isDocumentPickerShown = true }
       Button("Poll", systemImage: "chart.bar.xaxis") { isPollShown = true }
+      if viewModel.gifsAvailable {
+        Button("GIF", systemImage: "photo.stack") { gifPicker = viewModel.makeGifPicker() }
+      }
+      if !viewModel.stickerPacks.isEmpty {
+        Button("Sticker", systemImage: "face.smiling") { isStickerPickerShown = true }
+      }
       if UIPasteboard.general.hasImages {
         Button("Paste Picture", systemImage: "doc.on.clipboard") {
           let loaded = UIPasteboard.general.images?.compactMap(AttachmentLoader.load(image:)) ?? []
@@ -191,6 +199,16 @@ struct AttachmentButton: View {
     }
     .sheet(isPresented: $isPollShown) {
       CreatePollSheet(viewModel: viewModel)
+    }
+    .sheet(isPresented: $isStickerPickerShown) {
+      StickerPickerSheet(packs: viewModel.stickerPacks, repository: viewModel.media) { sticker in
+        Task { await viewModel.send(sticker: sticker) }
+      }
+    }
+    .sheet(item: $gifPicker) { picker in
+      GifPickerSheet(picker: picker) { gif in
+        Task { await viewModel.send(gif: gif) }
+      }
     }
     .fullScreenCover(isPresented: $isCameraShown) {
       CameraPicker { loaded in
