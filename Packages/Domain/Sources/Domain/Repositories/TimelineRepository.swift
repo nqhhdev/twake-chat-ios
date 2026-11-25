@@ -100,6 +100,8 @@ public protocol TimelineRepository: Sendable {
   /// The commands the room's bots announce (MSC4332).
   func botCommands() async -> [BotCommand]
 
+  func gifsEnabled() async -> Bool
+
   /// Sends `text` as a message that runs `command`.
   func send(command: BotCommand, text: String) async throws(TimelineError)
 
@@ -189,6 +191,7 @@ extension TimelineRepository {
 
   public func recentReactions() async -> [String] { [] }
   public func addRecentReaction(_ key: String) async {}
+  public func gifsEnabled() async -> Bool { true }
 }
 
 /// One thread of a room, as the room's Threads list shows it: its first message and its latest reply.

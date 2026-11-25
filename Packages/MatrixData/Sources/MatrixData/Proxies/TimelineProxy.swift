@@ -341,6 +341,24 @@ public actor TimelineProxy: TimelineRepository {
     return commands
   }
 
+  public func gifsEnabled() async -> Bool {
+    guard let opened else { return true }
+    if await opened.room.isDirect() { return true }
+    let room = ClientServerRequest.encode(roomId)
+    guard
+      let request = ClientServerRequest.make(
+        client: opened.client.client, path: "rooms/\(room)/state/\(Self.gifsStateType)/"),
+      let content = await ClientServerRequest.object(request)
+    else { return true }
+    return Self.gifsEnabled(content)
+  }
+
+  static let gifsStateType = "app.twake.chat.gifs"
+
+  static func gifsEnabled(_ content: [String: Any]) -> Bool {
+    (content["enabled"] as? Bool) != false
+  }
+
   /// The first page of the room's threads from the SDK's thread list (`/threads`), newest activity first.
   public func threads() async -> [ThreadListEntry] {
     guard let room = opened?.room else { return [] }

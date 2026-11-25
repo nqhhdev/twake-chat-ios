@@ -87,3 +87,7 @@
 
 ## 2026-11-24
 * **Decision (owner, 2026-11-24)**: no comments in Swift code. ADR 0025 (Proposed) records it, with the `swift-tools-version` line as the only exception; `scripts/check-no-comments.sh` and its tests are added. CI runs only the check's tests for now; the check itself is turned on once the existing comments are removed, after the open pull requests merge.
+
+## 2026-11-25
+* **Decision**: ADR 0028 (Proposed) decides the GIF picker (twake-common-proxy with an OpenID token, build setting `TWAKE_PROXY_URL`, hidden when the proxy offers no GIFs or the room turned them off), stickers from MSC2545 image packs, and checklists off until the web defines their event format.
+* **Change**: the composer takes hardware keyboard keys (#142), offers GIFs (#140) and stickers (#105) from the "+" menu, and shows received stickers without a bubble.

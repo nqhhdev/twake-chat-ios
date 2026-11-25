@@ -38,6 +38,14 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
 
   public func botCommands() async -> [BotCommand] { commands }
 
+  public var gifsOn: Bool {
+    get { lock.withLock { _gifsOn } }
+    set { lock.withLock { _gifsOn = newValue } }
+  }
+  private var _gifsOn = true
+
+  public func gifsEnabled() async -> Bool { gifsOn }
+
   /// What `threads()` answers.
   public var threadEntries: [ThreadListEntry] {
     get { lock.withLock { _threadEntries } }

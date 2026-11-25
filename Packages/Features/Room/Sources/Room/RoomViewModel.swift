@@ -64,6 +64,8 @@ public final class RoomViewModel {
   var threadPref: ThreadPref?
   /// The commands of the room's bots, loaded with the timeline.
   public private(set) var botCommands: [BotCommand] = []
+  @ObservationIgnored let gifs: (any GifRepository)?
+  public internal(set) var gifsAvailable = false
 
   /// The message whose edit history the sheet shows.
   public var historyMessage: TimelineMessage?
@@ -177,8 +179,10 @@ public final class RoomViewModel {
     saved: (any SavedMessagesRepository)? = nil,
     threadTimeline: ThreadTimeline? = nil, threadRootId: String? = nil,
     threadPrefs: (any ThreadPrefsRepository)? = nil,
-    scrollMemory: TimelineScrollMemory? = nil
+    scrollMemory: TimelineScrollMemory? = nil,
+    gifs: (any GifRepository)? = nil
   ) {
+    self.gifs = gifs
     self.scrollMemory = scrollMemory
     self.threadPrefs = threadPrefs
     self.threadTimeline = threadTimeline
@@ -216,7 +220,8 @@ public final class RoomViewModel {
       forwardTargets: forwardTargets, invitePeople: invitePeople, contentTimeline: nil,
       openDirectChat: openDirectChat, search: nil, isArchived: isArchived, rejoin: nil,
       linkPreviews: linkPreviews, checkSession: nil, display: display, blocking: blocking,
-      saved: saved, threadTimeline: nil, threadRootId: eventId, threadPrefs: threadPrefs)
+      saved: saved, threadTimeline: nil, threadRootId: eventId, threadPrefs: threadPrefs,
+      gifs: gifs)
   }
 
   /// The details page of this room, or `nil` when the app gave no details repository.
@@ -354,8 +359,9 @@ public final class RoomViewModel {
       async let reactions: Void = loadRecentReactions()
       async let saved: Void = loadSaved()
       async let threadPref: Void = loadThreadPref()
+      async let gifs: Void = loadGifsAvailability()
       let commands = await repository.botCommands()
-      _ = await (pinned, roomState, reactions, saved, threadPref)
+      _ = await (pinned, roomState, reactions, saved, threadPref, gifs)
       botCommands = commands
     }
     defer { extras.cancel() }

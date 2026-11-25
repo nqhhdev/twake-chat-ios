@@ -70,6 +70,7 @@ struct TwakeChatApp: App {
         devices: DevicesProxy(authentication: repository), chatDisplay: ChatDisplayDefaults(),
         appLock: AppLock(), sync: repository, sessionExpiry: repository,
         meetCalls: MeetCallProxy(authentication: repository),
+        gifs: url("TwakeProxyURL").map { GifProxy(baseURL: $0, authentication: repository) },
         signInConfiguration: configuration, webAuthenticator: SystemWebAuthenticator()))
     AppDelegate.push = root.push
   }
