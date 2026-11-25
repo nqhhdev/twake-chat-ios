@@ -44,5 +44,6 @@ public enum A11yIdentifiers {
     public let displayName = "settings.displayName"
     public let logout = "settings.logout"
     public let confirmLogout = "settings.confirmLogout"
+    public let personalQR = "settings.personalQR"
   }
 }
