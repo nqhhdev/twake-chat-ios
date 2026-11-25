@@ -87,3 +87,7 @@
 
 ## 2026-11-24
 * **Decision (owner, 2026-11-24)**: no comments in Swift code. ADR 0025 (Proposed) records it, with the `swift-tools-version` line as the only exception; `scripts/check-no-comments.sh` and its tests are added. CI runs only the check's tests for now; the check itself is turned on once the existing comments are removed, after the open pull requests merge.
+
+## 2026-11-25
+* **Decision**: ADR 0030 (Proposed) keeps QR device verification off: neither the pinned matrix-rust-components-swift 26.04.01 nor the newest 26.11.23 (nor matrix-rust-sdk `main`) exposes it in `SessionVerificationController`; emoji verification stays, and the ADR describes the upstream FFI change that would add it (#104).
+* **Change**: Personal QR built (#105): Settings > Your personal QR shows the user's `matrix.to` link as a QR code with Share and Copy link, and scans QR codes into the existing `MatrixLink` routing; `MatrixLink` also reads the Flutter personal QR link `https://links.twake.app/chat/…`. Deferred Features is updated.
