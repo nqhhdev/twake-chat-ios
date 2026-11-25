@@ -87,3 +87,6 @@
 
 ## 2026-11-24
 * **Decision (owner, 2026-11-24)**: no comments in Swift code. ADR 0025 (Proposed) records it, with the `swift-tools-version` line as the only exception; `scripts/check-no-comments.sh` and its tests are added. CI runs only the check's tests for now; the check itself is turned on once the existing comments are removed, after the open pull requests merge.
+
+## 2026-11-25
+* **Change**: Notifications (#91). Reply and Mark as read on message notifications (category `message`), handled by the app in the background on its own client (`NotificationActionProxy`); communication notifications with sender and group name and avatar (`INSendMessageIntent` from the extension, entitlement added); the user's own messages show nothing; a notification in a thread opens that thread. Not yet seen on a device.
