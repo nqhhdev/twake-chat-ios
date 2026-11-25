@@ -40,13 +40,27 @@ public actor SpacesProxy: SpacesRepository {
 
   static func child(_ room: SpaceRoom) -> SpaceChild {
     let isSpace = if case .space = room.roomType { true } else { false }
+    let isBroadcast =
+      if case .custom(let value) = room.roomType { value == BroadcastDraft.roomType } else { false }
     return SpaceChild(
       id: room.roomId,
       name: room.displayName.isEmpty ? (room.canonicalAlias ?? room.roomId) : room.displayName,
       topic: room.topic.flatMap { $0.isEmpty ? nil : $0 },
       avatar: RoomSummaryMapper.avatar(room.avatarUrl),
       memberCount: Int(clamping: room.numJoinedMembers), isJoined: room.state == .joined,
-      isSpace: isSpace, via: room.via)
+      isSpace: isSpace, via: room.via, isBroadcast: isBroadcast)
+  }
+
+  /// The state the web writes, read from the server: the pinned SDK gives no custom room state. A room the user is not
+  /// in usually refuses it, and gets no style.
+  public func pageStyle(of roomId: String) async -> PageStyle? {
+    guard let client = await clientProxy()?.client,
+      let request = ClientServerRequest.make(
+        client: client,
+        path: "rooms/\(ClientServerRequest.encode(roomId))/state/\(PageStyle.stateEventType)/"),
+      let content = await ClientServerRequest.object(request)
+    else { return nil }
+    return PageStyle(content: content) { RoomSummaryMapper.avatar($0) }
   }
 
   public func canAddChannel(to spaceId: String) async -> Bool {

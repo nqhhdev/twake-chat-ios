@@ -22,6 +22,10 @@ public final class SpaceViewModel {
   /// The user may add rooms to this space.
   public private(set) var canAddChannel = false
   public private(set) var isCreating = false
+  /// The look the web gives the space (`app.twake.chat.page_style`), drawn as the header; `nil` draws the plain one.
+  public private(set) var pageStyle: PageStyle?
+  /// The look of each Broadcast of the space that has one, by room id.
+  public private(set) var childStyles: [String: PageStyle] = [:]
 
   public init(
     space: RoomSummary, repository: any SpacesRepository,
@@ -39,6 +43,7 @@ public final class SpaceViewModel {
   public func load() async {
     errorMessage = nil
     canAddChannel = await repository.canAddChannel(to: space.id)
+    pageStyle = await repository.pageStyle(of: space.id)
     do {
       let found = try await repository.children(of: space.id)
       // Sub-spaces first, then rooms; joined ones before the others; by name.
@@ -51,7 +56,23 @@ public final class SpaceViewModel {
       children = children ?? []
       errorMessage = "Could not load this space."
     }
+    await loadChildStyles()
   }
+
+  /// Reads the page style of the Broadcasts listed, at most `maxStyledChildren` of them, all at once.
+  private func loadChildStyles() async {
+    let ids = (children ?? []).filter(\.isBroadcast).prefix(Self.maxStyledChildren).map(\.id)
+    let repository = repository
+    childStyles = await withTaskGroup(of: (String, PageStyle?).self) { group in
+      for id in ids { group.addTask { (id, await repository.pageStyle(of: id)) } }
+      var found: [String: PageStyle] = [:]
+      for await (id, style) in group { found[id] = style }
+      return found
+    }
+  }
+
+  /// Broadcasts whose style is read, so a huge space does not send a request per room.
+  static let maxStyledChildren = 20
 
   /// Joins a sub-space the user is not in, so it reaches the chat list (Flutter's joinable sub-space row). It stays
   /// on this screen; opening it is a tap on the row.
@@ -69,7 +90,8 @@ public final class SpaceViewModel {
     if let index = children?.firstIndex(where: { $0.id == child.id }) {
       children?[index] = SpaceChild(
         id: child.id, name: child.name, topic: child.topic, avatar: child.avatar,
-        memberCount: child.memberCount, isJoined: true, isSpace: true, via: child.via)
+        memberCount: child.memberCount, isJoined: true, isSpace: true, via: child.via,
+        isBroadcast: child.isBroadcast)
     }
   }
 
@@ -90,7 +112,8 @@ public final class SpaceViewModel {
       if let index = children?.firstIndex(where: { $0.id == child.id }) {
         children?[index] = SpaceChild(
           id: child.id, name: child.name, topic: child.topic, avatar: child.avatar,
-          memberCount: child.memberCount, isJoined: true, isSpace: false, via: child.via)
+          memberCount: child.memberCount, isJoined: true, isSpace: false, via: child.via,
+          isBroadcast: child.isBroadcast)
       }
     }
     onOpen(
@@ -166,11 +189,17 @@ struct SpaceScreen: View {
     List {
       Section {
         VStack(spacing: 8) {
+          // The web's page style: its cover above, the avatar over its lower edge, ringed in its colour.
+          if let style = viewModel.pageStyle {
+            PageCover(style: style, picture: viewModel.picture).padding(.bottom, -44)
+          }
           TwakeAvatar(
             name: viewModel.space.name, size: 72, pictureID: viewModel.space.avatar?.source,
             load: viewModel.space.avatar.map { reference in
               { @Sendable [picture = viewModel.picture] in await picture(reference) }
-            })
+            }
+          )
+          .pageAccentRing(viewModel.pageStyle, size: 72)
           Text(viewModel.space.name).font(.title3.weight(.semibold)).multilineTextAlignment(.center)
           if let children = viewModel.children {
             Text(children.count == 1 ? "1 room" : "\(children.count) rooms")
@@ -255,7 +284,9 @@ struct SpaceScreen: View {
         name: child.name, size: 40, pictureID: child.avatar?.source,
         load: child.avatar.map { reference in
           { @Sendable [picture = viewModel.picture] in await picture(reference) }
-        })
+        }
+      )
+      .pageAccentRing(viewModel.childStyles[child.id], size: 40)
       VStack(alignment: .leading, spacing: 2) {
         HStack(spacing: 4) {
           if child.isSpace {
