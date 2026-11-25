@@ -368,7 +368,8 @@ enum TimelineItemMapper {
     guard case .megolmV1AesSha2(_, let cause) = message else { return .unknown }
     return switch cause {
     case .sentBeforeWeJoined: .sentBeforeJoining
-    case .withheldBySender, .withheldForUnverifiedOrInsecureDevice: .withheld
+    case .withheldBySender: .withheld
+    case .withheldForUnverifiedOrInsecureDevice: .withheldFromUnverifiedDevice
     case .verificationViolation, .unsignedDevice, .unknownDevice: .untrustedSender
     case .historicalMessageAndBackupIsDisabled: .historical
     case .historicalMessageAndDeviceIsUnverified: .historicalUnverified
