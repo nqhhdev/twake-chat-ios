@@ -27,6 +27,7 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
     case endPoll(String)
     case acceptIdentity(String)
     case command(String, String)
+    case sticker(String)
   }
 
   /// What `botCommands()` answers.
@@ -37,6 +38,27 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
   private var _commands: [BotCommand] = []
 
   public func botCommands() async -> [BotCommand] { commands }
+
+  public var gifsOn: Bool {
+    get { lock.withLock { _gifsOn } }
+    set { lock.withLock { _gifsOn = newValue } }
+  }
+  private var _gifsOn = true
+
+  public func gifsEnabled() async -> Bool { gifsOn }
+
+  public var packs: [StickerPack] {
+    get { lock.withLock { _packs } }
+    set { lock.withLock { _packs = newValue } }
+  }
+  private var _packs: [StickerPack] = []
+
+  public func stickerPacks() async -> [StickerPack] { packs }
+
+  public func send(sticker: Sticker) async throws(TimelineError) {
+    record(.sticker(sticker.id))
+    try actionResult.get()
+  }
 
   /// What `threads()` answers.
   public var threadEntries: [ThreadListEntry] {

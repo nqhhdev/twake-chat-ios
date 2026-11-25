@@ -61,8 +61,8 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Spoiler in the toolbar | — | MSG-23 | Not built | Matrix | #178 |
 | Emoji shortcodes, bot commands (MSC4332) | `command_hints` | README | Built: `Room/EmojiSuggestions.swift`, `Domain/Models/BotCommand.swift` | Matrix | — |
 | Custom emotes and packs (MSC2545) | `settings_emotes` | — | Not built | Matrix | #186 |
-| Stickers: shown / sent | `sticker_picker_dialog` | — | Shown: `MessageBody.swift`; sending not built | Matrix | #105 |
-| GIF picker | — | D63, D146 | Not built | Twake (common proxy), ADR 0028 | #140 |
+| Stickers: shown / sent | `sticker_picker_dialog` | — | Built: `StickerViews.swift` (shown without a bubble), sent from MSC2545 packs, [ADR 0028](../../docs/adr/0028-gifs-stickers-checklists.md) | Matrix | #105 |
+| GIF picker | — | D63, D146 | Built: `GifPickerSheet.swift`; received GIFs not hidden when off, no owner switch yet | Twake (common proxy), ADR 0028 | #140 |
 | Typing line, receipts, Seen by, unread marker, mark unread | `seen_by_row` | Phase 2, 2b | Built: `Room/RoomScreen.swift`, `TimelineRows.swift` | Matrix | — |
 | Draft per chat and per thread, reopen where left | `chat_draft` | Phase 2b | Built: `TimelineRepository.saveDraft`, `Room/TimelineScrollMemory.swift` | Matrix | — |
 | Forward, pin, edit history (encrypted too), report, ignore | `forward`, `chat_pinned_events` | Phase 2b | Built: `Room/PinnedAndForward.swift`, `MatrixData/Proxies/EncryptedEditHistory.swift` | Matrix | — |
@@ -70,7 +70,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Search in a chat: unencrypted on the server, encrypted on device | `chat_search` | Phase 4 (D21) | Built: `Room/RoomSearch.swift`, `RoomSearchProxy.swift`; no persistent local index | Matrix | #94 |
 | Threads: list, reply, thread screen | — | Phase 2 | Built: `Room/Threads.swift`, `ThreadPrefsProxy.swift` | Matrix | #93 (notifications) |
 | Polls (MSC3381) | — | Phase 10 | Built: `Room/Polls.swift`, `Domain/Models/Poll.swift` | Matrix | — |
-| Checklists next to polls | — | THR-11 | Not built | Matrix | #105 |
+| Checklists next to polls | — | THR-11 | Off: no event format defined ([ADR 0028](../../docs/adr/0028-gifs-stickers-checklists.md)) | Matrix | #105 |
 | Voice messages (MSC3245), playback speed | `chat_audio_player_widget` | Phase 10 | Built: `Room/VoiceRecorder.swift`, `Players.swift`; interop to verify | Matrix | #108 |
 | Transcribe a voice message | — | MSG-13 | Not built | Device | #182 |
 | Translate a message | — | MSG-15 | Not built | Device (ADR 0026) | #181 |
@@ -80,7 +80,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Author removes a link preview | — | CMP-09 | Not built; the web has no format | Matrix | #185 |
 | Tombstone and blocked user banners, device verification banner | `tombstone_display`, `blocked_user_banner`, `chat_device_verifycation_banner` | — | Built: `Room/RoomBanners.swift` | Matrix | — |
 | Status on the author's avatar | — | NOT-04 | Not built | Matrix | #180 |
-| Hardware keyboard: Return sends, Up edits | `chat_input_row_web` | Phase 2b | Not built | Device | #142 |
+| Hardware keyboard: Return sends, Up edits | `chat_input_row_web` | Phase 2b | Built: `ComposerKeys.swift` | Device | #142 |
 | Broadcast channels (`app.twake.chat.page`) | `newfeed` (`app.twake.chat.feed`) | Phase 3, D2, D90 | Built: `Domain/Models/Broadcast.swift`; web form kept (ADR 0023) | Matrix | — |
 | Twake Assistant in rooms | — | D74, D102, D128, D212 | Not built; owner decision | Twake (Assistant) | #190 |
 | Public web page of a channel | — | D112, D178 | Not built | Twake (side service) | #189 |
