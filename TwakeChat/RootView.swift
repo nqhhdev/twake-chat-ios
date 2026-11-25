@@ -65,6 +65,7 @@ final class RootCoordinator {
   @ObservationIgnored private(set) var links: LinkRouter!
   /// What other apps share into the app, waiting for a chat.
   @ObservationIgnored let shares = ShareCenter()
+  @ObservationIgnored let shareSuggestions = ShareSuggestions()
   @ObservationIgnored private let verificationRepository: (any VerificationRepository)?
   /// Unlocks this device with the recovery key kept on ToM (ADR 0024); `nil` (tests) never runs.
   @ObservationIgnored private let deviceUnlock: DeviceUnlocker?
@@ -155,9 +156,10 @@ final class RootCoordinator {
       saved: savedMessages, threadPrefs: threadPrefs, people: people,
       openPerson: openDirectChat()
     ) {
-      [weak signedIn, push] in
+      [weak signedIn, push, shareSuggestions] in
       guard let signedIn else { return false }
       await push.stop()
+      shareSuggestions.forgetAll()
       await signedIn.logOut()
       return signedIn.errorMessage == nil
     }
@@ -170,10 +172,14 @@ final class RootCoordinator {
 
   /// A room's screen model on its own timeline; the shell keeps the open one and closes it through `onLeft`.
   func room(for summary: RoomSummary, onLeft: @escaping @MainActor () -> Void) -> RoomViewModel {
-    RoomViewModel(
+    let room = RoomViewModel(
       roomId: summary.id, roomName: summary.name, roomAvatar: summary.avatar,
       repository: makeTimeline(summary.id, nil), media: media,
-      details: roomDetails, onLeft: onLeft,
+      details: roomDetails,
+      onLeft: { [shareSuggestions] in
+        shareSuggestions.forget(summary.id)
+        onLeft()
+      },
       forwardTargets: { [weak self] in self?.chatList?.viewModel.visibleRooms ?? [] },
       invitePeople: invitePeople(),
       contentTimeline: { [makeTimeline] kind in makeTimeline(summary.id, kind) },
@@ -183,6 +189,8 @@ final class RootCoordinator {
       saved: savedMessages,
       threadTimeline: { [makeThreadTimeline] root in makeThreadTimeline(summary.id, root) },
       threadPrefs: threadPrefs)
+    shareSuggestions.follow(room)
+    return room
   }
 
   /// The account's do not disturb, for the chat list's banner.
@@ -319,9 +327,10 @@ final class RootCoordinator {
       media: media, verification: verificationRepository.map(VerificationViewModel.init),
       devices: devicesRepository.map(DevicesViewModel.init), chatDisplay: chatDisplay,
       appLock: appLock
-    ) { [weak signedIn, push] in
+    ) { [weak signedIn, push, shareSuggestions] in
       guard let signedIn else { return false }
       await push.stop()
+      shareSuggestions.forgetAll()
       await signedIn.logOut()
       return signedIn.errorMessage == nil
     }
@@ -385,6 +394,7 @@ final class RootCoordinator {
   func sessionExpired() async {
     guard case .restored = state, case .signedIn? = authentication?.screen else { return }
     await push.stop()
+    shareSuggestions.forgetAll()
     try? await repository.logout()
     guard (try? await repository.restoreSession()) == nil else { return }
     chatList = nil
@@ -408,6 +418,7 @@ final class RootCoordinator {
       started = false
       return
     }
+    shareSuggestions.forgetAll()
     state = .restored(nil)
     authentication = makeAuthentication(session: nil)
   }

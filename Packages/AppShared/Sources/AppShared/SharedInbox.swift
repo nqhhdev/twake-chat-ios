@@ -23,10 +23,12 @@ public struct SharedItems: Codable, Sendable, Equatable {
 
   public var text: String?
   public var files: [File]
+  public var roomId: String?
 
-  public init(text: String? = nil, files: [File] = []) {
+  public init(text: String? = nil, files: [File] = [], roomId: String? = nil) {
     self.text = text
     self.files = files
+    self.roomId = roomId
   }
 
   public var isEmpty: Bool { (text ?? "").isEmpty && files.isEmpty }
