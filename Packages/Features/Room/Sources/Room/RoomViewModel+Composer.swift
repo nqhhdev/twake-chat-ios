@@ -68,7 +68,9 @@ extension RoomViewModel {
   /// Sends what the preview kept, one after another (pictures sent together show as an album), the caption with the
   /// last one, as the Flutter upload manager does. The composer's draft, which the preview offered as the caption, is
   /// cleared; the copied files are deleted once sent.
-  func send(batch: [AttachmentLoader.Loaded], caption: String) async {
+  func send(
+    batch: [AttachmentLoader.Loaded], caption: String, descriptions: [UUID: String] = [:]
+  ) async {
     let caption = caption.trimmingCharacters(in: .whitespacesAndNewlines)
     draft = ""
     let limit = await media.maxUploadSize()
@@ -87,10 +89,19 @@ extension RoomViewModel {
       let isLast = index == batch.count - 1
       await send(
         attachment: item.kind, fileURL: item.fileURL, mimeType: item.mimeType, size: item.size,
-        caption: isLast && !caption.isEmpty ? caption : nil)
+        caption: Self.caption(
+          of: item, descriptions: descriptions, batchCaption: isLast ? caption : ""))
       AttachmentLoader.remove(item)
     }
     if let limitMessage { errorMessage = limitMessage }
+  }
+
+  static func caption(
+    of item: AttachmentLoader.Loaded, descriptions: [UUID: String], batchCaption: String
+  ) -> String? {
+    if !batchCaption.isEmpty { return batchCaption }
+    let description = descriptions[item.id]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return description.isEmpty ? nil : description
   }
 
   public var canSend: Bool {
