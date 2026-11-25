@@ -94,12 +94,13 @@ struct AnimatedImage: View {
   }
 }
 
-private struct AnimatedImageView: UIViewRepresentable {
+struct AnimatedImageView: UIViewRepresentable {
   let image: UIImage
+  var contentMode = UIView.ContentMode.scaleAspectFill
 
   func makeUIView(context: Context) -> UIImageView {
     let view = UIImageView()
-    view.contentMode = .scaleAspectFill
+    view.contentMode = contentMode
     view.clipsToBounds = true
     view.setContentHuggingPriority(.defaultLow, for: .horizontal)
     view.setContentHuggingPriority(.defaultLow, for: .vertical)

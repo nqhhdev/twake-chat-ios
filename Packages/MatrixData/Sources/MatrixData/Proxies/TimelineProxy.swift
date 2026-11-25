@@ -353,6 +353,65 @@ public actor TimelineProxy: TimelineRepository {
     return Self.gifsEnabled(content)
   }
 
+  public func stickerPacks() async -> [StickerPack] {
+    guard let opened else { return [] }
+    let client = opened.client.client
+    let source: (String) -> String? = { try? MediaSource.fromUrl(url: $0).toJson() }
+    var packs: [StickerPack] = []
+    let user = ImagePackMapper.eventContent(
+      try? await client.accountData(eventType: ImagePackMapper.userPackType))
+    if let user,
+      let pack = ImagePackMapper.pack(
+        id: "user", content: user, fallbackName: "My stickers", source: source)
+    {
+      packs.append(pack)
+    }
+    let room = ClientServerRequest.encode(roomId)
+    if let request = ClientServerRequest.make(client: client, path: "rooms/\(room)/state"),
+      let data = await Self.data(request),
+      let events = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+    {
+      for event in events where event["type"] as? String == ImagePackMapper.roomPackType {
+        guard let key = event["state_key"] as? String,
+          let content = event["content"] as? [String: Any],
+          let pack = ImagePackMapper.pack(
+            id: "room:\(roomId):\(key)", content: content,
+            fallbackName: key.isEmpty ? "Chat stickers" : key, source: source)
+        else { continue }
+        packs.append(pack)
+      }
+    }
+    let packRooms = ImagePackMapper.eventContent(
+      try? await client.accountData(eventType: ImagePackMapper.packRoomsType))
+    for (other, key) in packRooms.map(ImagePackMapper.packRooms) ?? [] where other != roomId {
+      let path =
+        "rooms/\(ClientServerRequest.encode(other))/state/\(ImagePackMapper.roomPackType)/"
+        + ClientServerRequest.encode(key)
+      guard let request = ClientServerRequest.make(client: client, path: path),
+        let content = await ClientServerRequest.object(request),
+        let pack = ImagePackMapper.pack(
+          id: "room:\(other):\(key)", content: content,
+          fallbackName: key.isEmpty ? "Stickers" : key, source: source)
+      else { continue }
+      packs.append(pack)
+    }
+    var seen = Set<String>()
+    return packs.filter { seen.insert($0.id).inserted }
+  }
+
+  public func send(sticker: Sticker) async throws(TimelineError) {
+    let room = try openedState().room
+    let content = ImagePackMapper.stickerContent(sticker, threadRoot: threadRoot)
+    guard let data = try? JSONSerialization.data(withJSONObject: content),
+      let json = String(data: data, encoding: .utf8)
+    else { throw .requestFailed }
+    do {
+      try await room.sendRaw(eventType: "m.sticker", content: json)
+    } catch {
+      throw Self.failure("sendSticker", error)
+    }
+  }
+
   static let gifsStateType = "app.twake.chat.gifs"
 
   static func gifsEnabled(_ content: [String: Any]) -> Bool {

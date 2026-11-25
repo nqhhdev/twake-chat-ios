@@ -43,7 +43,13 @@ struct MessageRow: View {
           }
         }
         Group {
-          if message.isEmojiOnly, message.reply == nil { bigEmoji } else { bubble }
+          if message.isEmojiOnly, message.reply == nil {
+            bigEmoji
+          } else if case .sticker = message.body, let media = message.media, message.reply == nil {
+            StickerMessage(message: message, media: media, repository: viewModel.media)
+          } else {
+            bubble
+          }
         }
         .overlay { HeartBurst(trigger: heartBurst) }
         .simultaneousGesture(
