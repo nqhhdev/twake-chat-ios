@@ -277,7 +277,12 @@ final class RootCoordinator {
     unlockedSignIn = signedIn
     isUnlockingDevice = true
     defer { isUnlockingDevice = false }
-    if case .setUpNotSaved(let key) = await deviceUnlock.run() { unsavedRecoveryKey = key }
+    switch await deviceUnlock.run() {
+    case .setUpNotSaved(let key): unsavedRecoveryKey = key
+    case .verifiedFromVault:
+      NotificationCenter.default.post(name: .encryptionKeysImported, object: nil)
+    case .alreadyVerified, .setUp, .needsKey: break
+    }
   }
 
   /// Rejoins a left chat from its read-only screen (the archive belongs to the room list proxy).

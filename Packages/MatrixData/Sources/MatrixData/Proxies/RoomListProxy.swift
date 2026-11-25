@@ -178,6 +178,16 @@ public actor RoomListProxy: RoomListRepository {
     return room
   }
 
+  public func retryDecryption(roomIds: [String]) async {
+    guard let client = await clientProxy()?.client else { return }
+    for roomId in roomIds.prefix(Self.previewBatch) {
+      guard let room = try? client.getRoom(roomId: roomId),
+        let timeline = try? await room.timeline()
+      else { continue }
+      timeline.retryDecryption(sessionIds: [])
+    }
+  }
+
   public func decline(roomId: String) async throws(Domain.RoomListError) {
     guard let room = try? await clientProxy()?.client.getRoom(roomId: roomId) else {
       throw .requestFailed

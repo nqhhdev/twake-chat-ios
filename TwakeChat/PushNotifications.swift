@@ -121,7 +121,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     _ center: UNUserNotificationCenter, willPresent notification: UNNotification
   ) async -> UNNotificationPresentationOptions {
     let roomId = notification.request.content.userInfo["room_id"] as? String
-    let shows = await MainActor.run { Self.push?.showsBanner(forRoom: roomId) ?? true }
+    let shows = await MainActor.run {
+      NotificationCenter.default.post(name: .encryptionKeysImported, object: nil)
+      return Self.push?.showsBanner(forRoom: roomId) ?? true
+    }
     return shows ? [.banner, .list, .sound, .badge] : []
   }
 
