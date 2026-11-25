@@ -57,6 +57,18 @@ status: draft
 - New spaces already carry what the web needs to publish a room later: only an owner may send
   `app.twake.chat.public_page` (power level 100).
 
+## Decision: the chat preview (#132)
+- PR #154 built the preview: a long press, or a secondary click with a pointer, shows the room's latest messages above
+  the menu, read-only and newest last; it sends no read receipt; it closes its timeline when the menu closes; an
+  undecryptable message shows the timeline's placeholder; spaces and invitations keep the plain menu; the row has a
+  hover effect.
+- What #132 still asks is that a tap on the preview opens the chat, as in Messages. SwiftUI's
+  `contextMenu(menuItems:preview:)` gives no action for a tap on the preview: it only closes the menu. The menu now
+  starts with Open, which opens the chat as a tap on the row does.
+- A tap on the preview itself needs `UIContextMenuInteraction` (its `willPerformPreviewActionForMenuWith`) around the
+  row, which would replace SwiftUI's list row menu and swipe actions with a UIKit bridge. That is left for the owner to
+  decide; #132 stays open for it.
+
 ## Consequences
 **Good.** A space made on iOS is the same on the web and in Flutter; a folder made on one client shows on the others.
 **Costly.** Reading tags costs one filtered `/sync` when the list opens and on each return to the foreground, and a

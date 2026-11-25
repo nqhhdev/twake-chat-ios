@@ -413,13 +413,17 @@ public struct ChatListScreen: View {
     }
   }
 
+  private func open(_ room: RoomSummary) {
+    if let space = viewModel.makeSpace(room, onOpen: { [onSelect] in onSelect($0) }) {
+      openedSpace = space
+    } else {
+      onSelect(room)
+    }
+  }
+
   private func roomButton(_ room: RoomSummary) -> some View {
     Button {
-      if let space = viewModel.makeSpace(room, onOpen: { [onSelect] in onSelect($0) }) {
-        openedSpace = space
-      } else {
-        onSelect(room)
-      }
+      open(room)
     } label: {
       ChatListRow(room: room, viewModel: viewModel)
     }
@@ -450,6 +454,7 @@ public struct ChatListScreen: View {
 
   /// The long-press menu of a chat row.
   @ViewBuilder private func menuItems(_ room: RoomSummary) -> some View {
+    Button("Open", systemImage: "arrow.up.forward.app") { open(room) }
     Button("Select", systemImage: "checkmark.circle") {
       withAnimation {
         isSelecting = true

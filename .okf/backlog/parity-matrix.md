@@ -36,7 +36,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Rooms by activity, unread, invitations accept and decline | `chat_list`, `invitation_selection` | Phase 2, 3 | Built: `ChatList/ChatListScreen.swift`, `ChatListViewModel.swift` | Matrix | — |
 | Filters, favourites, low priority, swipe and multiple selection | `chat_list/room_list_filter`, `slidable_chat_list_item` | Phase 2b, 11 | Built: `ChatListScreen.swift` | Matrix | — |
 | Draft on the row, mark all read, offline banner, quick switcher | `chat_draft` | Phase 2b, 11 | Built: `ChatListViewModel.swift`, `MarkAllRead.swift`, `Connectivity.swift`, `QuickSwitcher.swift` | Matrix | — |
-| Preview a chat on long press | — | — | Built: `ChatList/ChatPreview.swift` (#154) | Matrix | #132 |
+| Preview a chat on long press | — | — | Built: `ChatList/ChatPreview.swift` (#154); Open in its menu; a tap on the preview does not open the chat (SwiftUI, ADR 0036) | Matrix | #132 |
 | Typing on the row, presence dot, room kind badge, space unread | `chat_list_item_subtitle` | D182 | Built: `ChatList/ChatListScreen.swift` (`ChatListRow`), `RowPresence.swift`, `RowSpaceUnread.swift`, `Domain/Models/SpaceUnread.swift`; presence read when the row shows ([ADR 0031](../../docs/adr/0031-chat-list-row-marks.md)) | Matrix (presence: `GET /presence`, off on some servers) | #105, #136, #144, #145 |
 | Archive (web account data `app.twake.chat.archived_rooms`) | `archive` | D176 | Built: `ChatList/ArchivedChats.swift`, `Domain/Models/RoomArchive.swift` | Matrix | — |
 | Public groups: browse, join, knock | `public_rooms` | D206 | Built: `ChatList/PublicRooms.swift`, `MatrixData/Proxies/PublicRoomsProxy.swift` | Matrix | — |
