@@ -80,6 +80,11 @@ struct ActivityScreen: View {
       }
     }
     .navigationTitle("Activity")
+    .toolbar {
+      ToolbarItem(placement: .topBarTrailing) {
+        MarkAllReadButton(viewModel: viewModel, rooms: viewModel.inbox)
+      }
+    }
     .animation(.spring(response: 0.35, dampingFraction: 0.85), value: viewModel.inbox)
     .animation(.spring(response: 0.35, dampingFraction: 0.85), value: viewModel.followedThreads)
     .task { await viewModel.loadFollowedThreads() }
