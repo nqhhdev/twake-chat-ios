@@ -4,18 +4,43 @@ import Foundation
 public actor IdentityServerProxy: IdentityRepository {
   static let lookupBatch = 500
 
+  struct AccountState: Sendable {
+    var userId: String?
+    var service: IdentityService??
+    var token: String?
+    var pepper: String?
+
+    func forAccount(_ userId: String) -> AccountState {
+      self.userId == userId ? self : AccountState(userId: userId)
+    }
+  }
+
   private let clientProxy: @Sendable () async -> ClientProxy?
+  private let capabilities: any ServerCapabilitiesRepository
   private let transport: IdentityService.Transport
   private let language: String
-  private var service: IdentityService??
-  private var token: String?
-  private var pepper: String?
+  private var account = AccountState()
+
+  private var service: IdentityService?? {
+    get { account.service }
+    set { account.service = newValue }
+  }
+  private var token: String? {
+    get { account.token }
+    set { account.token = newValue }
+  }
+  private var pepper: String? {
+    get { account.pepper }
+    set { account.pepper = newValue }
+  }
 
   public init(
     authentication: MatrixAuthenticationRepository,
+    capabilities: any ServerCapabilitiesRepository,
     language: String = Locale.current.language.languageCode?.identifier ?? "en"
   ) {
     clientProxy = { await authentication.clientProxy }
+    self.capabilities = capabilities
     transport = { request in
       guard let (data, response) = try? await URLSession.shared.data(for: request),
         let http = response as? HTTPURLResponse
@@ -203,6 +228,8 @@ public actor IdentityServerProxy: IdentityRepository {
   }
 
   private func service(_ client: ClientProxy) async -> IdentityService? {
+    guard let userId = try? client.userId else { return nil }
+    account = account.forAccount(userId)
     if let service { return service }
     let found = await discover(client).flatMap {
       IdentityService(baseURL: $0, transport: transport)
@@ -213,19 +240,22 @@ public actor IdentityServerProxy: IdentityRepository {
 
   private func discover(_ client: ClientProxy) async -> URL? {
     guard let userId = try? client.userId else { return nil }
+    var accountData: Data?
     if let request = ClientServerRequest.make(
       client: client.client,
       path: "user/\(ClientServerRequest.encode(userId))/account_data/m.identity_server"),
-      let (status, data) = await ClientServerRequest.answer(request), status == 200,
-      let chosen = IdentityService.baseURL(fromAccountData: data)
+      let (status, data) = await ClientServerRequest.answer(request), status == 200
     {
+      accountData = data
+    }
+    return Self.server(accountData: accountData, capabilities: await capabilities.current())
+  }
+
+  static func server(accountData: Data?, capabilities: ServerCapabilities) -> URL? {
+    if let accountData, let chosen = IdentityService.baseURL(fromAccountData: accountData) {
       return chosen
     }
-    guard let serverName = userId.split(separator: ":", maxSplits: 1).last,
-      let url = URL(string: "https://\(serverName)/.well-known/matrix/client"),
-      let (status, data) = await transport(URLRequest(url: url)), status == 200
-    else { return nil }
-    return IdentityService.baseURL(fromWellKnown: data)
+    return capabilities.identityServer
   }
 
   private func acceptedTerms(_ client: ClientProxy) async -> [String] {

@@ -18,6 +18,7 @@ public actor TimelineProxy: TimelineRepository {
   /// Typing subscriptions, cancelled when the timeline closes.
   private var typingHandles: [TaskHandle] = []
   private let clientProxy: @Sendable () async -> ClientProxy?
+  private let index: MessageIndex?
   private var opened: Opened?
   private var knownEmotes: [String: String] = [:]
   private var delayedEventsSupported: Bool?
@@ -30,13 +31,14 @@ public actor TimelineProxy: TimelineRepository {
   ///   - threadRoot: Shows this thread (its root and replies); what is sent goes into it.
   public init(
     roomId: String, authentication: MatrixAuthenticationRepository,
-    only content: RoomContentKind? = nil, threadRoot: String? = nil,
+    only content: RoomContentKind? = nil, threadRoot: String? = nil, index: MessageIndex? = nil,
     capabilities: (any ServerCapabilitiesRepository)? = nil
   ) {
     self.capabilities = capabilities
     self.roomId = roomId
     self.content = content
     self.threadRoot = threadRoot
+    self.index = index
     clientProxy = { await authentication.clientProxy }
   }
 
@@ -81,7 +83,8 @@ public actor TimelineProxy: TimelineRepository {
     // The listener is called on an SDK thread; diffs are applied in order by one task, which keeps the client alive
     // until it ends.
     let sendHandles = SendHandles()
-    let applying = Task { [client] in
+    let recorder = await room.isEncrypted() ? index.map { IndexRecorder(index: $0) } : nil
+    let applying = Task { [client, roomId] in
       var mapped: [Domain.TimelineItem?] = []
       for await batch in diffs {
         guard !Task.isCancelled else { continue }
@@ -91,7 +94,9 @@ public actor TimelineProxy: TimelineRepository {
             return TimelineItemMapper.item(item, ownUserId: ownUserId)
           }.apply(to: &mapped)
         }
-        itemsContinuation.yield(mapped.compactMap { $0 })
+        let items = mapped.compactMap { $0 }
+        itemsContinuation.yield(items)
+        await recorder?.record(roomId: roomId, items: items)
       }
       itemsContinuation.finish()
       withExtendedLifetime(client) {}
@@ -857,7 +862,28 @@ public actor TimelineProxy: TimelineRepository {
 
 /// The SDK send handles of the messages that failed to send, by transaction id, so one of them can be sent again
 /// (`SendHandle.tryResend`). The timeline's applying task fills it; the proxy reads it.
-private final class SendHandles: @unchecked Sendable {
+private
+
+  actor IndexRecorder
+{
+  private let index: MessageIndex
+  private var recorded: [String: String] = [:]
+
+  init(index: MessageIndex) {
+    self.index = index
+  }
+
+  func record(roomId: String, items: [Domain.TimelineItem]) async {
+    let (entries, redacted) = MessageIndex.entries(roomId: roomId, items: items)
+    let changed = entries.filter { recorded[$0.eventId] != $0.text }
+    let removed = redacted.filter { recorded[$0] != "" }
+    for entry in changed { recorded[entry.eventId] = entry.text }
+    for eventId in removed { recorded[eventId] = "" }
+    await index.record(changed)
+    await index.remove(eventIds: removed)
+  }
+}
+final class SendHandles: @unchecked Sendable {
   private let lock = NSLock()
   private var handles: [String: SendHandle] = [:]
 

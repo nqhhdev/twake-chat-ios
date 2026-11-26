@@ -42,6 +42,10 @@ public actor MatrixAuthenticationRepository: AuthenticationRepository {
 
   public var clientProxy: ClientProxy? { proxy }
 
+  nonisolated var messageIndexURL: URL {
+    storeDirectory.appending(path: "message-index.sqlite3", directoryHint: .notDirectory)
+  }
+
   public func loginOptions(server: String) async throws(AuthenticationError)
     -> HomeserverLoginOptions
   {

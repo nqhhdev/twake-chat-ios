@@ -46,7 +46,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Activity: mentions, inbox, reactions to own messages | — | Phase 6, D57, D318 | Built: `ChatList/Activity.swift`, `ActivityReactionsProxy.swift` (#159) | Matrix | — |
 | Activity and push for followed threads | — | Phase 6 | Not built | Matrix | #93 |
 | Saved messages | — | Phase 11 | Built: `ChatList/SavedMessages.swift`, `Domain/Models/SavedMessages.swift` | Matrix | — |
-| Global search: chats, people, server messages | `search` | D147, D199, D228, D238 | Built: `ChatListViewModel.searchMessages`; encrypted rooms not searched | Matrix + ToM | #94 |
+| Global search: chats, people, server messages | `search` | D147, D199, D228, D238 | Built: `ChatListViewModel.searchMessages`; encrypted rooms through the on-device index (`MatrixData/Search/MessageIndex.swift`, ADR 0040), messages the app has decrypted only | Matrix + ToM | #94 |
 | Do not disturb with a banner | — | Phase 11 | Built: `SettingsScreen.swift`, `Connectivity.swift` (`.m.rule.master`) | Matrix | — |
 | App grid of Twake apps | `app_grid` | — | Built: `Settings/AppGrid.swift`, `TwakeChat/TwakeApps.json` (ADR 0034) | Twake (build setting) | #174 |
 | Broadcast lists (one message into each direct chat) | — | MSG-29, not built on the web | Not built | Matrix | none: no reference |
@@ -67,7 +67,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Draft per chat and per thread, reopen where left | `chat_draft` | Phase 2b | Built: `TimelineRepository.saveDraft`, `Room/TimelineScrollMemory.swift` | Matrix | — |
 | Forward, pin, edit history (encrypted too), report, ignore | `forward`, `chat_pinned_events` | Phase 2b | Built: `Room/PinnedAndForward.swift`, `MatrixData/Proxies/EncryptedEditHistory.swift` | Matrix | — |
 | Select many messages, select part of a text, go to a date | `chat` selection | Phase 2b | Built: `Room/MessageSelection.swift`, `SelectTextSheet.swift`, `HistoryLoading.swift` | Matrix | — |
-| Search in a chat: unencrypted on the server, encrypted on device | `chat_search` | Phase 4 (D21) | Built: `Room/RoomSearch.swift`, `RoomSearchProxy.swift`; no persistent local index | Matrix | #94 |
+| Search in a chat: unencrypted on the server, encrypted on device | `chat_search` | Phase 4 (D21) | Built: `Room/RoomSearch.swift`, `RoomSearchProxy.swift`, on-device index of decrypted messages (ADR 0040) | Matrix | #94 |
 | Threads: list, reply, thread screen | — | Phase 2 | Built: `Room/Threads.swift`, `ThreadPrefsProxy.swift` | Matrix | #93 (notifications) |
 | Polls (MSC3381) | — | Phase 10 | Built: `Room/Polls.swift`, `Domain/Models/Poll.swift` | Matrix | — |
 | Checklists next to polls | — | THR-11 | Off: no event format defined ([ADR 0028](../../docs/adr/0028-gifs-stickers-checklists.md)) | Matrix | #105 |

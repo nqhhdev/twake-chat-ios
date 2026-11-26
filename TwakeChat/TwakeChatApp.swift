@@ -51,6 +51,7 @@ struct TwakeChatApp: App {
       defaultHomeserver: E2EHarness.homeserver ?? url("DefaultHomeserver"),
       privacyURL: url("PrivacyURL") ?? URL(string: "https://twake.app/policy")!)
     let roomList = RoomListProxy(authentication: repository)
+    let messageIndex = MessageIndex(authentication: repository)
     let capabilities = ServerCapabilitiesProxy(
       authentication: repository, build: BuildServices.from(.main))
     let devices = DevicesProxy(authentication: repository)
@@ -66,15 +67,17 @@ struct TwakeChatApp: App {
         linkPreviews: LinkPreviewProxy(authentication: repository),
         makeTimeline: {
           TimelineProxy(
-            roomId: $0, authentication: repository, only: $1, capabilities: capabilities)
+            roomId: $0, authentication: repository, only: $1, index: messageIndex,
+            capabilities: capabilities)
         },
         makeThreadTimeline: {
           TimelineProxy(
-            roomId: $0, authentication: repository, threadRoot: $1, capabilities: capabilities)
+            roomId: $0, authentication: repository, threadRoot: $1, index: messageIndex,
+            capabilities: capabilities)
         },
         media: MediaProxy(authentication: repository),
         roomDetails: RoomDetailsProxy(authentication: repository),
-        roomSearch: RoomSearchProxy(authentication: repository),
+        roomSearch: RoomSearchProxy(authentication: repository, index: messageIndex),
         savedMessages: SavedMessagesProxy(authentication: repository),
         threadPrefs: ThreadPrefsProxy(authentication: repository),
         activityReactions: ActivityReactionsProxy(authentication: repository),
@@ -95,7 +98,7 @@ struct TwakeChatApp: App {
         roomCalls: ElementCallProxy(
           authentication: repository, fallbackURL: url("ElementCallURL"),
           clientId: Bundle.main.bundleIdentifier ?? "app.twake.ios.chat"),
-        identity: IdentityServerProxy(authentication: repository),
+        identity: IdentityServerProxy(authentication: repository, capabilities: capabilities),
         addressBook: SystemAddressBook(),
         twakeContacts: TomContactsProxy(authentication: repository, capabilities: capabilities),
         gifs: url("TwakeProxyURL").map { GifProxy(baseURL: $0, authentication: repository) },
