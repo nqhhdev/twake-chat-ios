@@ -36,11 +36,11 @@ public final class PersonalQRViewModel {
   public func scanned(_ text: String) -> Bool {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard let url = URL(string: trimmed), let link = MatrixLink(url: url) else {
-      scanError = "This QR code is not a Twake Chat or Matrix link."
+      scanError = localized("This QR code is not a Twake Chat or Matrix link.")
       return false
     }
     if link == .user(id: userId) {
-      scanError = "This is your own QR code."
+      scanError = localized("This is your own QR code.")
       return false
     }
     scanError = nil

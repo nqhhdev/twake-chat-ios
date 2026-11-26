@@ -27,27 +27,27 @@ struct EditProfileSheet: View {
           .listRowBackground(Color.clear)
         }
         Section {
-          TextField("Display name", text: $name)
+          TextField(localized("Display name"), text: $name)
             .textContentType(.name)
             .submitLabel(.done)
             .onSubmit { Task { await save() } }
         } header: {
-          Text("Name")
+          Text(localized("Name"))
         } footer: {
-          Text("Other people see this name and picture in chats.")
+          Text(localized("Other people see this name and picture in chats."))
         }
         if let message = viewModel.errorMessage {
           Text(message).foregroundStyle(SysColors.error)
         }
       }
-      .navigationTitle("Edit Profile")
+      .navigationTitle(localized("Edit Profile"))
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
+          Button(localized("Cancel")) { dismiss() }
         }
         ToolbarItem(placement: .confirmationAction) {
-          Button("Done") { Task { await save() } }
+          Button(localized("Done")) { Task { await save() } }
             .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || viewModel.isWorking)
         }
       }

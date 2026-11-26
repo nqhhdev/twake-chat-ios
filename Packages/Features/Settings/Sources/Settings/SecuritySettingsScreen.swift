@@ -14,26 +14,29 @@ struct SecurityScreen: View {
       if let verification = viewModel.verification {
         Section {
           HStack {
-            Text("This device")
+            Text(localized("This device"))
             Spacer()
             HStack(spacing: 6) {
               Image(
                 systemName: verification.state == .verified
                   ? "checkmark.seal.fill" : "exclamationmark.shield")
-              Text(verification.state == .verified ? "Verified" : "Not verified")
+              Text(
+                verification.state == .verified ? localized("Verified") : localized("Not verified"))
             }
             .foregroundStyle(verification.state == .verified ? SysColors.success : SysColors.error)
           }
           .accessibilityElement(children: .combine)
           if verification.state != .verified {
-            Button("Verify with another device") {
+            Button(localized("Verify with another device")) {
               isVerifying = true
               Task { await verification.start() }
             }
           }
         } footer: {
           Text(
-            "A verified device is trusted by your other devices and can read your older encrypted messages."
+            localized(
+              "A verified device is trusted by your other devices and can read your older encrypted messages."
+            )
           )
         }
       }
@@ -45,33 +48,35 @@ struct SecurityScreen: View {
           NavigationLink {
             DevicesScreen(viewModel: devices)
           } label: {
-            Label("Devices", systemImage: "laptopcomputer.and.iphone")
+            Label(localized("Devices"), systemImage: "laptopcomputer.and.iphone")
           }
         }
         NavigationLink {
           BlockedUsersScreen(viewModel: viewModel)
         } label: {
-          Label("Blocked people", systemImage: "hand.raised")
+          Label(localized("Blocked people"), systemImage: "hand.raised")
         }
       }
       Section {
-        LabeledContent("Chat backup", value: statusText)
+        LabeledContent(localized("Chat backup"), value: statusText)
       } footer: {
         Text(
-          "Your messages are encrypted. The recovery key unlocks older messages on a new device.")
+          localized(
+            "Your messages are encrypted. The recovery key unlocks older messages on a new device.")
+        )
       }
       switch viewModel.recoveryStatus {
       case .incomplete:
-        Section("Enter recovery key") {
-          SecureField("Recovery key", text: $key)
+        Section(localized("Enter recovery key")) {
+          SecureField(localized("Recovery key"), text: $key)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
-          Button("Unlock old messages") { Task { await viewModel.recover(with: key) } }
+          Button(localized("Unlock old messages")) { Task { await viewModel.recover(with: key) } }
             .disabled(key.isEmpty || viewModel.isWorking)
         }
       case .disabled:
         Section {
-          Button("Set up chat backup") { Task { await viewModel.enableRecovery() } }
+          Button(localized("Set up chat backup")) { Task { await viewModel.enableRecovery() } }
             .disabled(viewModel.isWorking)
         }
       case .enabled, .unknown:
@@ -79,15 +84,16 @@ struct SecurityScreen: View {
       }
       if viewModel.didRecover {
         Section {
-          Label("Old messages are unlocked.", systemImage: "checkmark.seal").foregroundStyle(
-            SysColors.success)
+          Label(localized("Old messages are unlocked."), systemImage: "checkmark.seal")
+            .foregroundStyle(
+              SysColors.success)
         }
         .transition(.scale.combined(with: .opacity))
       }
       if viewModel.didResetIdentity {
         Section {
           Label(
-            "Your identity was reset. Set up the chat backup again.",
+            localized("Your identity was reset. Set up the chat backup again."),
             systemImage: "checkmark.shield"
           )
           .foregroundStyle(SysColors.success)
@@ -101,32 +107,36 @@ struct SecurityScreen: View {
         Section { ProgressView().frame(maxWidth: .infinity) }
       }
       Section {
-        Button("Reset identity", role: .destructive) { isConfirmingReset = true }
+        Button(localized("Reset identity"), role: .destructive) { isConfirmingReset = true }
           .disabled(viewModel.isWorking)
       } footer: {
         Text(
-          "Only if you lost every device and your recovery key. Your verified devices and people must verify you again, and older encrypted messages stay locked."
+          localized(
+            "Only if you lost every device and your recovery key. Your verified devices and people must verify you again, and older encrypted messages stay locked."
+          )
         )
       }
     }
-    .twakeTitle("Privacy & Security")
+    .twakeTitle(localized("Privacy & Security"))
     .animation(.spring(response: 0.35, dampingFraction: 0.8), value: viewModel.didResetIdentity)
     .confirmationDialog(
-      "Reset your identity?", isPresented: $isConfirmingReset, titleVisibility: .visible
+      localized("Reset your identity?"), isPresented: $isConfirmingReset, titleVisibility: .visible
     ) {
-      Button("Reset", role: .destructive) { Task { await viewModel.startIdentityReset() } }
+      Button(localized("Reset"), role: .destructive) {
+        Task { await viewModel.startIdentityReset() }
+      }
     } message: {
-      Text("This cannot be undone.")
+      Text(localized("This cannot be undone."))
     }
     .alert(
-      "Confirm with your password",
+      localized("Confirm with your password"),
       isPresented: Binding(
         get: { viewModel.identityReset == .password },
         set: { if !$0 { resetPassword = "" } })
     ) {
-      SecureField("Password", text: $resetPassword)
-      Button("Cancel", role: .cancel) { Task { await viewModel.cancelIdentityReset() } }
-      Button("Reset", role: .destructive) {
+      SecureField(localized("Password"), text: $resetPassword)
+      Button(localized("Cancel"), role: .cancel) { Task { await viewModel.cancelIdentityReset() } }
+      Button(localized("Reset"), role: .destructive) {
         let typed = resetPassword
         resetPassword = ""
         Task { await viewModel.finishIdentityReset(password: typed) }
@@ -161,10 +171,10 @@ struct SecurityScreen: View {
 
   private var statusText: String {
     switch viewModel.recoveryStatus {
-    case .enabled: "On"
-    case .disabled: "Off"
-    case .incomplete: "Needs your recovery key"
-    case .unknown: "Checking…"
+    case .enabled: localized("On")
+    case .disabled: localized("Off")
+    case .incomplete: localized("Needs your recovery key")
+    case .unknown: localized("Checking…")
     }
   }
 }
@@ -181,9 +191,11 @@ public struct RecoveryKeySheet: View {
   public var body: some View {
     VStack(spacing: 16) {
       Image(systemName: "key.horizontal").font(.system(size: 40)).foregroundStyle(SysColors.primary)
-      Text("Recovery key").textStyle(TextStyles.titleLarge)
+      Text(localized("Recovery key")).textStyle(TextStyles.titleLarge)
       Text(
-        "Store securely on this device or in your password manager. You need it to read old messages on a new device."
+        localized(
+          "Store securely on this device or in your password manager. You need it to read old messages on a new device."
+        )
       )
       .textStyle(TextStyles.bodyMedium)
       .foregroundStyle(SysColors.textSecondary)
@@ -195,11 +207,11 @@ public struct RecoveryKeySheet: View {
         .frame(maxWidth: .infinity)
         .background(SysColors.surface, in: .rect(cornerRadius: 12))
       HStack {
-        Button("Copy", systemImage: "doc.on.doc") { UIPasteboard.general.string = key }
+        Button(localized("Copy"), systemImage: "doc.on.doc") { UIPasteboard.general.string = key }
         ShareLink(item: key)
       }
       .buttonStyle(.bordered)
-      Button("Done", action: done).buttonStyle(.twakePrimary)
+      Button(localized("Done"), action: done).buttonStyle(.twakePrimary)
     }
     .padding(24)
     .presentationDetents([.medium, .large])
