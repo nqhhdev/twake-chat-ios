@@ -450,6 +450,13 @@ final class RootCoordinator {
     }
   }
 
+  func applyCommonSettingsLanguage() async {
+    guard let accountSettings else { return }
+    let language = await accountSettings.commonSettingsLanguage()
+    if language == nil, await capabilities?.current().tom != nil { return }
+    CommonSettingsLanguage().apply(language)
+  }
+
   func accountDeleted() async {
     guard case .restored = state, case .signedIn? = authentication?.screen else { return }
     await push.stop()
@@ -543,6 +550,7 @@ struct RootView: View {
           .task { await coordinator.push.start() }
           .task { await coordinator.unlockDevice(for: signedIn) }
           .task { await coordinator.capabilities?.refresh() }
+          .task { await coordinator.applyCommonSettingsLanguage() }
           .sheet(
             isPresented: Binding(
               get: { coordinator.unsavedRecoveryKey != nil },

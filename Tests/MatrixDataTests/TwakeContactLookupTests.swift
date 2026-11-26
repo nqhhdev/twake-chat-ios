@@ -47,3 +47,19 @@ struct TwakeContactLookupTests {
     #expect(Stub.lastAuthorization == "Bearer token")
   }
 }
+
+extension TwakeContactLookupTests {
+  @Test func theCommonSettingsLanguageComesFromUserInfo() async {
+    Stub.responses = [
+      "/_twake/v1/user_info/@me:example.org": (200, #"{"language":"fr-FR","theme":"dark"}"#)
+    ]
+    let tom = URL(string: "https://tom.example.org")!
+    #expect(
+      await lookup().language(of: "@me:example.org", tom: tom, accessToken: "token") == "fr-FR")
+    #expect(Stub.lastAuthorization == "Bearer token")
+    Stub.responses = ["/_twake/v1/user_info/@me:example.org": (200, #"{"theme":"dark"}"#)]
+    #expect(await lookup().language(of: "@me:example.org", tom: tom, accessToken: "token") == nil)
+    Stub.responses = [:]
+    #expect(await lookup().language(of: "@me:example.org", tom: tom, accessToken: "token") == nil)
+  }
+}
