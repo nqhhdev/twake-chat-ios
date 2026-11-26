@@ -69,6 +69,7 @@ public final class RoomViewModel {
   public internal(set) var stickerPacks: [StickerPack] = []
   var presenceDots: [String: Presence.Dot] = [:]
   public internal(set) var emotes: [Emote] = []
+  public internal(set) var translations: [String: MessageTranslation] = [:]
   var emoteImages: [String: UIImage] = [:]
   @ObservationIgnored var emoteLoads: Set<String> = []
   @ObservationIgnored var presenceFetchedAt: [String: ContinuousClock.Instant] = [:]

@@ -156,6 +156,14 @@ struct MessageActionsOverlay: View {
           Task { await viewModel.togglePin(message) }
         })
     }
+    if viewModel.canTranslate(message) {
+      list.append(.init(title: "Translate", icon: "translate") { viewModel.translate(message) })
+    } else if case .translated = viewModel.translation(of: message) {
+      list.append(
+        .init(title: "Show Original", icon: "arrow.uturn.backward") {
+          viewModel.showOriginal(message)
+        })
+    }
     if message.isOwn, case .text = message.body {
       list.append(.init(title: "Edit", icon: "pencil") { viewModel.edit(message) })
     }

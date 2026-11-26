@@ -219,12 +219,19 @@ struct MessageRow: View {
           .frame(maxWidth: .infinity, alignment: .leading)
       } else if let link = calls?.link(of: message.call) {
         CallLinkCard(link: link, isPreview: isPreview)
+      } else if case .translated(let translated) = viewModel.translation(of: message) {
+        TranslatedText(text: translated) { viewModel.showOriginal(message) }
       } else {
         MessageBody(
           content: message.body, formatted: message.formatted,
           isDeviceVerified: viewModel.sessionWarning == nil, emotes: viewModel
         )
         .frame(maxWidth: .infinity, alignment: .leading)
+        .opacity(viewModel.translation(of: message) == .translating ? 0.5 : 1)
+        .overlay {
+          if viewModel.translation(of: message) == .translating { ProgressView() }
+        }
+        .modifier(MessageTranslationTask(message: message, viewModel: viewModel))
         if case .text(let text) = message.body, let link = RoomViewModel.previewLink(in: text) {
           LinkPreviewCard(url: link, width: contentWidth, viewModel: viewModel)
         }
