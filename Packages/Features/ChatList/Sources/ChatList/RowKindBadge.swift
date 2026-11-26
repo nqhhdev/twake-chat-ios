@@ -12,10 +12,10 @@ extension RoomKindBadge {
 
   var accessibilityLabel: String {
     switch self {
-    case .space: "Space"
-    case .broadcast: "Broadcast"
-    case .publicGroup: "Public group"
-    case .group: "Group"
+    case .space: localized("Space")
+    case .broadcast: localized("Broadcast")
+    case .publicGroup: localized("Public group")
+    case .group: localized("Group")
     }
   }
 }

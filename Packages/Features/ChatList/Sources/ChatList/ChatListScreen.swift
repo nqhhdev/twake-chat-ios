@@ -43,8 +43,9 @@ public struct ChatListScreen: View {
       .background(SysColors.background)
       .navigationTitle(
         isSelecting
-          ? (viewModel.selection.isEmpty ? "Select chats" : "\(viewModel.selection.count) selected")
-          : "Chats"
+          ? (viewModel.selection.isEmpty
+            ? localized("Select chats") : localized("\(viewModel.selection.count) selected"))
+          : localized("Chats")
       )
       .navigationBarTitleDisplayMode(.large)
       .navigationDestination(item: $openedSpace) { space in
@@ -53,7 +54,7 @@ public struct ChatListScreen: View {
       }
       .searchable(
         text: $viewModel.query, placement: .navigationBarDrawer(displayMode: .always),
-        prompt: "Search chats and messages"
+        prompt: localized("Search chats and messages")
       )
       .task(id: viewModel.query) { await viewModel.searchMessages() }
       .task { await viewModel.refreshDoNotDisturb() }
@@ -68,7 +69,7 @@ public struct ChatListScreen: View {
       .toolbar {
         if isSelecting {
           ToolbarItem(placement: .confirmationAction) {
-            Button("Done") { endSelecting() }
+            Button(localized("Done")) { endSelecting() }
           }
         } else {
           ToolbarItem(placement: .topBarTrailing) {
@@ -82,20 +83,21 @@ public struct ChatListScreen: View {
             }
             .accessibilityLabel(
               viewModel.mentionTotal > 0
-                ? "Activity, \(viewModel.mentionTotal) mentions"
-                : viewModel.hasActivity ? "Activity, unread chats" : "Activity")
+                ? localized("Activity, \(viewModel.mentionTotal) mentions")
+                : viewModel.hasActivity
+                  ? localized("Activity, unread chats") : localized("Activity"))
           }
           if let onCompose {
             ToolbarItem(placement: .topBarTrailing) {
-              Button("New chat", systemImage: "square.and.pencil", action: onCompose)
+              Button(localized("New chat"), systemImage: "square.and.pencil", action: onCompose)
                 .accessibilityIdentifier(A11yIdentifiers.chatList.newChat)
             }
           }
           ToolbarItem(placement: .topBarTrailing) {
-            Menu("More", systemImage: "ellipsis.circle") {
+            Menu(localized("More"), systemImage: "ellipsis.circle") {
               MarkAllReadButton(viewModel: viewModel, rooms: viewModel.unreadRooms)
               if viewModel.hasSpaces {
-                Button("New Space", systemImage: "cube") { startNewSpace() }
+                Button(localized("New Space"), systemImage: "cube") { startNewSpace() }
                   .accessibilityIdentifier(A11yIdentifiers.chatList.newSpace)
               }
             }
@@ -115,30 +117,30 @@ public struct ChatListScreen: View {
         }
       }
       .confirmationDialog(
-        leaving.map { "Leave \($0.name)?" } ?? "",
+        leaving.map { localized("Leave \($0.name)?") } ?? "",
         isPresented: Binding(get: { leaving != nil }, set: { if !$0 { leaving = nil } }),
         titleVisibility: .visible
       ) {
-        Button("Leave", role: .destructive) {
+        Button(localized("Leave"), role: .destructive) {
           if let room = leaving { Task { await viewModel.leave(room) } }
         }
       } message: {
-        Text("You will no longer receive its messages.")
+        Text(localized("You will no longer receive its messages."))
       }
       .task { await viewModel.start() }
       .sheet(item: $newSpace) { model in NewSpaceScreen(viewModel: model) }
       .sheet(item: $folderEditor) { model in FolderEditorScreen(viewModel: model) }
       .confirmationDialog(
-        deletingFolder.map { "Delete \($0.name)?" } ?? "",
+        deletingFolder.map { localized("Delete \($0.name)?") } ?? "",
         isPresented: Binding(
           get: { deletingFolder != nil }, set: { if !$0 { deletingFolder = nil } }),
         titleVisibility: .visible
       ) {
-        Button("Delete Folder", role: .destructive) {
+        Button(localized("Delete Folder"), role: .destructive) {
           if let folder = deletingFolder { Task { await viewModel.deleteFolder(folder) } }
         }
       } message: {
-        Text("Its chats stay in your list.")
+        Text(localized("Its chats stay in your list."))
       }
   }
 
@@ -147,20 +149,22 @@ public struct ChatListScreen: View {
   }
 
   @ViewBuilder private func folderMenu(_ folder: Folder) -> some View {
-    Button("Edit Folder", systemImage: "pencil") { editFolder(folder) }
-    Button("Move Left", systemImage: "arrow.left") {
+    Button(localized("Edit Folder"), systemImage: "pencil") { editFolder(folder) }
+    Button(localized("Move Left"), systemImage: "arrow.left") {
       Task { await viewModel.moveFolder(folder, by: -1) }
     }
-    Button("Move Right", systemImage: "arrow.right") {
+    Button(localized("Move Right"), systemImage: "arrow.right") {
       Task { await viewModel.moveFolder(folder, by: 1) }
     }
     Divider()
-    Button("Delete Folder", systemImage: "trash", role: .destructive) { deletingFolder = folder }
+    Button(localized("Delete Folder"), systemImage: "trash", role: .destructive) {
+      deletingFolder = folder
+    }
   }
 
   @ViewBuilder private func foldersMenu(_ room: RoomSummary) -> some View {
     if viewModel.hasFolders, !room.isSpace {
-      Menu("Folders", systemImage: "folder") {
+      Menu(localized("Folders"), systemImage: "folder") {
         ForEach(viewModel.userFolders) { folder in
           Toggle(
             folder.title,
@@ -168,7 +172,7 @@ public struct ChatListScreen: View {
               get: { viewModel.isRoom(room, in: folder) },
               set: { _ in Task { await viewModel.toggle(room, in: folder) } }))
         }
-        Button("New Folder", systemImage: "folder.badge.plus") { editFolder(nil) }
+        Button(localized("New Folder"), systemImage: "folder.badge.plus") { editFolder(nil) }
       }
     }
   }
@@ -186,8 +190,8 @@ public struct ChatListScreen: View {
       ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
     case .empty:
       ContentUnavailableView(
-        "Welcome to Twake 👋", systemImage: "bubble.left.and.bubble.right",
-        description: Text("Start one with the New chat button."))
+        localized("Welcome to Twake 👋"), systemImage: "bubble.left.and.bubble.right",
+        description: Text(localized("Start one with the New chat button.")))
     case .failed(let message):
       ContentUnavailableView(message, systemImage: "exclamationmark.triangle")
     case .loaded:
@@ -222,7 +226,7 @@ public struct ChatListScreen: View {
           .contextMenu { folderMenu(folder) }
         }
         if viewModel.hasFolders {
-          Button("New Folder", systemImage: "plus") { editFolder(nil) }
+          Button(localized("New Folder"), systemImage: "plus") { editFolder(nil) }
             .labelStyle(.iconOnly)
             .font(.subheadline.weight(.medium))
             .foregroundStyle(SysColors.onSurface)
@@ -249,35 +253,37 @@ public struct ChatListScreen: View {
   private var selectionBar: some View {
     let count = viewModel.selection.count
     return HStack {
-      Button("Read", systemImage: "envelope.open") {
+      Button(localized("Read"), systemImage: "envelope.open") {
         Task {
           await viewModel.markSelectionRead()
           endSelecting()
         }
       }
       Spacer()
-      Button("Mute", systemImage: "bell.slash") {
+      Button(localized("Mute"), systemImage: "bell.slash") {
         Task {
           await viewModel.toggleSelectionMuted()
           endSelecting()
         }
       }
       Spacer()
-      Button("Favourite", systemImage: "star") {
+      Button(localized("Favourite"), systemImage: "star") {
         Task {
           await viewModel.toggleSelectionFavourite()
           endSelecting()
         }
       }
       Spacer()
-      Button("Leave", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
+      Button(
+        localized("Leave"), systemImage: "rectangle.portrait.and.arrow.right", role: .destructive
+      ) {
         isConfirmingLeaveSelection = true
       }
       .confirmationDialog(
-        "Leave \(count == 1 ? "this chat" : "\(count) chats")?",
+        localized("Leave \(count == 1 ? "this chat" : "\(count) chats")?"),
         isPresented: $isConfirmingLeaveSelection, titleVisibility: .visible
       ) {
-        Button("Leave", role: .destructive) {
+        Button(localized("Leave"), role: .destructive) {
           Task {
             await viewModel.leaveSelection()
             endSelecting()
@@ -349,7 +355,7 @@ public struct ChatListScreen: View {
       Section {
         ForEach(favourites) { room in row(room) }
       } header: {
-        sectionHeader("Favourites")
+        sectionHeader(localized("Favourites"))
       }
     }
     Section {
@@ -357,14 +363,14 @@ public struct ChatListScreen: View {
         row(room)
       }
     } header: {
-      if !favourites.isEmpty, viewModel.filter != .favourites { sectionHeader("Chats") }
+      if !favourites.isEmpty, viewModel.filter != .favourites { sectionHeader(localized("Chats")) }
     }
     let lowPriority = viewModel.lowPriorityRooms
     if !lowPriority.isEmpty, viewModel.filter != .favourites {
       Section {
         ForEach(lowPriority) { room in row(room) }
       } header: {
-        sectionHeader("Low priority")
+        sectionHeader(localized("Low priority"))
       }
     }
     if !viewModel.query.trimmingCharacters(in: .whitespaces).isEmpty, !isSelecting {
@@ -377,7 +383,7 @@ public struct ChatListScreen: View {
             PublicRoomsScreen(viewModel: publicRooms, list: viewModel)
               .ignoresSafeArea(.container, edges: isBesideChat ? .trailing : [])
           } label: {
-            Label("Public groups", systemImage: "person.3")
+            Label(localized("Public groups"), systemImage: "person.3")
               .foregroundStyle(SysColors.textSecondary)
           }
         }
@@ -386,7 +392,7 @@ public struct ChatListScreen: View {
             SavedMessagesScreen(repository: saved)
               .ignoresSafeArea(.container, edges: isBesideChat ? .trailing : [])
           } label: {
-            Label("Saved messages", systemImage: "bookmark")
+            Label(localized("Saved messages"), systemImage: "bookmark")
               .foregroundStyle(SysColors.textSecondary)
           }
         }
@@ -395,14 +401,14 @@ public struct ChatListScreen: View {
             ArchivedChatsScreen(viewModel: archive, list: viewModel, onSelect: onSelect)
               .ignoresSafeArea(.container, edges: isBesideChat ? .trailing : [])
           } label: {
-            Label("Archived chats", systemImage: "archivebox")
+            Label(localized("Archived chats"), systemImage: "archivebox")
               .foregroundStyle(SysColors.textSecondary)
           }
         }
       }
     }
     if viewModel.joinedRooms.isEmpty {
-      Text("No chats here.")
+      Text(localized("No chats here."))
         .foregroundStyle(SysColors.textSecondary)
         .frame(maxWidth: .infinity)
         .listRowSeparator(.hidden)
@@ -444,7 +450,9 @@ public struct ChatListScreen: View {
       readButton(room).tint(SysColors.primary)
     }
     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-      Button("Leave", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
+      Button(
+        localized("Leave"), systemImage: "rectangle.portrait.and.arrow.right", role: .destructive
+      ) {
         leaving = room
       }
       favouriteButton(room).tint(.orange)
@@ -460,8 +468,8 @@ public struct ChatListScreen: View {
 
   /// The long-press menu of a chat row.
   @ViewBuilder private func menuItems(_ room: RoomSummary) -> some View {
-    Button("Open", systemImage: "arrow.up.forward.app") { open(room) }
-    Button("Select", systemImage: "checkmark.circle") {
+    Button(localized("Open"), systemImage: "arrow.up.forward.app") { open(room) }
+    Button(localized("Select"), systemImage: "checkmark.circle") {
       withAnimation {
         isSelecting = true
         viewModel.selection = [room.id]
@@ -473,13 +481,15 @@ public struct ChatListScreen: View {
     muteButton(room)
     foldersMenu(room)
     Button(
-      room.isLowPriority ? "Normal priority" : "Low priority",
+      room.isLowPriority ? localized("Normal priority") : localized("Low priority"),
       systemImage: room.isLowPriority ? "arrow.up.circle" : "arrow.down.circle"
     ) {
       Task { await viewModel.setLowPriority(!room.isLowPriority, room: room) }
     }
     Divider()
-    Button("Leave", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
+    Button(
+      localized("Leave"), systemImage: "rectangle.portrait.and.arrow.right", role: .destructive
+    ) {
       leaving = room
     }
   }
@@ -487,7 +497,7 @@ public struct ChatListScreen: View {
   private func readButton(_ room: RoomSummary) -> some View {
     let isUnread = room.isUnread
     return Button(
-      isUnread ? "Read" : "Unread",
+      isUnread ? localized("Read") : localized("Unread"),
       systemImage: isUnread ? "envelope.open" : "envelope.badge"
     ) {
       Task { await viewModel.setUnread(!isUnread, room: room) }
@@ -496,7 +506,8 @@ public struct ChatListScreen: View {
 
   private func muteButton(_ room: RoomSummary) -> some View {
     Button(
-      room.isMuted ? "Unmute" : "Mute", systemImage: room.isMuted ? "bell" : "bell.slash"
+      room.isMuted ? localized("Unmute") : localized("Mute"),
+      systemImage: room.isMuted ? "bell" : "bell.slash"
     ) {
       Task { await viewModel.setMuted(!room.isMuted, room: room) }
     }
@@ -504,7 +515,7 @@ public struct ChatListScreen: View {
 
   private func favouriteButton(_ room: RoomSummary) -> some View {
     Button(
-      room.isFavourite ? "Unfavourite" : "Favourite",
+      room.isFavourite ? localized("Unfavourite") : localized("Favourite"),
       systemImage: room.isFavourite ? "star.slash" : "star"
     ) {
       Task { await viewModel.setFavourite(!room.isFavourite, room: room) }

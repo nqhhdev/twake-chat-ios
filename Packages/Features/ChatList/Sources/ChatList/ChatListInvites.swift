@@ -19,10 +19,10 @@ struct InvitesHeader: View {
           }
         }
         .frame(width: 56, alignment: .leading)
-        Text("Invitations")
+        Text(localized("Invitations"))
           .textStyle(TextStyles.titleMedium.with(weight: .semibold))
           .foregroundStyle(SysColors.onSurface)
-        Text("\(invites.count)")
+        Text(verbatim: "\(invites.count)")
           .textStyle(TextStyles.labelMedium)
           .foregroundStyle(SysColors.onPrimary)
           .padding(.horizontal, 7)
@@ -39,8 +39,8 @@ struct InvitesHeader: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .accessibilityLabel("\(invites.count) invitations")
-    .accessibilityValue(isExpanded ? "Shown" : "Hidden")
+    .accessibilityLabel(localized("\(invites.count) invitations"))
+    .accessibilityValue(isExpanded ? localized("Shown") : localized("Hidden"))
   }
 }
 
@@ -57,7 +57,7 @@ struct InviteRow: View {
           .textStyle(TextStyles.titleMedium)
           .foregroundStyle(SysColors.onSurface)
           .lineLimit(1)
-        Text("Invited you to chat")
+        Text(localized("Invited you to chat"))
           .textStyle(TextStyles.bodySmall)
           .foregroundStyle(SysColors.textSecondary)
           .lineLimit(1)
@@ -75,7 +75,7 @@ struct InviteRow: View {
             .frame(width: 34, height: 34)
             .background(SysColors.surface, in: Circle())
         }
-        .accessibilityLabel("Decline \(room.name)")
+        .accessibilityLabel(localized("Decline \(room.name)"))
         Button {
           Task { await viewModel.answerInvite(room, accept: true) }
         } label: {
@@ -85,7 +85,7 @@ struct InviteRow: View {
             .frame(width: 34, height: 34)
             .background(SysColors.primary, in: Circle())
         }
-        .accessibilityLabel("Accept \(room.name)")
+        .accessibilityLabel(localized("Accept \(room.name)"))
       }
     }
     .buttonStyle(.plain)

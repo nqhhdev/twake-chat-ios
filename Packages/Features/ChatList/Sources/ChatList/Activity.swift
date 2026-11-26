@@ -51,16 +51,16 @@ extension ChatListViewModel {
 
   /// "Sender reacted 👍 to your message", as the web's activity row says it.
   public static func title(of reaction: ActivityReaction) -> String {
-    "\(reaction.senderName) reacted \(reaction.key) to your message"
+    localized("\(reaction.senderName) reacted \(reaction.key) to your message")
   }
 
   /// "Sender: text" of a followed thread's root, or "Thread" when it could not be loaded.
   public static func preview(of thread: FollowedThread) -> String {
     if let latest = thread.latestText, !latest.isEmpty {
       let line = thread.latestSenderName.map { "\($0): \(latest)" } ?? latest
-      return thread.replyCount > 1 ? "\(thread.replyCount) replies · \(line)" : line
+      return thread.replyCount > 1 ? localized("\(thread.replyCount) replies · \(line)") : line
     }
-    guard let text = thread.rootText, !text.isEmpty else { return "Thread" }
+    guard let text = thread.rootText, !text.isEmpty else { return localized("Thread") }
     guard let sender = thread.rootSenderName, !sender.isEmpty else { return text }
     return "\(sender): \(text)"
   }
@@ -78,26 +78,26 @@ struct ActivityScreen: View {
     List {
       let mentioned = viewModel.mentioned
       if !mentioned.isEmpty {
-        Section("Mentions") {
+        Section(localized("Mentions")) {
           ForEach(mentioned) { room in row(room, badge: "@\(room.mentionCount)") }
         }
       }
       let reactions = viewModel.reactions
       if !reactions.isEmpty {
-        Section("Reactions") {
+        Section(localized("Reactions")) {
           ForEach(reactions) { reaction in reactionRow(reaction) }
         }
       }
       let followed = viewModel.followedThreads
       if !followed.isEmpty {
-        Section("Threads") {
+        Section(localized("Threads")) {
           ForEach(followed) { thread in threadRow(thread) }
         }
       }
-      Section("Inbox") {
+      Section(localized("Inbox")) {
         let inbox = viewModel.inbox
         if inbox.isEmpty {
-          Label("You are all caught up.", systemImage: "checkmark.circle")
+          Label(localized("You are all caught up."), systemImage: "checkmark.circle")
             .foregroundStyle(SysColors.textSecondary)
             .transition(.opacity)
         }
@@ -110,12 +110,12 @@ struct ActivityScreen: View {
           NavigationLink {
             SavedMessagesScreen(repository: saved)
           } label: {
-            Label("Saved messages", systemImage: "bookmark")
+            Label(localized("Saved messages"), systemImage: "bookmark")
           }
         }
       }
     }
-    .navigationTitle("Activity")
+    .navigationTitle(localized("Activity"))
     .toolbar {
       ToolbarItem(placement: .topBarTrailing) {
         MarkAllReadButton(viewModel: viewModel, rooms: viewModel.inbox)
@@ -162,7 +162,7 @@ struct ActivityScreen: View {
     }
     .buttonStyle(.plain)
     .accessibilityElement(children: .combine)
-    .accessibilityHint("Opens the message in its chat")
+    .accessibilityHint(localized("Opens the message in its chat"))
   }
 
   /// A followed thread: its chat and its first message. A tap opens the chat at the thread's root, whose summary
@@ -194,7 +194,7 @@ struct ActivityScreen: View {
     }
     .buttonStyle(.plain)
     .accessibilityElement(children: .combine)
-    .accessibilityHint("Opens the thread's chat")
+    .accessibilityHint(localized("Opens the thread's chat"))
   }
 
   private func row(_ room: RoomSummary, badge: String) -> some View {
@@ -225,7 +225,7 @@ struct ActivityScreen: View {
         Image(systemName: "envelope.open")
       }
       .buttonStyle(.borderless)
-      .accessibilityLabel("Mark \(room.name) as read")
+      .accessibilityLabel(localized("Mark \(room.name) as read"))
     }
     .transition(.move(edge: .trailing).combined(with: .opacity))
   }
