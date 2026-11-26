@@ -464,7 +464,7 @@ final class RootCoordinator {
     do {
       try await repository.logout()
     } catch {
-      logOutErrorMessage = "Could not log out. Please try again."
+      logOutErrorMessage = String(localized: "Could not log out. Please try again.")
       started = false
       return
     }

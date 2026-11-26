@@ -151,10 +151,12 @@ struct NotificationAction: Sendable, Equatable {
 
   static var categories: Set<UNNotificationCategory> {
     let reply = UNTextInputNotificationAction(
-      identifier: PushPayload.replyAction, title: "Reply", options: [],
-      textInputButtonTitle: "Send", textInputPlaceholder: "Message")
+      identifier: PushPayload.replyAction, title: String(localized: "Reply"), options: [],
+      textInputButtonTitle: String(localized: "Send"),
+      textInputPlaceholder: String(localized: "Message"))
     let markAsRead = UNNotificationAction(
-      identifier: PushPayload.markAsReadAction, title: "Mark as read", options: [])
+      identifier: PushPayload.markAsReadAction, title: String(localized: "Mark as read"),
+      options: [])
     return [
       UNNotificationCategory(
         identifier: PushPayload.messageCategory, actions: [reply, markAsRead],
@@ -165,7 +167,7 @@ struct NotificationAction: Sendable, Equatable {
   static func replyFailureContent(for action: NotificationAction) -> UNMutableNotificationContent {
     let content = UNMutableNotificationContent()
     content.title = action.title
-    content.body = "Your reply was not sent. Open the chat to try again."
+    content.body = String(localized: "Your reply was not sent. Open the chat to try again.")
     content.threadIdentifier = action.roomId
     content.userInfo = [PushPayload.roomIdKey: action.roomId]
     if let threadId = action.threadId { content.userInfo[PushPayload.threadIdKey] = threadId }
