@@ -140,6 +140,14 @@ public final class SpaceViewModel {
     }
   }
 
+  public func makeNewSubspace(onCreated: @escaping @MainActor () -> Void) -> NewSpaceViewModel? {
+    guard canAddChannel else { return nil }
+    return NewSpaceViewModel(parentId: space.id, repository: repository) { [weak self] _ in
+      onCreated()
+      Task { await self?.load() }
+    }
+  }
+
   /// Marks every room the user is in read: this space's and its sub-spaces', as the web's "Mark space as read".
   public func markAllRead() async {
     guard let markRead, !isMarkingRead else { return }
@@ -184,6 +192,7 @@ struct SpaceScreen: View {
   let viewModel: SpaceViewModel
   @State private var isNaming = false
   @State private var newName = ""
+  @State private var newSubspace: NewSpaceViewModel?
 
   var body: some View {
     List {
@@ -260,8 +269,13 @@ struct SpaceScreen: View {
     .toolbar {
       if viewModel.canAddChannel {
         ToolbarItem(placement: .topBarTrailing) {
-          Button("New Channel", systemImage: "plus") { isNaming = true }
-            .disabled(viewModel.isCreating)
+          Menu("Add", systemImage: "plus") {
+            Button("New Channel", systemImage: "number") { isNaming = true }
+            Button("New Sub-space", systemImage: "cube") {
+              newSubspace = viewModel.makeNewSubspace { newSubspace = nil }
+            }
+          }
+          .disabled(viewModel.isCreating)
         }
       }
       if viewModel.markRead != nil {
@@ -276,6 +290,7 @@ struct SpaceScreen: View {
     }
     .task { await viewModel.load() }
     .refreshable { await viewModel.load() }
+    .sheet(item: $newSubspace) { model in NewSpaceScreen(viewModel: model) }
   }
 
   private func row(_ child: SpaceChild) -> some View {
