@@ -11,6 +11,35 @@ public final class FakeRoomDetailsRepository: RoomDetailsRepository, @unchecked 
 
   public init() {}
 
+  private var _channel: ChannelSettings?
+  private var _channelFails = false
+  private var _channelChanges: [String] = []
+
+  public var channel: ChannelSettings? {
+    get { lock.withLock { _channel } }
+    set { lock.withLock { _channel = newValue } }
+  }
+  public var channelFails: Bool {
+    get { lock.withLock { _channelFails } }
+    set { lock.withLock { _channelFails = newValue } }
+  }
+  public var channelChanges: [String] { lock.withLock { _channelChanges } }
+
+  public func channelSettings(roomId: String) async -> ChannelSettings? { channel }
+
+  public func setGifs(_ enabled: Bool, roomId: String) async throws(RoomDetailsError) {
+    let fails = lock.withLock {
+      _channelChanges.append("gifs \(enabled)")
+      return _channelFails
+    }
+    if fails { throw .requestFailed }
+    lock.withLock {
+      if let current = _channel {
+        _channel = ChannelSettings(isOwner: current.isOwner, gifsEnabled: enabled)
+      }
+    }
+  }
+
   /// Fed by tests to report a room change, as the SDK does on a sync.
   public let roomChanges = AsyncStream<Void>.makeStream()
 
