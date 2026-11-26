@@ -1,0 +1,262 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "%@ and %@ are typing…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ et %2$@ sont en train d’écrire…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ và %2$@ đang nhập…"
+          }
+        }
+      }
+    },
+    "%@ and %lld others are typing…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ et %2$lld autres personnes sont en train d’écrire…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ và %2$lld người khác đang nhập…"
+          }
+        }
+      }
+    },
+    "%@ is typing…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ est en train d’écrire…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ đang nhập…"
+          }
+        }
+      }
+    },
+    "Active %lld days ago": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actif il y a %lld jours"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoạt động %lld ngày trước"
+          }
+        }
+      }
+    },
+    "Active %lld h ago": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actif il y a %lld h"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoạt động %lld giờ trước"
+          }
+        }
+      }
+    },
+    "Active %lld min ago": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actif il y a %lld min"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoạt động %lld phút trước"
+          }
+        }
+      }
+    },
+    "Active just now": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actif à l’instant"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vừa hoạt động"
+          }
+        }
+      }
+    },
+    "Active yesterday": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actif hier"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoạt động hôm qua"
+          }
+        }
+      }
+    },
+    "No key for this message has reached this device. It was probably sent before this device could receive it.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune clé pour ce message n’est parvenue à cet appareil. Il a sans doute été envoyé avant que cet appareil puisse la recevoir."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thiết bị này chưa nhận được khóa nào cho tin nhắn này. Có lẽ tin nhắn đã được gửi trước khi thiết bị có thể nhận khóa."
+          }
+        }
+      }
+    },
+    "Online": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En ligne"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trực tuyến"
+          }
+        }
+      }
+    },
+    "Passcode": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mật mã"
+          }
+        }
+      }
+    },
+    "The device of the sender cannot be trusted, so this message stays hidden.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’appareil de l’expéditeur n’est pas fiable : ce message reste masqué."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thiết bị của người gửi không đáng tin cậy, nên tin nhắn này bị ẩn."
+          }
+        }
+      }
+    },
+    "The sender did not share the key for this message with this device.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’expéditeur n’a pas partagé la clé de ce message avec cet appareil."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Người gửi chưa chia sẻ khóa của tin nhắn này với thiết bị này."
+          }
+        }
+      }
+    },
+    "This message was sent before this device existed, and your backup does not hold its key.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce message a été envoyé avant que cet appareil existe, et votre sauvegarde ne contient pas sa clé."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tin nhắn này được gửi trước khi có thiết bị này, và bản sao lưu của bạn không chứa khóa của nó."
+          }
+        }
+      }
+    },
+    "This message was sent before you joined this chat, so no key exists for it.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce message a été envoyé avant que vous rejoigniez cette discussion : aucune clé n’existe pour lui."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tin nhắn này được gửi trước khi bạn tham gia cuộc trò chuyện, nên không có khóa nào cho nó."
+          }
+        }
+      }
+    },
+    "Verify this device with your recovery key to read it.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérifiez cet appareil avec votre clé de récupération pour le lire."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hãy xác minh thiết bị này bằng khóa khôi phục để đọc tin nhắn."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

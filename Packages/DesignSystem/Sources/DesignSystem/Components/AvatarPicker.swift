@@ -62,12 +62,15 @@ public struct AvatarPicker: View {
       }
       .animation(.easeInOut(duration: 0.2), value: isWorking)
       Menu {
-        Button("Choose Photo", systemImage: "photo.on.rectangle") { isPickerShown = true }
+        Button(localized("Choose Photo"), systemImage: "photo.on.rectangle") {
+          isPickerShown = true
+        }
         if let onRemove {
-          Button("Remove Photo", systemImage: "trash", role: .destructive, action: onRemove)
+          Button(
+            localized("Remove Photo"), systemImage: "trash", role: .destructive, action: onRemove)
         }
       } label: {
-        Text("Edit").font(.subheadline.weight(.semibold))
+        Text(localized("Edit")).font(.subheadline.weight(.semibold))
           .padding(.horizontal, 14)
           .padding(.vertical, 5)
           .background(.fill.tertiary, in: .capsule)

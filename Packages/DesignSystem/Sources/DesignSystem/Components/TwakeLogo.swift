@@ -25,7 +25,7 @@ public struct TwakeLogo: View {
       .resizable()
       .scaledToFit()
       .frame(width: width, height: height)
-      .accessibilityLabel("Twake Chat")
+      .accessibilityLabel(Text(verbatim: "Twake Chat"))
   }
 }
 

@@ -264,16 +264,16 @@ public struct Presence: Sendable, Equatable {
   /// known.
   public var line: String? {
     if let statusMessage { return statusMessage }
-    if isOnline { return "Online" }
+    if isOnline { return localized("Online") }
     guard let lastActive else { return nil }
     let minutes = Int(lastActive / 60)
     switch minutes {
-    case ..<1: return "Active just now"
-    case ..<60: return "Active \(minutes) min ago"
-    case ..<(24 * 60): return "Active \(minutes / 60) h ago"
+    case ..<1: return localized("Active just now")
+    case ..<60: return localized("Active \(minutes) min ago")
+    case ..<(24 * 60): return localized("Active \(minutes / 60) h ago")
     default:
       let days = minutes / (24 * 60)
-      return days == 1 ? "Active yesterday" : "Active \(days) days ago"
+      return days == 1 ? localized("Active yesterday") : localized("Active \(days) days ago")
     }
   }
 }
