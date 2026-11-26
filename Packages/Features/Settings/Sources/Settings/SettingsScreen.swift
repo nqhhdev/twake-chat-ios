@@ -145,6 +145,9 @@ public struct SettingsScreen: View {
           Text(message).foregroundStyle(SysColors.error)
         }
       }
+      if let help = viewModel.help {
+        HelpSection(viewModel: help)
+      }
       if let deleteAccount = viewModel.deleteAccount {
         DeleteAccountSection(viewModel: deleteAccount)
       }
@@ -157,6 +160,7 @@ public struct SettingsScreen: View {
     }
     .animation(.default, value: viewModel.displayName)
     .task { await viewModel.load() }
+    .task { await viewModel.help?.load() }
     .onChange(of: scenePhase) { _, phase in
       if phase == .active { Task { await viewModel.refreshDisplayName() } }
     }

@@ -38,6 +38,7 @@ public final class SettingsViewModel {
   @ObservationIgnored private let chatDisplayStore: (any ChatDisplaySettingsStore)?
 
   public var deleteAccount: DeleteAccountViewModel?
+  public var help: HelpViewModel?
   @ObservationIgnored private let repository: any AccountSettingsRepository
   @ObservationIgnored private let logOutAction: @MainActor () async -> Bool
 

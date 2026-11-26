@@ -737,6 +737,7 @@
 				TWAKE_PRIVACY_URL = "https://twake.app/en/privacy/";
 				TWAKE_PROXY_URL = "https://proxy.dev.twake.lin-saas.com";
 				TWAKE_PUSH_GATEWAY_URL = "https://push.twake.app/_matrix/push/v1/notify";
+				TWAKE_SUPPORT_URL = "https://twake.app/support";
 				TWAKE_REGISTRATION_URL = "https://sign-up.stg.lin-saas.com/";
 				TWAKE_WORKPLACE_HOMESERVER = "https://tom.stg.lin-saas.com/";
 			};
@@ -771,6 +772,7 @@
 				TWAKE_PRIVACY_URL = "https://twake.app/policy";
 				TWAKE_PROXY_URL = "";
 				TWAKE_PUSH_GATEWAY_URL = "https://push.twake.app/_matrix/push/v1/notify";
+				TWAKE_SUPPORT_URL = "https://twake.app/support";
 				TWAKE_REGISTRATION_URL = "https://sign-up.twake.app/";
 				TWAKE_WORKPLACE_HOMESERVER = "https://matrix.twake.app";
 			};

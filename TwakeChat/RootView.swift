@@ -382,6 +382,9 @@ final class RootCoordinator {
       return signedIn.errorMessage == nil
     }
     viewModel.personalQR.openLink = { [weak self] url in _ = self?.links.handle(url) }
+    if let capabilities {
+      viewModel.help = HelpViewModel(capabilities: capabilities, openDirectChat: openDirectChat())
+    }
     if let capabilities, let accountDeletion {
       viewModel.deleteAccount = DeleteAccountViewModel(
         userId: signedIn.userId, capabilities: capabilities, repository: accountDeletion,
