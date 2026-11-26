@@ -33,6 +33,10 @@ extension RoomViewModel {
     attachment kind: OutgoingAttachment.Kind, fileURL: URL, mimeType: String?, size: Int?,
     caption: String? = nil, batchId: String? = nil
   ) async {
+    if gifsOff, Self.isGif(mimeType: mimeType) {
+      errorMessage = Self.gifsOffRefusal
+      return
+    }
     var replyTo: String?
     if case .reply(let eventId, _) = composerMode {
       replyTo = eventId

@@ -96,7 +96,7 @@ public enum TimelineRows {
   /// The most pictures one album holds; more start a new album.
   public static let albumLimit = 10
 
-  public static func rows(from items: [TimelineItem]) -> [ChatRow] {
+  public static func rows(from items: [TimelineItem], gifsOff: Bool = false) -> [ChatRow] {
     // 1. Albums: runs of at least two pictures sent together.
     var units: [Unit] = []
     for item in items {
@@ -104,12 +104,14 @@ public enum TimelineRows {
         units.append(.other(item))
         continue
       }
-      if isAlbumPicture(message), case .pictures(let id, var run)? = units.last,
+      let isPicture =
+        isAlbumPicture(message) && !RoomViewModel.isHiddenGif(message, gifsOff: gifsOff)
+      if isPicture, case .pictures(let id, var run)? = units.last,
         let previous = run.last, canJoin(message, after: previous, runCount: run.count)
       {
         run.append(message)
         units[units.count - 1] = .pictures(id: id, run)
-      } else if isAlbumPicture(message) {
+      } else if isPicture {
         // batchId stays the same when an older picture of the same send is prepended, so the row id does not change.
         units.append(.pictures(id: message.batchId ?? item.id, [message]))
       } else {
