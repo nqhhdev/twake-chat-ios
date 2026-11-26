@@ -28,4 +28,23 @@ struct PusherProxyTests {
     #expect(id.count == 64)
     #expect(!id.contains("alice"))
   }
+
+  @Test func thePusherKeepsThePushersOfOtherAccountsOnTheSameDevice() throws {
+    let body = PusherProxy.pusherBody(
+      pushkey: "key", appId: "app.twake.ios.chat", gatewayURL: "https://push.example/notify",
+      deviceName: "Twake Chat on iPhone", clientIdentifier: "abc")
+    #expect(body["append"] as? Bool == true)
+    #expect(body["kind"] as? String == "http")
+    #expect(body["pushkey"] as? String == "key")
+    #expect(body["app_id"] as? String == "app.twake.ios.chat")
+    #expect(body["app_display_name"] as? String == "Twake Chat")
+    #expect(body["device_display_name"] as? String == "Twake Chat on iPhone")
+    #expect(body["lang"] as? String == "en")
+    let data = try #require(body["data"] as? [String: Any])
+    #expect(data["url"] as? String == "https://push.example/notify")
+    #expect(data["format"] as? String == "event_id_only")
+    let payload = try #require(data["default_payload"] as? [String: Any])
+    #expect(payload["pusher_notification_client_identifier"] as? String == "abc")
+    #expect((payload["aps"] as? [String: Any])?["mutable-content"] as? Int == 1)
+  }
 }
