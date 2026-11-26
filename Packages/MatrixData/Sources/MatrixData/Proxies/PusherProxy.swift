@@ -30,18 +30,29 @@ public actor PusherProxy: PushRepository {
     guard let client = await clientProxy() else { throw .notSignedIn }
     let identifiers = Self.identifiers(token: deviceToken, isProduction: isProduction)
     let userId = (try? client.userId) ?? ""
-    do {
-      try await client.client.setPusher(
-        identifiers: PusherIdentifiers(pushkey: identifiers.pushkey, appId: identifiers.appId),
-        kind: .http(
-          data: HttpPusherData(
-            url: gatewayURL, format: .eventIdOnly,
-            defaultPayload: Self.defaultPayload(clientIdentifier: Self.clientIdentifier(userId)))),
-        appDisplayName: "Twake Chat", deviceDisplayName: deviceName, profileTag: nil, lang: "en")
-      registered = PusherIdentifiers(pushkey: identifiers.pushkey, appId: identifiers.appId)
-    } catch {
-      throw .requestFailed
-    }
+    let body = Self.pusherBody(
+      pushkey: identifiers.pushkey, appId: identifiers.appId, gatewayURL: gatewayURL,
+      deviceName: deviceName, clientIdentifier: Self.clientIdentifier(userId))
+    guard
+      let request = ClientServerRequest.make(
+        client: client.client, path: "pushers/set", method: "POST", json: body),
+      await ClientServerRequest.succeeds(request)
+    else { throw .requestFailed }
+    registered = PusherIdentifiers(pushkey: identifiers.pushkey, appId: identifiers.appId)
+  }
+
+  static func pusherBody(
+    pushkey: String, appId: String, gatewayURL: String, deviceName: String,
+    clientIdentifier: String
+  ) -> [String: Any] {
+    let payload =
+      (try? JSONSerialization.jsonObject(
+        with: Data(defaultPayload(clientIdentifier: clientIdentifier).utf8))) ?? [:]
+    return [
+      "pushkey": pushkey, "kind": "http", "app_id": appId, "app_display_name": "Twake Chat",
+      "device_display_name": deviceName, "lang": "en", "append": true,
+      "data": ["url": gatewayURL, "format": "event_id_only", "default_payload": payload],
+    ]
   }
 
   public func unregister() async {
