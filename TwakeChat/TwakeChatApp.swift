@@ -78,7 +78,8 @@ struct TwakeChatApp: App {
         addressBook: SystemAddressBook(),
         gifs: url("TwakeProxyURL").map { GifProxy(baseURL: $0, authentication: repository) },
         signInConfiguration: configuration, webAuthenticator: SystemWebAuthenticator(),
-        capabilities: capabilities, accountDeletion: devices))
+        capabilities: capabilities, accountDeletion: devices,
+        analytics: AnalyticsProxy(authentication: repository)))
     AppDelegate.push = root.push
   }
 

@@ -39,6 +39,7 @@ public final class SettingsViewModel {
 
   public var deleteAccount: DeleteAccountViewModel?
   public var help: HelpViewModel?
+  public var usageAnalytics: UsageAnalyticsViewModel?
   @ObservationIgnored private let repository: any AccountSettingsRepository
   @ObservationIgnored private let logOutAction: @MainActor () async -> Bool
 
