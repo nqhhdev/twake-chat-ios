@@ -7,7 +7,7 @@ final class SessionPromptFlowTests: XCTestCase {
   override func setUp() { continueAfterFailure = false }
 
   @MainActor func testTheSessionPromptLeavesAnOpenChatInPlace() {
-    let app = E2EApp.launch()
+    let app = E2EApp.launch(skipsSessionPrompt: false)
     signIn(app)
     dismissSavePassword(app)
     openRoom(app, named: "E2E Chat")
@@ -21,7 +21,7 @@ final class SessionPromptFlowTests: XCTestCase {
   }
 
   @MainActor func testTheSessionPromptLeavesAnOpenNewChatSheetInPlace() {
-    let app = E2EApp.launch()
+    let app = E2EApp.launch(skipsSessionPrompt: false)
     signIn(app)
     dismissSavePassword(app)
 
