@@ -61,7 +61,7 @@ public actor TimelineProxy: TimelineRepository {
           if let content { Self.configuration(only: content) } else {
             Self.configuration(threadRoot: threadRoot)
           }
-        let timeline = try await found.timelineWithConfiguration(configuration: configuration)
+        let timeline = try await Self.timeline(in: found, configuration: configuration)
         return (found, timeline)
       }
     } catch is WaitTimeout {
@@ -118,6 +118,24 @@ public actor TimelineProxy: TimelineRepository {
       applying: applying, sendHandles: sendHandles)
     itemsContinuation.onTermination = { _ in diffsContinuation.finish() }
     return items
+  }
+
+  static let storeLockRetryPause: Duration = .milliseconds(250)
+
+  static func isStoreLockTimeout(_ error: ClientError) -> Bool {
+    guard case .Generic(_, let details?) = error else { return false }
+    return details.contains("Unobtained(TimedOut)")
+  }
+
+  static func timeline(in room: Room, configuration: TimelineConfiguration) async throws -> Timeline
+  {
+    while true {
+      do {
+        return try await room.timelineWithConfiguration(configuration: configuration)
+      } catch let error as ClientError where isStoreLockTimeout(error) {
+        try await Task.sleep(for: storeLockRetryPause)
+      }
+    }
   }
 
   /// A timeline of one kind of message, as the Flutter chat details tabs list them (`isVideoOrImage`, `isAFile`, and
