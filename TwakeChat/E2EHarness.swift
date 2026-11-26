@@ -12,6 +12,10 @@ enum E2EHarness {
     #endif
   }
 
+  static var skipsSessionPrompt: Bool {
+    isRunning && environment["E2E_SKIP_SESSION_PROMPT"] == "1"
+  }
+
   static var homeserver: URL? {
     guard isRunning, let value = environment["E2E_HOMESERVER"], !value.isEmpty else { return nil }
     return URL(string: value)

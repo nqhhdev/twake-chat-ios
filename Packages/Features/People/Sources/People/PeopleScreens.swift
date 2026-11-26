@@ -100,6 +100,7 @@ struct PeopleSearchList: View {
             .contentShape(Rectangle())
           }
           .buttonStyle(.plain)
+          .accessibilityIdentifier(A11yIdentifiers.newChat.person(person.id))
         }
       } footer: {
         if viewModel.query.isEmpty {
@@ -201,6 +202,7 @@ public struct NewChatScreen: View {
         .padding(.vertical, 8)
         if viewModel.mode == .group {
           TextField("Group name", text: $viewModel.groupName)
+            .accessibilityIdentifier(A11yIdentifiers.newChat.groupName)
             .textStyle(TextStyles.bodyLarge)
             .padding(12)
             .background(SysColors.surface, in: .rect(cornerRadius: 12))
@@ -224,6 +226,7 @@ public struct NewChatScreen: View {
           ToolbarItem(placement: .confirmationAction) {
             Button("Create") { Task { await viewModel.createGroup() } }
               .disabled(!viewModel.canCreateGroup)
+              .accessibilityIdentifier(A11yIdentifiers.newChat.create)
           }
         }
         if viewModel.mode == .broadcast {
