@@ -53,7 +53,7 @@ the older one. `main` requires every job below; keep the names stable.
 | Check | Runner | What it runs |
 |---|---|---|
 | `format (<module>)` | `ubuntu-24.04` | `scripts/lint.sh <path>` per module ([ADR 0014](../../docs/adr/0014-ci-github-actions-swift-format.md)) |
-| `architecture` | `ubuntu-24.04` | `scripts/check-architecture.sh` and the self-tests of the architecture and no-comments checks |
+| `architecture` | `ubuntu-24.04` | `scripts/check-architecture.sh`, `scripts/check-localization.sh` and the self-tests of the architecture, no-comments and localization checks |
 | `build` | `macos-26` | `xcodebuild build` of the `TwakeChat` scheme for the pinned simulator ([ADR 0027](../../docs/adr/0027-ci-builds-and-tests-every-pull-request.md)) |
 | `unit tests` | `macos-26` | `swift test` in `Packages/Domain` and `Packages/AppShared`, then `xcodebuild test` with the `TwakeChat` test plan ([Test](test.md#in-ci)) |
 

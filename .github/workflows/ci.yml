@@ -76,6 +76,12 @@ jobs:
       - name: No-comments check tests (ADR 0025)
         run: scripts/tests/check_no_comments_test.sh
 
+      - name: Localization check (#90)
+        run: scripts/check-localization.sh
+
+      - name: Localization check tests
+        run: scripts/tests/check_localization_test.sh
+
   build:
     name: build
     runs-on: macos-26
