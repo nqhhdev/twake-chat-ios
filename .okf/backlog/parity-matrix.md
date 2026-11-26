@@ -90,7 +90,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Feature | Flutter | Web | iOS | Server | Issue |
 |---|---|---|---|---|---|
 | Inline pictures and video, viewer, Quick Look, save to Photos | `image_viewer`, `media_viewer` | Phase 2, 11 | Built: `Room/MediaViews.swift`, `SaveToPhotos.swift` | Matrix | — |
-| Preview before sending, album, camera, paste, drag and drop | `send_media_native_dialog`, `domain/media_album` | Phase 2 | Built: `Room/AttachmentPicking.swift`, `AttachmentDrop.swift`; album format to verify | Matrix | #115 |
+| Preview before sending, album, camera, paste, drag and drop | `send_media_native_dialog`, `domain/media_album` | Phase 2 | Built: `Room/AttachmentPicking.swift`, `AttachmentDrop.swift`. Albums are read by `app.twake.chat.batch` (`MatrixData/Mappers/MediaBatch.swift`), the key Flutter writes on each picture of a send of two or more (`domain/media_album/policy/media_batch_stamp.dart`); iOS does not write it yet, so its multi-picture sends show as single pictures on Flutter and web | Matrix | #210 |
 | Upload progress, size limit from `/media/v3/config` | `send_file_dialog` | Phase 2 | Built: `MatrixData/Proxies/MediaProxy.swift` | Matrix | — |
 | Media, Files, Links tabs in chat info | `chat_details_page_view` | — | Built: `Room/RoomDetailsScreen.swift` | Matrix | — |
 | Alternative text on sent pictures | — | A11Y-04 | Built: sent as the picture's caption ([ADR 0035](../../docs/adr/0035-timeline-extras-formats.md)) | Matrix | #179 |
@@ -153,6 +153,18 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Stories, emotes settings, style (theme, wallpaper) | `settings_stories`, `story`, `settings_style` | — | Dropped (ADR 0026): not in Twake's settings list, iOS system appearance | — | none |
 | iPad layout | `chat_adaptive_scaffold` | Phase 8 | Built: `DesignSystem/Layout/TwakeLayout.swift`, `TwakeChat/ChatShell.swift` | Device | #103 |
 | Localisation, accessibility pass, performance | `assets/l10n` | Phase 8, 9 | Partly | Device | #90, #96 |
+
+## Reference-client facts (#115)
+
+Checked on 2026-11-26: Flutter `twake-on-matrix` at `9c769f877`, web `twake-space-chat` at `67f2ca6e`.
+
+| Fact | Finding | Evidence |
+|---|---|---|
+| Flutter: edit history UI | None: an edited message shows "edited" next to its time; edits are aggregated only to resend failed ones | `lib/pages/chat/events/message_time.dart:63`, `lib/pages/chat/chat.dart:1220` |
+| Web: sending stickers | Not sent and not drawn: `m.sticker` is an unsupported type; the GIF decision says "no stickers" | `src/adapters/matrix/readMessages.ts:72`, `DECISION.md` (GIF entry, "Limits") |
+| Flutter: accessibility | Minimal: four `Semantics` widgets and a few `semanticLabel`s, no accessibility pass | `lib/pages/chat/events/images_builder/image_bubble.dart`, `lib/pages/chat_list/room_list_filter/` |
+| Flutter: crash reporting | Sentry (`sentry_flutter` 9.10), DSN from `AppConfig.sentryDsn`, off in local builds | `pubspec.yaml:173`, `lib/utils/sentry_init.dart`, `lib/main.dart:149` |
+| Flutter: album format | `app.twake.chat.batch`, a UUID on each picture of a send of two or more | `lib/domain/media_album/policy/media_batch_stamp.dart:21` |
 
 ## Cross-cutting
 
