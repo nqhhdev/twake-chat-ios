@@ -133,7 +133,7 @@ struct RoomCallViewModelTests {
       return
     }
     system.onEndedBySystem?(id)
-    while !calls.session.ended { await Task.yield() }
+    while !calls.session.ended || system.events.last != "ended" { await Task.yield() }
     #expect(viewModel.activeCall == nil)
     #expect(system.events == ["started Room", "ended"])
   }
