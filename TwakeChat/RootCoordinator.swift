@@ -51,6 +51,7 @@ final class RootCoordinator {
   @ObservationIgnored let meetCalls: (any MeetCallRepository)?
   @ObservationIgnored let roomCalls: (any RoomCallRepository)?
   @ObservationIgnored private let gifs: (any GifRepository)?
+  @ObservationIgnored private let drive: (any TwakeDriveRepository)?
   @ObservationIgnored let push: PushCenter
   @ObservationIgnored let lifecycle: AppLifecycle
   @ObservationIgnored private(set) var links: LinkRouter!
@@ -97,6 +98,7 @@ final class RootCoordinator {
     identity: (any IdentityRepository)? = nil, addressBook: (any AddressBook)? = nil,
     twakeContacts: (any TwakeContactsRepository)? = nil,
     gifs: (any GifRepository)? = nil,
+    drive: (any TwakeDriveRepository)? = nil,
     signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator,
     capabilities: (any ServerCapabilitiesRepository)? = nil,
     accountDeletion: (any AccountDeletionRepository)? = nil,
@@ -111,6 +113,7 @@ final class RootCoordinator {
     self.addressBook = addressBook
     self.twakeContactsRepository = twakeContacts
     self.gifs = gifs
+    self.drive = drive
     let pushCenter = PushCenter(repository: push, actions: notificationActions)
     self.sessionExpiry = sessionExpiry
     self.push = pushCenter
@@ -196,7 +199,8 @@ final class RootCoordinator {
       checkSession: sessionCheck(), display: displaySettings(), blocking: blocking(),
       saved: savedMessages,
       threadTimeline: { [makeThreadTimeline] root in makeThreadTimeline(summary.id, root) },
-      threadPrefs: threadPrefs, scrollMemory: scrollMemory, gifs: gifs)
+      threadPrefs: threadPrefs, scrollMemory: scrollMemory, gifs: gifs,
+      drive: driveAccess())
     shareSuggestions.follow(room)
     return room
   }
@@ -215,6 +219,18 @@ final class RootCoordinator {
           return false
         }
       })
+  }
+
+  private func driveAccess() -> DriveAccess? {
+    guard let drive else { return nil }
+    return DriveAccess(repository: drive) { [webAuthenticator] request throws(DriveError) in
+      do throws(WebAuthenticationError) {
+        return try await webAuthenticator.authenticate(
+          url: request.url, callbackScheme: request.callbackScheme)
+      } catch {
+        throw error == .cancelled ? .cancelled : .signInFailed
+      }
+    }
   }
 
   private func blocking() -> RoomViewModel.Blocking? {

@@ -21,9 +21,16 @@ struct AppComposition: Sendable {
   func root(
     for slot: AccountSlot, onSessionChange: @escaping @Sendable (SessionChange) -> Void
   ) -> RootCoordinator {
+    let driveSecrets = KeychainSecretStore(service: "app.twake.ios.chat.drive", accessGroup: nil)
     let repository = MatrixAuthenticationRepository(
       storeDirectory: registry.storeDirectory(for: slot), sessionStore: sessionStore(slot),
-      signsOutWithoutStore: true, onSessionChange: onSessionChange)
+      signsOutWithoutStore: true,
+      onSessionChange: { change in
+        if case .signedOut(let userId) = change {
+          TwakeDriveProxy.forget(userId: userId, in: driveSecrets)
+        }
+        onSessionChange(change)
+      })
     func url(_ key: String) -> URL? {
       (Bundle.main.object(forInfoDictionaryKey: key) as? String).flatMap {
         $0.isEmpty ? nil : URL(string: $0)
@@ -84,6 +91,8 @@ struct AppComposition: Sendable {
       addressBook: SystemAddressBook(),
       twakeContacts: TomContactsProxy(authentication: repository, capabilities: capabilities),
       gifs: url("TwakeProxyURL").map { GifProxy(baseURL: $0, authentication: repository) },
+      drive: TwakeDriveProxy(
+        authentication: repository, capabilities: capabilities, secrets: driveSecrets),
       signInConfiguration: configuration, webAuthenticator: SystemWebAuthenticator(),
       capabilities: capabilities, accountDeletion: devices,
       analytics: AnalyticsProxy(authentication: repository))

@@ -94,11 +94,11 @@ struct DrivePickerScreen: View {
         .overlay {
           if !isReady { ProgressView() }
         }
-        .navigationTitle("Twake Drive")
+        .navigationTitle(localized("Twake Drive"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
           ToolbarItem(placement: .cancellationAction) {
-            Button("Cancel") { onFinish(.cancelled) }
+            Button(localized("Cancel")) { onFinish(.cancelled) }
           }
         }
     }

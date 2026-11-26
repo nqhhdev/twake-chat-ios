@@ -149,22 +149,16 @@ struct AttachmentButton: View {
       if CameraPicker.isAvailable {
         Button(localized("Camera"), systemImage: "camera") { isCameraShown = true }
       }
-<<<<<<< HEAD
-      Button("Gallery", systemImage: "photo.on.rectangle") { isGalleryShown = true }
-      Button("Documents", systemImage: "paperclip") { isDocumentPickerShown = true }
+      Button(localized("Gallery"), systemImage: "photo.on.rectangle") { isGalleryShown = true }
+      Button(localized("Documents"), systemImage: "paperclip") { isDocumentPickerShown = true }
       if viewModel.driveAvailable {
-        Button("Add from Drive", systemImage: "externaldrive") {
+        Button(localized("Add from Drive"), systemImage: "externaldrive") {
           Task { drivePicker = await viewModel.openDrive(isDark: colorScheme == .dark) }
         }
         .disabled(viewModel.isOpeningDrive)
         .accessibilityIdentifier(A11yIdentifiers.room.addFromDrive)
       }
-      Button("Poll", systemImage: "chart.bar.xaxis") { isPollShown = true }
-=======
-      Button(localized("Gallery"), systemImage: "photo.on.rectangle") { isGalleryShown = true }
-      Button(localized("Documents"), systemImage: "paperclip") { isDocumentPickerShown = true }
       Button(localized("Poll"), systemImage: "chart.bar.xaxis") { isPollShown = true }
->>>>>>> origin/main
       if viewModel.gifsAvailable {
         Button(localized("GIF"), systemImage: "photo.stack") {
           gifPicker = viewModel.makeGifPicker()

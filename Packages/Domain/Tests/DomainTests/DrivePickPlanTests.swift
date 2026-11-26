@@ -35,8 +35,10 @@ struct DrivePickPlanTests {
   }
 
   @Test func plainHttpLinksAreNotSent() {
-    #expect(DrivePickPlan.plan([document("a", sharing: "http://d.example.org/s/a")]) == .nothingToSend)
-    #expect(DrivePickPlan.plan([document("a", download: "http://d.example.org/a")]) == .nothingToSend)
+    #expect(
+      DrivePickPlan.plan([document("a", sharing: "http://d.example.org/s/a")]) == .nothingToSend)
+    #expect(
+      DrivePickPlan.plan([document("a", download: "http://d.example.org/a")]) == .nothingToSend)
   }
 
   @Test func longPicksAreSplitBetweenLinks() {
@@ -68,9 +70,15 @@ struct DrivePickPlanTests {
   }
 
   @Test func theOriginDropsTheDefaultPort() {
-    #expect(DrivePicker.origin(scheme: "HTTPS", host: "D.example.org", port: 443) == "https://d.example.org")
-    #expect(DrivePicker.origin(scheme: "https", host: "d.example.org", port: 0) == "https://d.example.org")
-    #expect(DrivePicker.origin(scheme: "https", host: "d.example.org", port: 8443) == "https://d.example.org:8443")
+    #expect(
+      DrivePicker.origin(scheme: "HTTPS", host: "D.example.org", port: 443)
+        == "https://d.example.org")
+    #expect(
+      DrivePicker.origin(scheme: "https", host: "d.example.org", port: 0) == "https://d.example.org"
+    )
+    #expect(
+      DrivePicker.origin(scheme: "https", host: "d.example.org", port: 8443)
+        == "https://d.example.org:8443")
     #expect(DrivePicker.origin(scheme: "https", host: "", port: nil) == nil)
   }
 }

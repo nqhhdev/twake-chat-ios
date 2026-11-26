@@ -8,7 +8,8 @@ public struct DriveAccess: Sendable {
 
   public init(
     repository: any TwakeDriveRepository,
-    authenticate: @escaping @MainActor @Sendable (DriveSignInRequest) async throws(DriveError) -> URL
+    authenticate:
+      @escaping @MainActor @Sendable (DriveSignInRequest) async throws(DriveError) -> URL
   ) {
     self.repository = repository
     self.authenticate = authenticate
@@ -22,9 +23,13 @@ enum DrivePickOutcome: Equatable {
 }
 
 extension RoomViewModel {
-  static let driveCouldNotOpen = "Couldn't open Twake Drive"
-  static let driveShortcutsNotSent = "Shortcuts can't be attached, send a link instead"
-  static let driveDownloadFailed = "Some files couldn't be added from Twake Drive"
+  static var driveCouldNotOpen: String { localized("Couldn't open Twake Drive") }
+  static var driveShortcutsNotSent: String {
+    localized("Shortcuts can't be attached, send a link instead")
+  }
+  static var driveDownloadFailed: String {
+    localized("Some files couldn't be added from Twake Drive")
+  }
 
   func loadDriveAvailability() async {
     driveAvailable = await drive?.repository.isAvailable() ?? false
@@ -36,7 +41,7 @@ extension RoomViewModel {
     defer { isOpeningDrive = false }
     errorMessage = nil
     let options = DrivePickerOptions(
-      linkLabel: "Add as link", attachLabel: "Add as attachment",
+      linkLabel: localized("Add as link"), attachLabel: localized("Add as attachment"),
       maxAttachmentBytes: await media.maxUploadSize(), isDark: isDark)
     do {
       return try await Self.picker(drive, options: options)
@@ -63,9 +68,11 @@ extension RoomViewModel {
   static func driveFailureMessage(_ error: DriveError) -> String? {
     switch error {
     case .cancelled: nil
-    case .notSignedIn, .signInFailed, .workplaceUnknown: "Couldn't sign in to Twake Drive"
+    case .notSignedIn, .signInFailed, .workplaceUnknown:
+      localized("Couldn't sign in to Twake Drive")
     case .chatAppMissing:
-      "Twake Chat isn't installed on your Twake Drive yet. Ask your administrator to install it."
+      localized(
+        "Twake Chat isn't installed on your Twake Drive yet. Ask your administrator to install it.")
     case .unavailable, .exchangeRejected, .intentFailed, .tooLarge, .downloadFailed:
       driveCouldNotOpen
     }
@@ -133,6 +140,6 @@ extension RoomViewModel {
     let type =
       document.mimeType.flatMap { UTType(mimeType: $0) }
       ?? UTType(filenameExtension: (document.name as NSString).pathExtension)
-    return AttachmentLoader.kind(of: type)
+    return AttachmentType.kind(of: type)
   }
 }
