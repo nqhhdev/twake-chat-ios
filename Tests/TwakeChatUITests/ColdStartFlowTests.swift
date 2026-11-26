@@ -23,6 +23,7 @@ final class ColdStartFlowTests: XCTestCase {
     tapTheNotificationAndCheckTheRoom(app, named: roomName)
 
     try? await otherDevice.removeAlias(Self.alias)
+    try? await otherDevice.leaveAndForget(roomId)
     try? await otherDevice.logout()
   }
 
@@ -52,6 +53,7 @@ final class ColdStartFlowTests: XCTestCase {
     tapTheNotificationAndCheckTheRoom(app, named: roomName)
 
     try? await otherDevice.removeAlias(Self.alias)
+    try? await otherDevice.leaveAndForget(roomId)
     try? await otherDevice.logout()
   }
 }
@@ -146,6 +148,11 @@ struct E2ERest: Sendable {
     _ = try await Self.call(
       "PUT", "rooms/\(roomId)/send/m.room.message/\(UUID().uuidString)", token: token,
       ["msgtype": "m.text", "body": text])
+  }
+
+  func leaveAndForget(_ roomId: String) async throws {
+    _ = try await Self.call("POST", "rooms/\(roomId)/leave", token: token, [:])
+    _ = try await Self.call("POST", "rooms/\(roomId)/forget", token: token, [:])
   }
 
   func logout() async throws {
