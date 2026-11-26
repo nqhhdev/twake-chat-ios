@@ -44,14 +44,18 @@ struct AudioMessageRow: View {
   @State private var duration: TimeInterval = 0
   private let speedSetting = PlaybackSpeedSetting.shared
 
-  /// Fixed bar heights from the message id, so each message keeps its own shape.
   private var bars: [CGFloat] {
+    if let wave = message.voice?.bars(28), !wave.isEmpty {
+      return wave.map { 0.15 + CGFloat($0) * 0.85 }
+    }
     var seed = UInt64(truncatingIfNeeded: (message.eventId ?? message.senderId).hashValue)
     return (0..<28).map { _ in
       seed = seed &* 6_364_136_223_846_793_005 &+ 1
       return 0.25 + CGFloat(seed >> 33 % 1000) / 1000 * 0.75
     }
   }
+
+  private var length: TimeInterval { duration > 0 ? duration : message.voice?.duration ?? 0 }
 
   var body: some View {
     HStack(spacing: 10) {
@@ -85,7 +89,7 @@ struct AudioMessageRow: View {
           }
           .frame(height: 24)
         }
-        Text(Self.time(isPlaying || progress > 0 ? duration * (1 - progress) : duration))
+        Text(Self.time(isPlaying || progress > 0 ? length * (1 - progress) : length))
           .textStyle(TextStyles.labelSmall)
           .foregroundStyle(SysColors.textSecondary)
           .monospacedDigit()

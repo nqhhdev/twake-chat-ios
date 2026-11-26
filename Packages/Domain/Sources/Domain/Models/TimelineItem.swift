@@ -105,6 +105,32 @@ public struct TimelineMessage: Sendable, Equatable {
     case threadRoot
   }
 
+  public struct Voice: Sendable, Equatable {
+    public let duration: TimeInterval?
+    public let waveform: [Float]
+
+    public init(duration: TimeInterval?, waveform: [Float]) {
+      self.duration = duration
+      self.waveform = waveform
+    }
+
+    public static let maxAmplitude: Float = 1024
+
+    public static func waveform(amplitudes: [UInt16]) -> [Float] {
+      amplitudes.map { min(Float($0), maxAmplitude) / maxAmplitude }
+    }
+
+    public func bars(_ count: Int) -> [Float] {
+      guard !waveform.isEmpty, count > 0 else { return [] }
+      let size = Double(waveform.count) / Double(count)
+      return (0..<count).map { index in
+        let lower = min(waveform.count - 1, Int(Double(index) * size))
+        let upper = min(waveform.count, max(lower + 1, Int(Double(index + 1) * size)))
+        return waveform[lower..<upper].max() ?? 0
+      }
+    }
+  }
+
   public struct Reply: Sendable, Equatable {
     public let senderName: String
     public let text: String?
@@ -158,6 +184,7 @@ public struct TimelineMessage: Sendable, Equatable {
   public let transactionId: String?
   /// The call this message starts, `nil` for any other message.
   public let call: Call?
+  public let voice: Voice?
 
   public init(
     eventId: String?, senderId: String, senderName: String, isOwn: Bool, date: Date, body: Body,
@@ -167,9 +194,10 @@ public struct TimelineMessage: Sendable, Equatable {
     replyToEventId: String? = nil, formatted: AttributedString? = nil,
     uploadProgress: Double? = nil, poll: Poll? = nil, thread: ThreadPreview? = nil,
     threadRootId: String? = nil, batchId: String? = nil, transactionId: String? = nil,
-    call: Call? = nil
+    call: Call? = nil, voice: Voice? = nil
   ) {
     self.call = call
+    self.voice = voice
     self.transactionId = transactionId
     self.batchId = batchId
     self.thread = thread
