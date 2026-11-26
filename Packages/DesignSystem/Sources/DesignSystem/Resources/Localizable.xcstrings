@@ -17,6 +17,22 @@
         }
       }
     },
+    "Choose Photo": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisir une photo"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chọn ảnh"
+          }
+        }
+      }
+    },
     "Edit": {
       "localizations": {
         "fr": {
@@ -45,6 +61,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trực tuyến"
+          }
+        }
+      }
+    },
+    "Remove Photo": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retirer la photo"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xóa ảnh"
           }
         }
       }

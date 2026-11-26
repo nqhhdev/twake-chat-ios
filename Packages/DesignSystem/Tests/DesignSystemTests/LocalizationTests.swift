@@ -22,8 +22,15 @@ struct LocalizationTests {
     return keys
   }
 
-  static func table(_ language: String) -> Bundle? {
-    Localization.bundle.path(forResource: language, ofType: "lproj").flatMap(Bundle.init(path:))
+  static func translatedKeys(_ language: String) throws -> Set<String> {
+    let data = try Data(contentsOf: sources.appending(path: "Resources/Localizable.xcstrings"))
+    let catalog = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    let strings = catalog?["strings"] as? [String: [String: Any]] ?? [:]
+    return Set(
+      strings.compactMap { key, entry in
+        let localizations = entry["localizations"] as? [String: Any]
+        return localizations?[language] == nil ? nil : key
+      })
   }
 
   @Test func theSourcesUseLocalizedStrings() throws {
@@ -32,10 +39,7 @@ struct LocalizationTests {
 
   @Test(arguments: ["fr", "vi"])
   func everyKeyInTheCodeIsTranslated(language: String) throws {
-    let table = try #require(Self.table(language))
-    let missing = try Self.keysInSources().filter {
-      table.localizedString(forKey: $0, value: "\u{1}", table: nil) == "\u{1}"
-    }
+    let missing = try Self.keysInSources().subtracting(Self.translatedKeys(language))
     #expect(missing.isEmpty, "Missing in \(language): \(missing.sorted())")
   }
 }
