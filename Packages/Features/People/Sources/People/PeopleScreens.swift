@@ -35,7 +35,7 @@ struct PeopleSearchList: View {
       if viewModel.mode != .direct,
         !viewModel.selected.isEmpty || !viewModel.selectedAddresses.isEmpty
       {
-        Section("Selected users") {
+        Section(localized("Selected users")) {
           ScrollView(.horizontal) {
             HStack(spacing: 12) {
               ForEach(viewModel.selectedAddresses) { address in
@@ -106,12 +106,12 @@ struct PeopleSearchList: View {
         if viewModel.query.isEmpty {
           Text(
             viewModel.offersAddressInvites
-              ? "Search for people by name, Matrix ID, e-mail or phone number."
-              : "Search for people by name or Matrix ID, such as @alice:example.org.")
+              ? localized("Search for people by name, Matrix ID, e-mail or phone number.")
+              : localized("Search for people by name or Matrix ID, such as @alice:example.org."))
         } else if viewModel.results.isEmpty, viewModel.typedAddress == nil,
           !viewModel.isSearching
         {
-          Text("No results found")
+          Text(localized("No results found"))
         }
       }
       if let address = viewModel.typedAddress {
@@ -124,8 +124,11 @@ struct PeopleSearchList: View {
               VStack(alignment: .leading, spacing: 0) {
                 Text(address.address).textStyle(TextStyles.titleMedium)
                   .foregroundStyle(SysColors.onSurface).lineLimit(1)
-                Text(address.kind == .email ? "Invite by e-mail" : "Invite by text message")
-                  .textStyle(TextStyles.bodySmall).foregroundStyle(SysColors.textSecondary)
+                Text(
+                  address.kind == .email
+                    ? localized("Invite by e-mail") : localized("Invite by text message")
+                )
+                .textStyle(TextStyles.bodySmall).foregroundStyle(SysColors.textSecondary)
               }
               Spacer()
               if viewModel.mode != .direct {
@@ -142,7 +145,7 @@ struct PeopleSearchList: View {
           }
           .buttonStyle(.plain)
         } footer: {
-          Text("No account yet? They get an invitation and join you once they sign up.")
+          Text(localized("No account yet? They get an invitation and join you once they sign up."))
         }
         .transition(.opacity)
       }
@@ -161,7 +164,7 @@ struct PeopleSearchList: View {
     }
     .searchable(
       text: $viewModel.query, placement: .navigationBarDrawer(displayMode: .always),
-      prompt: "Search"
+      prompt: localized("Search")
     )
     .textInputAutocapitalization(.never)
     .autocorrectionDisabled()
@@ -191,17 +194,18 @@ public struct NewChatScreen: View {
     NavigationStack {
       VStack(spacing: 0) {
         Picker(
-          "Kind", selection: Binding(get: { viewModel.mode }, set: { viewModel.switchMode($0) })
+          localized("Kind"),
+          selection: Binding(get: { viewModel.mode }, set: { viewModel.switchMode($0) })
         ) {
-          Text("Direct").tag(PeopleSearchViewModel.Mode.direct)
-          Text("Group").tag(PeopleSearchViewModel.Mode.group)
-          Text("Broadcast").tag(PeopleSearchViewModel.Mode.broadcast)
+          Text(localized("Direct")).tag(PeopleSearchViewModel.Mode.direct)
+          Text(localized("Group")).tag(PeopleSearchViewModel.Mode.group)
+          Text(localized("Broadcast")).tag(PeopleSearchViewModel.Mode.broadcast)
         }
         .pickerStyle(.segmented)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         if viewModel.mode == .group {
-          TextField("Group name", text: $viewModel.groupName)
+          TextField(localized("Group name"), text: $viewModel.groupName)
             .accessibilityIdentifier(A11yIdentifiers.newChat.groupName)
             .textStyle(TextStyles.bodyLarge)
             .padding(12)
@@ -217,21 +221,21 @@ public struct NewChatScreen: View {
       }
       .animation(.spring(response: 0.35, dampingFraction: 0.85), value: viewModel.mode)
       .background(SysColors.background)
-      .twakeTitle("New chat")
+      .twakeTitle(localized("New chat"))
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
+          Button(localized("Cancel")) { dismiss() }
         }
         if viewModel.mode == .group {
           ToolbarItem(placement: .confirmationAction) {
-            Button("Create") { Task { await viewModel.createGroup() } }
+            Button(localized("Create")) { Task { await viewModel.createGroup() } }
               .disabled(!viewModel.canCreateGroup)
               .accessibilityIdentifier(A11yIdentifiers.newChat.create)
           }
         }
         if viewModel.mode == .broadcast {
           ToolbarItem(placement: .confirmationAction) {
-            Button("Create") { Task { await viewModel.createBroadcast() } }
+            Button(localized("Create")) { Task { await viewModel.createBroadcast() } }
               .disabled(!viewModel.canCreateBroadcast)
           }
         }
@@ -262,7 +266,7 @@ public struct ContactsScreen: View {
     )
     .scrollContentBackground(.hidden)
     .background(SysColors.background)
-    .twakeTitle("Contacts")
+    .twakeTitle(localized("Contacts"))
     .toolbar {
       if let twakeContacts {
         TwakeContactsToolbar(contacts: twakeContacts, isAdding: $isAddingContact)
@@ -292,14 +296,14 @@ public struct InviteScreen: View {
   public var body: some View {
     NavigationStack {
       PeopleSearchList(viewModel: viewModel)
-        .navigationTitle("Add people")
+        .navigationTitle(localized("Add people"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
           ToolbarItem(placement: .cancellationAction) {
-            Button("Cancel") { dismiss() }
+            Button(localized("Cancel")) { dismiss() }
           }
           ToolbarItem(placement: .confirmationAction) {
-            Button("Invite") { Task { await viewModel.inviteSelected() } }
+            Button(localized("Invite")) { Task { await viewModel.inviteSelected() } }
               .disabled(
                 (viewModel.selected.isEmpty && viewModel.selectedAddresses.isEmpty)
                   || viewModel.isCreating)
@@ -317,26 +321,30 @@ struct BroadcastForm: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      TextField("Broadcast name", text: $viewModel.broadcast.name)
+      TextField(localized("Broadcast name"), text: $viewModel.broadcast.name)
         .textStyle(TextStyles.bodyLarge)
         .padding(12)
         .background(SysColors.surface, in: .rect(cornerRadius: 12))
-      TextField("Description (optional)", text: $viewModel.broadcast.topic, axis: .vertical)
-        .lineLimit(1...3)
-        .textStyle(TextStyles.bodyMedium)
-        .padding(12)
-        .background(SysColors.surface, in: .rect(cornerRadius: 12))
-      Picker("Who follows", selection: $viewModel.broadcast.access) {
-        Label("Anyone", systemImage: "globe").tag(BroadcastDraft.Access.open)
-        Label("On approval", systemImage: "hand.raised").tag(BroadcastDraft.Access.approval)
-        Label("Invited people", systemImage: "envelope").tag(BroadcastDraft.Access.invitation)
+      TextField(
+        localized("Description (optional)"), text: $viewModel.broadcast.topic, axis: .vertical
+      )
+      .lineLimit(1...3)
+      .textStyle(TextStyles.bodyMedium)
+      .padding(12)
+      .background(SysColors.surface, in: .rect(cornerRadius: 12))
+      Picker(localized("Who follows"), selection: $viewModel.broadcast.access) {
+        Label(localized("Anyone"), systemImage: "globe").tag(BroadcastDraft.Access.open)
+        Label(localized("On approval"), systemImage: "hand.raised").tag(
+          BroadcastDraft.Access.approval)
+        Label(localized("Invited people"), systemImage: "envelope").tag(
+          BroadcastDraft.Access.invitation)
       }
       .pickerStyle(.menu)
       if viewModel.broadcast.access == .open {
         HStack(spacing: 2) {
-          Text("#").foregroundStyle(SysColors.textSecondary)
+          Text(verbatim: "#").foregroundStyle(SysColors.textSecondary)
           TextField(
-            "address",
+            localized("address"),
             text: Binding(
               get: { viewModel.broadcast.slug },
               set: {
@@ -359,7 +367,7 @@ struct BroadcastForm: View {
         )
         .transition(.move(edge: .top).combined(with: .opacity))
       }
-      Toggle("Followers can react", isOn: $viewModel.broadcast.allowsReactions)
+      Toggle(localized("Followers can react"), isOn: $viewModel.broadcast.allowsReactions)
       Text(footer)
         .textStyle(TextStyles.labelSmall)
         .foregroundStyle(SysColors.textSecondary)
@@ -370,11 +378,11 @@ struct BroadcastForm: View {
   }
 
   private var footer: String {
-    let posting = "Only you and moderators post."
+    let posting = localized("Only you and moderators post.")
     switch viewModel.broadcast.access {
-    case .open: return "\(posting) Listed in the server's directory; anyone can read it."
-    case .approval: return "\(posting) Listed in the directory; you approve who follows."
-    case .invitation: return "\(posting) Only the people you invite follow it."
+    case .open: return localized("\(posting) Listed in the server's directory; anyone can read it.")
+    case .approval: return localized("\(posting) Listed in the directory; you approve who follows.")
+    case .invitation: return localized("\(posting) Only the people you invite follow it.")
     }
   }
 }
@@ -399,8 +407,8 @@ public struct DraftChatScreen: View {
         VStack(spacing: 8) {
           TwakeAvatar(name: person.name, size: 72)
           Text(person.name).textStyle(TextStyles.titleMedium).lineLimit(1)
-          Text("No message here yet").textStyle(TextStyles.bodyMedium)
-          Text("Send a message to start the conversation")
+          Text(localized("No message here yet")).textStyle(TextStyles.bodyMedium)
+          Text(localized("Send a message to start the conversation"))
             .textStyle(TextStyles.bodyMedium)
             .foregroundStyle(SysColors.textSecondary)
             .multilineTextAlignment(.center)
@@ -414,7 +422,7 @@ public struct DraftChatScreen: View {
             .padding(.horizontal, 16)
         }
         HStack(alignment: .bottom, spacing: 8) {
-          TextField("Type a message", text: $viewModel.draftText, axis: .vertical)
+          TextField(localized("Type a message"), text: $viewModel.draftText, axis: .vertical)
             .lineLimit(1...5)
             .focused($isWriting)
             .padding(.horizontal, 14)
@@ -431,7 +439,7 @@ public struct DraftChatScreen: View {
           }
           .frame(width: 40, height: 40)
           .disabled(!viewModel.canSendDraft)
-          .accessibilityLabel("Send")
+          .accessibilityLabel(localized("Send"))
         }
         .padding(12)
       }
@@ -440,7 +448,7 @@ public struct DraftChatScreen: View {
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") {
+          Button(localized("Cancel")) {
             viewModel.discardDraft()
             dismiss()
           }

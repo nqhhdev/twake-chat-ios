@@ -92,13 +92,13 @@ public final class PeopleSearchViewModel {
     if failed.isEmpty, failedAddresses.isEmpty {
       didInvite = true
     } else if failed.count == selected.count, failedAddresses.count == selectedAddresses.count {
-      errorMessage = "Could not invite. Please try again."
+      errorMessage = localized("Could not invite. Please try again.")
     } else {
       selected = selected.filter { failed.contains($0.id) }
       selectedAddresses = failedAddresses
       let names = (selected.map { $0.displayName ?? $0.id } + failedAddresses.map(\.address))
         .formatted(.list(type: .and))
-      errorMessage = "Could not invite \(names). The others were invited."
+      errorMessage = localized("Could not invite \(names). The others were invited.")
     }
   }
 
@@ -137,7 +137,7 @@ public final class PeopleSearchViewModel {
       }
       errorMessage = nil
     } catch {
-      errorMessage = "Could not search. Please try again."
+      errorMessage = localized("Could not search. Please try again.")
     }
   }
 
@@ -168,7 +168,7 @@ public final class PeopleSearchViewModel {
       userId = try await identity?.lookup([address])[address]
     } catch {
       isCreating = false
-      errorMessage = "Could not look up \(address.address). Please try again."
+      errorMessage = localized("Could not look up \(address.address). Please try again.")
       return
     }
     if let userId {
@@ -188,7 +188,7 @@ public final class PeopleSearchViewModel {
         let roomId = try await identity.startDirectChat(inviting: address)
         onOpen(roomId, address.address)
       } catch {
-        errorMessage = "Could not invite \(address.address). Please try again."
+        errorMessage = localized("Could not invite \(address.address). Please try again.")
       }
     }
   }
@@ -201,7 +201,7 @@ public final class PeopleSearchViewModel {
       identityStatus = .ready
     } catch {
       addressAfterConsent = nil
-      errorMessage = "Could not accept the terms. Please try again."
+      errorMessage = localized("Could not accept the terms. Please try again.")
       return
     }
     if let address = addressAfterConsent {
@@ -299,7 +299,7 @@ public final class PeopleSearchViewModel {
       draftText = ""
       onOpen(roomId, person.name)
     } catch {
-      errorMessage = "Could not start the chat. Please try again."
+      errorMessage = localized("Could not start the chat. Please try again.")
     }
   }
 
@@ -328,8 +328,8 @@ public final class PeopleSearchViewModel {
     } catch {
       errorMessage =
         broadcast.access == .open
-        ? "Could not create the Broadcast. Its address may be taken."
-        : "Could not create the Broadcast."
+        ? localized("Could not create the Broadcast. Its address may be taken.")
+        : localized("Could not create the Broadcast.")
     }
   }
 
@@ -343,7 +343,7 @@ public final class PeopleSearchViewModel {
       await inviteAddresses(intoRoom: roomId)
       onOpen(roomId, name)
     } catch {
-      errorMessage = "Could not create the group. Please try again."
+      errorMessage = localized("Could not create the group. Please try again.")
     }
   }
 }
