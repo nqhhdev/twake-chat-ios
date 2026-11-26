@@ -3,7 +3,6 @@ import Testing
 
 @testable import MatrixData
 
-/// The ToM lookup reads `t.server` and the address book through a stubbed URL session; nothing leaves the machine.
 @Suite(.serialized)
 struct TwakeContactLookupTests {
   final class Stub: URLProtocol {
@@ -15,7 +14,8 @@ struct TwakeContactLookupTests {
     override func startLoading() {
       Self.lastAuthorization = request.value(forHTTPHeaderField: "Authorization")
       let (status, body) = Self.responses[request.url?.path ?? ""] ?? (404, "{}")
-      let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
+      let response = HTTPURLResponse(
+        url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
       client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
       client?.urlProtocol(self, didLoad: Data(body.utf8))
       client?.urlProtocolDidFinishLoading(self)
@@ -29,27 +29,37 @@ struct TwakeContactLookupTests {
     return TwakeContactLookup(session: URLSession(configuration: configuration))
   }
 
-  @Test func findsTheToMServerAndSearchesItsAddressBook() async throws {
+  @Test func searchesTheToMAddressBook() async throws {
     Stub.responses = [
-      "/.well-known/matrix/client": (
-        200, #"{"t.server":{"base_url":"https://tom.example.org/","server_name":"example.org"}}"#
-      ),
       "/_twake/identity/v1/lookup/match": (
         200,
         #"{"matches":[{"uid":"alice","displayName":"Alice"},{"uid":"bob","address":"@bob:other.org","cn":"Bob B"}],"inactive_matches":[]}"#
-      ),
+      )
     ]
-    let lookup = lookup()
-    let tom = try #require(await lookup.tomServer(forUserId: "@me:example.org"))
-    #expect(tom.baseURL.absoluteString == "https://tom.example.org/")
-    let matches = try await lookup.search(
-      "al", limit: 10, tom: tom.baseURL, serverName: tom.serverName, accessToken: "token")
-    #expect(matches == [.init(userId: "@alice:example.org", displayName: "Alice"), .init(userId: "@bob:other.org", displayName: "Bob B")])
+    let matches = try await lookup().search(
+      "al", limit: 10, tom: URL(string: "https://tom.example.org/")!, serverName: "example.org",
+      accessToken: "token")
+    #expect(
+      matches == [
+        .init(userId: "@alice:example.org", displayName: "Alice"),
+        .init(userId: "@bob:other.org", displayName: "Bob B"),
+      ])
     #expect(Stub.lastAuthorization == "Bearer token")
   }
+}
 
-  @Test func aServerWithoutToMHasNoAddressBook() async {
-    Stub.responses = ["/.well-known/matrix/client": (200, #"{"m.homeserver":{"base_url":"https://m.example.org"}}"#)]
-    #expect(await lookup().tomServer(forUserId: "@me:example.org") == nil)
+extension TwakeContactLookupTests {
+  @Test func theCommonSettingsLanguageComesFromUserInfo() async {
+    Stub.responses = [
+      "/_twake/v1/user_info/@me:example.org": (200, #"{"language":"fr-FR","theme":"dark"}"#)
+    ]
+    let tom = URL(string: "https://tom.example.org")!
+    #expect(
+      await lookup().language(of: "@me:example.org", tom: tom, accessToken: "token") == "fr-FR")
+    #expect(Stub.lastAuthorization == "Bearer token")
+    Stub.responses = ["/_twake/v1/user_info/@me:example.org": (200, #"{"theme":"dark"}"#)]
+    #expect(await lookup().language(of: "@me:example.org", tom: tom, accessToken: "token") == nil)
+    Stub.responses = [:]
+    #expect(await lookup().language(of: "@me:example.org", tom: tom, accessToken: "token") == nil)
   }
 }

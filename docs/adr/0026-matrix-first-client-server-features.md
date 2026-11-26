@@ -70,7 +70,7 @@ way in places: `TwakeContactLookup` and `TwakeMeet` (MatrixData `Discovery/`) re
 | ToM address book: add and edit a contact | ToM `/_twake/addressbook` | `t.server` | Hidden | On |
 | Invitation link and invitation status | ToM `/_twake/v1/invite`, `/invite/generate` | `t.server` and `app.twake.chat.enable_invitations` | Hidden; e-mail invites go through the identity server (Matrix 3pid, ADR 0029) | On |
 | Language from the common settings | ToM `user_info` `language` | `t.server`, field present | Device language | On |
-| Analytics with consent | ToM `/_twake/v1/analytics/events` | `t.server` and build setting on | Off, nothing collected, no consent prompt | Off until the owner turns it on |
+| Analytics with consent | twake-chat-side-service `/analytics/events` (the web moved off ToM, see ADR 0034) | `app.twake.chat.side_service` and build setting on | Off, nothing collected, no consent prompt | Off until the owner turns it on |
 | Push notifications | A push gateway with the app's APNs credentials | Build setting `TWAKE_PUSH_GATEWAY_URL` | Works: the gateway does not depend on the homeserver ([ADR 0009](0009-push-gateway-and-nse-decryption.md)) | On (Twake gateway) |
 | Sign up | Twake registration site | Build setting `TWAKE_REGISTRATION_URL` | Matrix `/register` when the server offers it (`HomeserverDiscovery.registrationSupported`), else none | On (built, [ADR 0021](0021-sign-in-as-the-flutter-app.md)) |
 | Twake Welcome screen and Twake ID | Twake registration site | Build setting | Starts on the homeserver picker | On (built) |

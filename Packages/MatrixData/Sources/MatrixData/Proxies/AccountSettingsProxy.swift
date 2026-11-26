@@ -10,12 +10,15 @@ public actor AccountSettingsProxy: AccountSettingsRepository {
   private let recoveryVault: (any RecoveryVault)?
   /// The identity reset waiting for the user's password or web approval.
   private var pendingReset: IdentityResetHandle?
+  private let capabilities: (any ServerCapabilitiesRepository)?
 
   public init(
-    authentication: MatrixAuthenticationRepository, recoveryVault: (any RecoveryVault)? = nil
+    authentication: MatrixAuthenticationRepository, recoveryVault: (any RecoveryVault)? = nil,
+    capabilities: (any ServerCapabilitiesRepository)? = nil
   ) {
     clientProxy = { await authentication.clientProxy }
     self.recoveryVault = recoveryVault
+    self.capabilities = capabilities
   }
 
   /// `GET /profile/{userId}`, as Flutter `fetchOwnProfile` reads it: an unset name is `nil`, a failed request throws.
@@ -164,6 +167,11 @@ public actor AccountSettingsProxy: AccountSettingsRepository {
       let raw = await lookup.visibility(of: userId, tom: tom, accessToken: token)
     else { return nil }
     return ContactsVisibility(rawValue: raw)
+  }
+
+  public func commonSettingsLanguage() async -> String? {
+    guard let (lookup, tom, userId, token) = await tomAccess() else { return nil }
+    return await lookup.language(of: userId, tom: tom, accessToken: token)
   }
 
   public func setContactsVisibility(_ visibility: ContactsVisibility) async throws(SettingsError) {
@@ -349,14 +357,12 @@ public actor AccountSettingsProxy: AccountSettingsRepository {
     }
   }
 
-  /// The ToM server of the account, with what its calls need; `nil` without ToM.
   private func tomAccess() async -> (TwakeContactLookup, URL, String, String)? {
-    let lookup = TwakeContactLookup()
     guard let client = await clientProxy(), let userId = try? client.userId,
       let token = try? client.client.session().accessToken,
-      let tom = await lookup.tomServer(forUserId: userId)
+      let tom = await capabilities?.current().tom
     else { return nil }
-    return (lookup, tom.baseURL, userId, token)
+    return (TwakeContactLookup(), tom.baseURL, userId, token)
   }
 
   public func cacheSize() async -> Int? {

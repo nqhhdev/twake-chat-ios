@@ -126,20 +126,4 @@ struct TomContactsAPITests {
     await #expect(throws: TwakeContactsError.tooManyRequests) { try await api.invite(address) }
     await #expect(throws: TwakeContactsError.requestFailed) { try await api.invite(address) }
   }
-
-  @Test func invitationsFollowTheWellKnownFlag() throws {
-    let on = Data(
-      #"{"t.server":{"base_url":"https://tom.example.org","server_name":"example.org"},"app.twake.chat":{"enable_invitations":true}}"#
-        .utf8)
-    let server = try #require(TwakeContactLookup.twakeServer(fromWellKnown: on, serverName: "x"))
-    #expect(server.baseURL.absoluteString == "https://tom.example.org")
-    #expect(server.serverName == "example.org")
-    #expect(server.invitationsEnabled)
-    let off = Data(
-      #"{"t.server":{"base_url":"https://tom.example.org"},"app.twake.chat":"weird"}"#.utf8)
-    let plain = try #require(TwakeContactLookup.twakeServer(fromWellKnown: off, serverName: "x"))
-    #expect(!plain.invitationsEnabled)
-    #expect(plain.serverName == "x")
-    #expect(TwakeContactLookup.twakeServer(fromWellKnown: Data("{}".utf8), serverName: "x") == nil)
-  }
 }
