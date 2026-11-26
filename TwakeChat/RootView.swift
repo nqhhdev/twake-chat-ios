@@ -386,6 +386,7 @@ final class RootCoordinator {
     }
     viewModel.personalQR.openLink = { [weak self] url in _ = self?.links.handle(url) }
     if let capabilities {
+      viewModel.appGrid = AppGridViewModel(capabilities: capabilities)
       viewModel.help = HelpViewModel(capabilities: capabilities, openDirectChat: openDirectChat())
     }
     if let capabilities, let analyticsRepository {
