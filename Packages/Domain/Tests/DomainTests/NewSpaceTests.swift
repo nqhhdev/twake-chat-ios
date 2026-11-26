@@ -68,6 +68,12 @@ struct NewSpaceTests {
     #expect((state.first?["content"] as? [String: String])?["url"] == "mxc://example.org/abc")
   }
 
+  @Test func theParentListsItsChildThroughTheServersOfBoth() throws {
+    let content = try json(
+      NewSpace.childContent(childId: "!child:other.org", ownServer: "example.org"))
+    #expect(content["via"] as? [String] == ["other.org", "example.org"])
+  }
+
   @Test func aSpaceNeedsAName() {
     #expect(!NewSpace(name: "   ").canCreate)
     #expect(NewSpace(name: "A").canCreate)
