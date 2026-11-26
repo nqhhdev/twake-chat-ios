@@ -1,19 +1,22 @@
 # E2E XCUITest against a local Synapse (issue #83).
 #
-# Manual only (`workflow_dispatch`): a macOS runner billed at 10× would exhaust
-# the Actions minutes if this ran on every pull request. Run it from the Actions
-# tab, or run `scripts/e2e.sh all` locally.
+# Manual (`workflow_dispatch`) and once a week: a macOS runner billed at 10× would
+# exhaust the Actions minutes if this ran on every pull request, so it is not a
+# required check of main. Run it from the Actions tab, or `scripts/e2e.sh all`
+# locally.
 #
 # Tradeoff if you do dispatch it: GitHub-hosted macos-26 (Apple Silicon) cannot
 # run Docker or Colima. macos-15-intel can run Colima until ~August 2027 and
 # currently ships Xcode 26.x, so Synapse and the simulator share
-# http://localhost:8008. timeout-minutes is 50 — enough for a cold SDK build and
-# the suite, short enough that a stuck Colima/start cannot drain the remaining
-# minutes.
+# http://localhost:8008. timeout-minutes is 90 — enough for a cold SDK build and
+# the eleven flows on an Intel runner, short enough that a stuck Colima start
+# cannot drain the remaining minutes.
 name: E2E
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 1"
 
 permissions:
   contents: read
@@ -22,14 +25,11 @@ concurrency:
   group: e2e-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  XCODE_VERSION: "26.2"
-
 jobs:
   e2e:
     name: e2e (Synapse + XCUITest)
     runs-on: macos-15-intel
-    timeout-minutes: 50
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
 
@@ -39,9 +39,10 @@ jobs:
           ls /Applications/Xcode*.app
           xcodebuild -version || true
 
-      - name: Select Xcode ${{ env.XCODE_VERSION }}
+      - name: Select the newest Xcode 26
         run: |
-          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+          xcode=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+          sudo xcode-select -s "$xcode"
           xcodebuild -version
 
       - name: Set up Docker (Colima)

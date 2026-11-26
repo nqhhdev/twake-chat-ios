@@ -8,6 +8,10 @@ public enum A11yIdentifiers {
   public static let chatList = ChatList()
   public static let room = Room()
   public static let settings = Settings()
+  public static let newChat = NewChat()
+  public static let newSpace = NewSpace()
+  public static let space = Space()
+  public static let folderEditor = FolderEditor()
 
   public struct Welcome: Sendable {
     public let companyServer = "welcome.companyServer"
@@ -29,6 +33,12 @@ public enum A11yIdentifiers {
     public let list = "chatList.list"
     /// A room row, by the room's display name.
     public func room(_ name: String) -> String { "chatList.room.\(name)" }
+    public let newChat = "chatList.newChat"
+    public let more = "chatList.more"
+    public let newSpace = "chatList.newSpace"
+    public let newFolder = "chatList.newFolder"
+    public func filter(_ title: String) -> String { "chatList.filter.\(title)" }
+    public func folder(_ name: String) -> String { "chatList.folder.\(name)" }
   }
 
   public struct Room: Sendable {
@@ -39,6 +49,10 @@ public enum A11yIdentifiers {
     public func action(_ title: String) -> String { "room.action.\(title)" }
     /// A reaction of the quick reaction bar, by its emoji.
     public func reaction(_ key: String) -> String { "room.reaction.\(key)" }
+    public let attach = "room.attach"
+    public let pastePicture = "room.attach.pastePicture"
+    public let sendAttachments = "room.attach.send"
+    public let attachmentCaption = "room.attach.caption"
   }
 
   public struct Settings: Sendable {
@@ -46,5 +60,27 @@ public enum A11yIdentifiers {
     public let logout = "settings.logout"
     public let confirmLogout = "settings.confirmLogout"
     public let personalQR = "settings.personalQR"
+  }
+
+  public struct NewChat: Sendable {
+    public let groupName = "newChat.groupName"
+    public let create = "newChat.create"
+    public func person(_ userId: String) -> String { "newChat.person.\(userId)" }
+  }
+
+  public struct NewSpace: Sendable {
+    public let name = "newSpace.name"
+    public let create = "newSpace.create"
+  }
+
+  public struct Space: Sendable {
+    public let add = "space.add"
+    public let newSubspace = "space.newSubspace"
+    public func child(_ name: String) -> String { "space.child.\(name)" }
+  }
+
+  public struct FolderEditor: Sendable {
+    public let name = "folderEditor.name"
+    public let save = "folderEditor.save"
   }
 }

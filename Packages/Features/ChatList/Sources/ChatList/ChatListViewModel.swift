@@ -421,6 +421,11 @@ public final class ChatListViewModel {
     do { try await action() } catch { actionErrorMessage = failure }
   }
 
+  public var showsNoResults: Bool {
+    visibleRooms.isEmpty && peopleResults.isEmpty && messageResults.isEmpty
+      && !isSearchingMessages
+  }
+
   public func retryUndecryptedPreviews() async {
     let undecrypted = loadedRooms.filter { $0.lastMessageKind == .encrypted }.map(\.id)
     guard !undecrypted.isEmpty else { return }

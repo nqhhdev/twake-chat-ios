@@ -8,10 +8,7 @@ final class AuthenticationFlowTests: XCTestCase {
   @MainActor func testSignInChatListAndLogout() {
     let app = E2EApp.launch()
     signIn(app)
-    XCTAssertTrue(
-      app.buttons[A11yIdentifiers.chatList.room("E2E Chat")].waitForExistence(
-        timeout: Self.timeout),
-      "The seeded room is in the chat list")
+    XCTAssertTrue(chatRow(app, named: "E2E Chat").exists, "The seeded room is in the chat list")
     signOut(app)
   }
 }
