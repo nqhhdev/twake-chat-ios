@@ -66,6 +66,7 @@ public final class RoomViewModel {
   public private(set) var botCommands: [BotCommand] = []
   @ObservationIgnored let gifs: (any GifRepository)?
   public internal(set) var gifsAvailable = false
+  public internal(set) var gifsOff = false
   public internal(set) var stickerPacks: [StickerPack] = []
   var presenceDots: [String: Presence.Dot] = [:]
   public internal(set) var emotes: [Emote] = []
@@ -249,6 +250,12 @@ public final class RoomViewModel {
             return false
           }
         })
+    }
+    .map { details in
+      details.onGifsChanged = { [weak self] enabled in
+        Task { await self?.gifsChanged(enabled: enabled) }
+      }
+      return details
     }
   }
 

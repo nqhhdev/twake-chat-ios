@@ -21,6 +21,8 @@ struct MessageMediaView: View {
 
   var body: some View {
     switch message.body {
+    case .image where RoomViewModel.isHiddenGif(message, gifsOff: viewModel.gifsOff):
+      HiddenGifNotice()
     case .image, .sticker, .video:
       thumbnail
     case .audio:
@@ -535,4 +537,17 @@ struct AlbumGrid: View {
 struct ViewerStart: Identifiable {
   let index: Int
   var id: Int { index }
+}
+
+struct HiddenGifNotice: View {
+  var body: some View {
+    Label("GIF hidden", systemImage: "eye.slash")
+      .textStyle(TextStyles.bodyMedium)
+      .foregroundStyle(SysColors.textSecondary)
+      .padding(.horizontal, 12)
+      .padding(.vertical, 10)
+      .background(SysColors.surface, in: .rect(cornerRadius: 12))
+      .accessibilityElement(children: .combine)
+      .accessibilityHint("The owner of this chat turned GIFs off.")
+  }
 }
