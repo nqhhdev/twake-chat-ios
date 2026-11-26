@@ -12,8 +12,9 @@ final class AccountsCoordinator {
 
     var message: String {
       switch self {
-      case .alreadyAdded(let userId): "\(userId) is already signed in on this device."
-      case .full: "You can add up to \(AccountList.maximum) accounts."
+      case .alreadyAdded(let userId):
+        String(localized: "\(userId) is already signed in on this device.")
+      case .full: String(localized: "You can add up to \(AccountList.maximum) accounts.")
       }
     }
   }
