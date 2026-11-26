@@ -77,11 +77,16 @@ has not settled. Keeping the Meet link only: no interoperable call with the web.
    `org.matrix.msc4075.rtc.notification` (`MessageLikeEventContent.rtcNotification` in the SDK) and hands it to the
    app through `CXProvider.reportNewIncomingVoIPPushPayload`, which needs a PushKit registration, the `voip`
    background mode and a decline through `Room.declineCall`. It touches the push extension and the pusher (ADR 0009,
-   ADR 0017), so it is its own change.
-2. Picture in picture and keeping the call while browsing other chats.
+   ADR 0017), so it is its own change: #222.
+2. Picture in picture and keeping the call while browsing other chats: #223.
 3. Twake hosting Element Call and announcing it in `.well-known/element/element.json`.
 4. The Meet features of D30 (recording, captions, transcription) on an unencrypted call.
 5. Trying a call between iOS and the web on `linagora.com`; the simulator has no camera.
+
+## Out of scope
+- **Screen sharing.** A `WKWebView` on iOS cannot capture the screen for a web page, and sharing it from the app
+  would need a ReplayKit broadcast extension feeding a native LiveKit track, which this ADR rejects. Element Call is
+  told to hide it.
 
 ## When to revisit
 When the SDK gains a native call API, when Twake hosts Element Call, or when the push work above is planned.
