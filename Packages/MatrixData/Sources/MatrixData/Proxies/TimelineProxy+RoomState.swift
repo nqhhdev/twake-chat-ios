@@ -25,12 +25,18 @@ extension TimelineProxy {
   }
 
   public func gifsEnabled() async -> Bool {
-    guard let opened else { return true }
-    if await opened.room.isDirect() { return true }
-    let room = ClientServerRequest.encode(roomId)
+    await gifsEnabled(in: roomId)
+  }
+
+  public func gifsEnabled(in roomId: String) async -> Bool {
+    guard let opened, let room = try? opened.client.client.getRoom(roomId: roomId) else {
+      return true
+    }
+    if await room.isDirect() { return true }
+    let encoded = ClientServerRequest.encode(roomId)
     guard
       let request = ClientServerRequest.make(
-        client: opened.client.client, path: "rooms/\(room)/state/\(Self.gifsStateType)/"),
+        client: opened.client.client, path: "rooms/\(encoded)/state/\(Self.gifsStateType)/"),
       let content = await ClientServerRequest.object(request)
     else { return true }
     return Self.gifsEnabled(content)

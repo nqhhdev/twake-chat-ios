@@ -50,6 +50,14 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
 
   public func gifsEnabled() async -> Bool { gifsOn }
 
+  public var gifsOffRooms: Set<String> {
+    get { lock.withLock { _gifsOffRooms } }
+    set { lock.withLock { _gifsOffRooms = newValue } }
+  }
+  private var _gifsOffRooms: Set<String> = []
+
+  public func gifsEnabled(in roomId: String) async -> Bool { !gifsOffRooms.contains(roomId) }
+
   public var packs: [StickerPack] {
     get { lock.withLock { _packs } }
     set { lock.withLock { _packs = newValue } }

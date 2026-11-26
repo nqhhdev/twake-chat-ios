@@ -102,6 +102,8 @@ public protocol TimelineRepository: Sendable {
 
   func gifsEnabled() async -> Bool
 
+  func gifsEnabled(in roomId: String) async -> Bool
+
   func stickerPacks() async -> [StickerPack]
 
   func emotes() async -> [Emote]
@@ -208,6 +210,7 @@ extension TimelineRepository {
   public func recentReactions() async -> [String] { [] }
   public func addRecentReaction(_ key: String) async {}
   public func gifsEnabled() async -> Bool { true }
+  public func gifsEnabled(in roomId: String) async -> Bool { true }
   public func stickerPacks() async -> [StickerPack] { [] }
   public func emotes() async -> [Emote] { [] }
   public func canSchedule() async -> Bool { false }

@@ -3193,6 +3193,38 @@
         }
       }
     },
+    "GIFs are off in %@, so GIFs are not forwarded there.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les GIF sont désactivés dans %@ : les GIF n’y sont pas transférés."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GIF đang tắt trong %@ nên GIF không được chuyển tiếp tới đó."
+          }
+        }
+      }
+    },
+    "GIFs are off in this chat, so GIF files cannot be sent here.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les GIF sont désactivés dans cette discussion : les fichiers GIF ne peuvent pas y être envoyés."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GIF đang tắt trong cuộc trò chuyện này nên không thể gửi tệp GIF ở đây."
+          }
+        }
+      }
+    },
     "GIFs are off: the GIF picker is hidden in this chat.": {
       "localizations": {
         "fr": {

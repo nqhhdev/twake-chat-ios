@@ -169,7 +169,8 @@ struct AttachmentButton: View {
       }
       if UIPasteboard.general.hasImages {
         Button(localized("Paste Picture"), systemImage: "doc.on.clipboard") {
-          let loaded = UIPasteboard.general.images?.compactMap(AttachmentLoader.load(image:)) ?? []
+          let loaded = viewModel.sendable(
+            UIPasteboard.general.images?.compactMap(AttachmentLoader.load(image:)) ?? [])
           if !loaded.isEmpty { preview = PickedBatch(items: loaded) }
         }
         .accessibilityIdentifier(A11yIdentifiers.room.pastePicture)
@@ -195,6 +196,7 @@ struct AttachmentButton: View {
         for item in items {
           if let one = await AttachmentLoader.load(item) { loaded.append(one) }
         }
+        loaded = viewModel.sendable(loaded)
         if !loaded.isEmpty { preview = PickedBatch(items: loaded) }
       }
     }
@@ -204,7 +206,7 @@ struct AttachmentButton: View {
     ) {
       result in
       guard case .success(let urls) = result else { return }
-      let loaded = urls.compactMap(AttachmentLoader.load(document:))
+      let loaded = viewModel.sendable(urls.compactMap(AttachmentLoader.load(document:)))
       if !loaded.isEmpty { preview = PickedBatch(items: loaded) }
     }
     .sheet(item: $preview) { batch in

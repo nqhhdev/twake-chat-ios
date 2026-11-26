@@ -143,6 +143,7 @@ struct AttachmentDropModifier: ViewModifier {
           isEnabled: viewModel.acceptsDroppedFiles, isTargeted: $isTargeted
         ) { providers in
           AttachmentDrop.load(providers) { loaded in
+            let loaded = viewModel.sendable(loaded)
             if !loaded.isEmpty { preview = PickedBatch(items: loaded) }
           }
         }
