@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
   name: "People",
+  defaultLocalization: "en",
   platforms: [.iOS(.v18)],
   products: [
     .library(name: "People", targets: ["People"]),
@@ -19,6 +20,7 @@ let package = Package(
         .product(name: "Domain", package: "Domain"),
         .product(name: "DesignSystem", package: "DesignSystem"),
       ],
+      resources: [.process("Localizable.xcstrings")],
       swiftSettings: [.treatAllWarnings(as: .error)]
     ),
     .target(

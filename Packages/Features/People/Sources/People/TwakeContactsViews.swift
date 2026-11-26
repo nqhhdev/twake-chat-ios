@@ -11,7 +11,7 @@ struct AddressBookSection: View {
   var body: some View {
     let shown = contacts.filtered(by: search.query)
     if contacts.features.addressBook, !shown.isEmpty {
-      Section("My contacts") {
+      Section(localized("My contacts")) {
         ForEach(shown) { entry in
           Button {
             Task { await search.tap(Person(id: entry.userId, displayName: entry.name)) }
@@ -30,12 +30,14 @@ struct AddressBookSection: View {
           }
           .buttonStyle(.plain)
           .swipeActions {
-            Button("Remove", role: .destructive) { removing = entry }
-            Button("Edit") { editing = entry }.tint(SysColors.primary)
+            Button(localized("Remove"), role: .destructive) { removing = entry }
+            Button(localized("Edit")) { editing = entry }.tint(SysColors.primary)
           }
           .contextMenu {
-            Button("Edit", systemImage: "pencil") { editing = entry }
-            Button("Remove", systemImage: "trash", role: .destructive) { removing = entry }
+            Button(localized("Edit"), systemImage: "pencil") { editing = entry }
+            Button(localized("Remove"), systemImage: "trash", role: .destructive) {
+              removing = entry
+            }
           }
         }
       }
@@ -43,15 +45,15 @@ struct AddressBookSection: View {
         AddressBookContactSheet(contacts: contacts, editing: entry)
       }
       .confirmationDialog(
-        "Remove \(removing?.name ?? "")?",
+        localized("Remove \(removing?.name ?? "")?"),
         isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
         titleVisibility: .visible
       ) {
-        Button("Remove", role: .destructive) {
+        Button(localized("Remove"), role: .destructive) {
           if let entry = removing { Task { await contacts.remove(entry) } }
         }
       } message: {
-        Text("They leave your contacts on every device. Your chats with them stay.")
+        Text(localized("They leave your contacts on every device. Your chats with them stay."))
       }
     }
   }
@@ -69,32 +71,33 @@ struct AddressBookContactSheet: View {
     NavigationStack {
       Form {
         Section {
-          TextField("Name", text: $name)
+          TextField(localized("Name"), text: $name)
             .textContentType(.name)
-          TextField("@alice:example.org", text: $matrixId)
+          TextField(localized("@alice:example.org"), text: $matrixId)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .keyboardType(.emailAddress)
             .disabled(editing != nil)
             .foregroundStyle(editing == nil ? SysColors.onSurface : SysColors.textSecondary)
         } footer: {
-          Text("Your contacts are kept by your Twake server and show on all your devices.")
+          Text(
+            localized("Your contacts are kept by your Twake server and show on all your devices."))
         }
         if let message = contacts.errorMessage {
           Section { Text(message).foregroundStyle(SysColors.error) }
         }
       }
-      .navigationTitle(editing == nil ? "New contact" : "Edit contact")
+      .navigationTitle(editing == nil ? localized("New contact") : localized("Edit contact"))
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") {
+          Button(localized("Cancel")) {
             contacts.clearError()
             dismiss()
           }
         }
         ToolbarItem(placement: .confirmationAction) {
-          Button("Save") {
+          Button(localized("Save")) {
             Task {
               var saved = false
               if let editing {
@@ -130,14 +133,15 @@ public struct InvitationsScreen: View {
       if let invitations = contacts.invitations {
         if invitations.isEmpty {
           ContentUnavailableView(
-            "No invitations", systemImage: "envelope.open",
-            description: Text("People you invite by e-mail, text message or link show here."))
+            localized("No invitations"), systemImage: "envelope.open",
+            description: Text(
+              localized("People you invite by e-mail, text message or link show here.")))
         } else {
           List {
             ForEach(invitations) { invitation in
               InvitationRow(invitation: invitation)
                 .swipeActions {
-                  Button("Check", systemImage: "arrow.clockwise") {
+                  Button(localized("Check"), systemImage: "arrow.clockwise") {
                     Task { await contacts.refresh(invitation) }
                   }
                   .tint(SysColors.primary)
@@ -153,7 +157,7 @@ public struct InvitationsScreen: View {
         ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
-    .twakeTitle("Invitations")
+    .twakeTitle(localized("Invitations"))
     .toolbar {
       ToolbarItem(placement: .primaryAction) { InviteLinkButton(contacts: contacts) }
     }
@@ -171,7 +175,7 @@ struct InvitationRow: View {
         .frame(width: 40, height: 40)
         .background(SysColors.primaryContainer, in: Circle())
       VStack(alignment: .leading, spacing: 2) {
-        Text(invitation.recipient.isEmpty ? "Invitation link" : invitation.recipient)
+        Text(invitation.recipient.isEmpty ? localized("Invitation link") : invitation.recipient)
           .textStyle(TextStyles.titleMedium).lineLimit(1)
         Text(statusText).textStyle(TextStyles.bodySmall)
           .foregroundStyle(statusColor)
@@ -190,10 +194,10 @@ struct InvitationRow: View {
 
   private var statusText: String {
     switch invitation.status() {
-    case .joined(let userId): "Joined as \(userId)"
-    case .opened: "Opened, not joined yet"
-    case .pending: "Sent"
-    case .expired: "Expired"
+    case .joined(let userId): localized("Joined as \(userId)")
+    case .opened: localized("Opened, not joined yet")
+    case .pending: localized("Sent")
+    case .expired: localized("Expired")
     }
   }
 
@@ -212,13 +216,13 @@ struct InviteLinkButton: View {
   var body: some View {
     if let link = contacts.link {
       ShareLink(
-        item: link.url, subject: Text("Join me on Twake Chat"),
-        message: Text("Join me on Twake Chat: \(link.url.absoluteString)")
+        item: link.url, subject: Text(localized("Join me on Twake Chat")),
+        message: Text(localized("Join me on Twake Chat: \(link.url.absoluteString)"))
       ) {
-        Label("Share invitation link", systemImage: "square.and.arrow.up")
+        Label(localized("Share invitation link"), systemImage: "square.and.arrow.up")
       }
     } else {
-      Button("Create invitation link", systemImage: "link") {
+      Button(localized("Create invitation link"), systemImage: "link") {
         Task { await contacts.makeLink() }
       }
       .disabled(contacts.isWorking)
@@ -235,20 +239,20 @@ struct TwakeContactsToolbar: ToolbarContent {
       ToolbarItem(placement: .primaryAction) {
         Menu {
           if contacts.features.addressBook {
-            Button("New contact", systemImage: "person.badge.plus") { isAdding = true }
+            Button(localized("New contact"), systemImage: "person.badge.plus") { isAdding = true }
           }
           if contacts.features.invitations {
             InviteLinkButton(contacts: contacts)
             NavigationLink {
               InvitationsScreen(contacts: contacts)
             } label: {
-              Label("Invitations", systemImage: "envelope.open")
+              Label(localized("Invitations"), systemImage: "envelope.open")
             }
           }
         } label: {
           Image(systemName: "plus")
         }
-        .accessibilityLabel("Add")
+        .accessibilityLabel(localized("Add"))
       }
     }
   }

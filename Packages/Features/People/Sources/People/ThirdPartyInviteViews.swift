@@ -31,10 +31,12 @@ struct IdentityConsentSheet: View {
             Image(systemName: "person.crop.circle.badge.questionmark")
               .font(.system(size: 40))
               .foregroundStyle(SysColors.primary)
-            Text("Find people by e-mail or phone")
+            Text(localized("Find people by e-mail or phone"))
               .textStyle(TextStyles.titleMedium)
             Text(
-              "To find people by their e-mail or phone number and invite them, the app asks the identity server \(consent.server). It only sends a scrambled form (a hash) of the addresses, never the addresses themselves, and nothing is sent before you accept its terms."
+              localized(
+                "To find people by their e-mail or phone number and invite them, the app asks the identity server \(consent.server). It only sends a scrambled form (a hash) of the addresses, never the addresses themselves, and nothing is sent before you accept its terms."
+              )
             )
             .textStyle(TextStyles.bodyMedium)
             .foregroundStyle(SysColors.textSecondary)
@@ -42,7 +44,7 @@ struct IdentityConsentSheet: View {
           .padding(.vertical, 8)
         }
         if !consent.policies.isEmpty {
-          Section("Terms of \(consent.server)") {
+          Section(localized("Terms of \(consent.server)")) {
             ForEach(consent.policies) { policy in
               Link(destination: policy.url) {
                 Label(policy.title, systemImage: "doc.text")
@@ -51,7 +53,7 @@ struct IdentityConsentSheet: View {
           }
         }
       }
-      .navigationTitle("Identity server")
+      .navigationTitle(localized("Identity server"))
       .navigationBarTitleDisplayMode(.inline)
       .safeAreaInset(edge: .bottom) {
         VStack(spacing: 8) {
@@ -59,11 +61,11 @@ struct IdentityConsentSheet: View {
             onAccept()
             dismiss()
           } label: {
-            Text("Accept and continue").frame(maxWidth: .infinity)
+            Text(localized("Accept and continue")).frame(maxWidth: .infinity)
           }
           .buttonStyle(.borderedProminent)
           .controlSize(.large)
-          Button("Not now") {
+          Button(localized("Not now")) {
             onDecline()
             dismiss()
           }
@@ -94,14 +96,14 @@ struct PhoneContactsSections: View {
         findButton { isAskingConsent = true }
       case .denied:
         Section {
-          Button("Allow access to Contacts", systemImage: "gear") {
+          Button(localized("Allow access to Contacts"), systemImage: "gear") {
             if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
           }
         } footer: {
-          Text("Turn on Contacts for this app in Settings to find the people you know.")
+          Text(localized("Turn on Contacts for this app in Settings to find the people you know."))
         }
       case .loading:
-        Section("From your contacts") {
+        Section(localized("From your contacts")) {
           HStack {
             Spacer()
             ProgressView()
@@ -110,11 +112,11 @@ struct PhoneContactsSections: View {
         }
       case .failed:
         Section {
-          Button("Try again", systemImage: "arrow.clockwise") {
+          Button(localized("Try again"), systemImage: "arrow.clockwise") {
             Task { await contacts.load() }
           }
         } footer: {
-          Text("Could not look up your contacts.")
+          Text(localized("Could not look up your contacts."))
         }
       case .loaded:
         loaded
@@ -132,7 +134,7 @@ struct PhoneContactsSections: View {
     let matched = contacts.filtered(contacts.onMatrix, by: search.query)
     let others = contacts.filtered(contacts.invitable, by: search.query)
     if !matched.isEmpty {
-      Section("From your contacts") {
+      Section(localized("From your contacts")) {
         ForEach(matched) { entry in
           Button {
             guard let userId = entry.userId else { return }
@@ -169,9 +171,9 @@ struct PhoneContactsSections: View {
           }
         }
       } header: {
-        Text("Invite to chat")
+        Text(localized("Invite to chat"))
       } footer: {
-        Text("They get an invitation and join you once they sign up.")
+        Text(localized("They get an invitation and join you once they sign up."))
       }
     }
   }
@@ -179,17 +181,17 @@ struct PhoneContactsSections: View {
   @ViewBuilder private func inviteButton(_ address: ContactAddress) -> some View {
     if let twake, twake.features.invitations {
       if twake.invited[address] != nil {
-        Label("Invited", systemImage: "checkmark")
+        Label(localized("Invited"), systemImage: "checkmark")
           .labelStyle(.titleAndIcon)
           .textStyle(TextStyles.labelSmall)
           .foregroundStyle(SysColors.textSecondary)
       } else {
-        Button("Invite") { Task { _ = await twake.invite(address) } }
+        Button(localized("Invite")) { Task { _ = await twake.invite(address) } }
           .buttonStyle(.bordered)
           .disabled(twake.isWorking)
       }
     } else {
-      Button("Invite") { Task { await search.tap(address) } }
+      Button(localized("Invite")) { Task { await search.tap(address) } }
         .buttonStyle(.bordered)
         .disabled(search.isCreating)
     }
@@ -198,11 +200,14 @@ struct PhoneContactsSections: View {
   private func findButton(_ action: @escaping () -> Void) -> some View {
     Section {
       Button(
-        "Find people from your contacts", systemImage: "person.crop.rectangle.stack", action: action
+        localized("Find people from your contacts"), systemImage: "person.crop.rectangle.stack",
+        action: action
       )
     } footer: {
       Text(
-        "Your contacts' e-mails and phone numbers are checked, in hashed form, against the identity server to show who already uses Matrix. Nothing leaves your device until you allow it."
+        localized(
+          "Your contacts' e-mails and phone numbers are checked, in hashed form, against the identity server to show who already uses Matrix. Nothing leaves your device until you allow it."
+        )
       )
     }
   }
