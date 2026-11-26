@@ -339,7 +339,12 @@ public final class RoomViewModel {
   public func start() async {
     startCount += 1
     let thisStart = startCount
-    state = .loading
+    var keepsShownRows = false
+    if case .loaded(let shown) = state, !shown.isEmpty {
+      keepsShownRows = true
+    } else {
+      state = .loading
+    }
     let items: AsyncStream<[TimelineItem]>
     do {
       items = try await openTimeline()
@@ -389,6 +394,8 @@ public final class RoomViewModel {
     }
     defer { extras.cancel() }
     for await list in items where thisStart == startCount {
+      if keepsShownRows, list.isEmpty { continue }
+      keepsShownRows = false
       state = .loaded(list)
       noteStart(in: list)
       restoreScroll(in: list)

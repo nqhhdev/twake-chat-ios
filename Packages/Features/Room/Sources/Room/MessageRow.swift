@@ -29,20 +29,23 @@ struct MessageRow: View {
 
   var body: some View {
     VStack(alignment: message.isOwn ? .trailing : .leading, spacing: 2) {
-      HStack(alignment: .bottom, spacing: 8) {
+      HStack(alignment: .bottom, spacing: RoomMetrics.avatarSpacing) {
         if !message.isOwn {
           // The avatar sits by the last bubble of a group; the others keep its space so the bubbles line up.
           if position.isLast {
             TwakeAvatar(
-              name: message.senderName, size: 32, pictureID: message.senderAvatar?.source,
+              name: message.senderName, size: RoomMetrics.avatarSize,
+              pictureID: message.senderAvatar?.source,
               load: message.senderAvatar.map { reference in
                 { @Sendable [viewModel] in await viewModel.picture(reference) }
               }
             )
             .overlay(alignment: .bottomTrailing) {
               if let dot = viewModel.presenceDot(of: message.senderId) {
-                AvatarPresenceDot(dot == .online ? .online : .away, avatarSize: 32)
-                  .offset(x: 3, y: 3)
+                AvatarPresenceDot(
+                  dot == .online ? .online : .away, avatarSize: RoomMetrics.avatarSize
+                )
+                .offset(x: 3, y: 3)
               }
             }
             .task(id: message.senderId) {
@@ -50,7 +53,7 @@ struct MessageRow: View {
               await viewModel.refreshPresence(of: message.senderId)
             }
           } else {
-            Color.clear.frame(width: 32, height: 1)
+            Color.clear.frame(width: RoomMetrics.avatarSize, height: 1)
           }
         }
         Group {
@@ -84,7 +87,7 @@ struct MessageRow: View {
     .background {
       if !isPreview, message.eventId != nil, viewModel.highlightedEventId == message.eventId {
         RoundedRectangle(cornerRadius: 14).fill(SysColors.primary.opacity(0.14))
-          .padding(.horizontal, -6)
+          .padding(.horizontal, -RoomMetrics.highlightBleed)
           .transition(.opacity)
       }
     }
@@ -161,9 +164,8 @@ struct MessageRow: View {
     }
   }
 
-  /// The widest the text inside the bubble may be: the bubble's limit less its padding and, for others, the avatar.
   private var contentWidth: CGFloat {
-    bubbleWidth - 24 - (message.isOwn ? 0 : 40)
+    RoomMetrics.contentWidth(bubbleWidth: bubbleWidth, isOwn: message.isOwn)
   }
 
   /// The bubble hugs its content: `HuggingStack` makes it as wide as its widest part, at most `contentWidth`, so a
@@ -257,8 +259,8 @@ struct MessageRow: View {
       .foregroundStyle(SysColors.textSecondary)
       .frame(maxWidth: .infinity, alignment: .trailing)
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 8)
+    .padding(.horizontal, RoomMetrics.bubbleInset)
+    .padding(.vertical, RoomMetrics.bubbleVerticalInset)
     .background(
       message.isOwn ? SysColors.primaryContainer : SysColors.onPrimary,
       in: TwakeBubbleShape(isOwn: message.isOwn, isFirst: position.isFirst, isLast: position.isLast)
@@ -350,12 +352,11 @@ struct MessageRow: View {
       }
     }
     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: message.reactions)
-    // No wider than the bubble may be, so many reactions wrap instead of widening the chat (twake-on-matrix #3258).
     .frame(
-      maxWidth: bubbleWidth - (message.isOwn ? 0 : 40),
+      maxWidth: RoomMetrics.reactionsWidth(bubbleWidth: bubbleWidth, isOwn: message.isOwn),
       alignment: message.isOwn ? .trailing : .leading
     )
-    .padding(.leading, message.isOwn ? 0 : 40)
+    .padding(.leading, message.isOwn ? 0 : RoomMetrics.avatarColumn)
     .allowsHitTesting(!isPreview)
   }
 
