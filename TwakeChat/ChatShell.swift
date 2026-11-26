@@ -66,6 +66,7 @@ struct ChatShell: View {
   /// What the prompt after sign-in asks the user to do, as the Flutter app asks for recovery right after login.
   @State private var sessionPrompt: SessionWarning?
   @State private var quickSwitcher: QuickSwitcherViewModel?
+  @Environment(\.scenePhase) private var scenePhase
 
   var body: some View {
     GeometryReader { geometry in
@@ -105,6 +106,15 @@ struct ChatShell: View {
         push.pendingThreadId = nil
         destination = .chats
         Task { await openWhenKnown(roomId, name: fallbackName, thread: threadId) }
+      }
+      .onChange(of: scenePhase) { _, phase in
+        if phase == .active { Task { await chatList.retryUndecryptedPreviews() } }
+      }
+      .onReceive(NotificationCenter.default.publisher(for: .encryptionKeysImported)) { _ in
+        Task { await chatList.retryUndecryptedPreviews() }
+      }
+      .task(id: chatList.loadedRooms.isEmpty) {
+        if !chatList.loadedRooms.isEmpty { await chatList.retryUndecryptedPreviews() }
       }
       .onChange(of: push.pendingDraftUserId, initial: true) { _, userId in
         guard let userId else { return }
