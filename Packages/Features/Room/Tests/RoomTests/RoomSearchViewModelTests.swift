@@ -17,6 +17,22 @@ private final class FakeRoomSearch: RoomSearchRepository, @unchecked Sendable {
 
   var asked: [String] { lock.withLock { _asked } }
 
+  private var _onDevice: [RoomSearchResult] = []
+  private var _askedOnDevice: [String] = []
+
+  var onDevice: [RoomSearchResult] {
+    get { lock.withLock { _onDevice } }
+    set { lock.withLock { _onDevice = newValue } }
+  }
+  var askedOnDevice: [String] { lock.withLock { _askedOnDevice } }
+
+  func searchOnDevice(_ term: String, roomId: String) async -> [RoomSearchResult] {
+    lock.withLock {
+      _askedOnDevice.append("\(term)@\(roomId)")
+      return _onDevice
+    }
+  }
+
   func search(_ term: String, roomId: String, from nextBatch: String?)
     async throws(RoomSearchError) -> RoomSearchPage
   {
@@ -99,6 +115,35 @@ struct RoomSearchViewModelTests {
     #expect(viewModel.results.map(\.eventId) == ["$3", "$1"])
     viewModel.query = "dejeuner midi"
     #expect(viewModel.results.map(\.eventId) == ["$1"])
+    timeline.finish()
+    await task.value
+  }
+
+  @Test func anEncryptedChatAlsoShowsOlderMessagesFromTheDeviceIndex() async {
+    let timeline = FakeTimelineRepository()
+    let server = FakeRoomSearch()
+    let old = RoomSearchResult(
+      eventId: "$9", senderId: "@ann:example.org", senderName: "Ann",
+      date: Date(timeIntervalSince1970: 1), text: "Lunch last year", roomId: "!r")
+    let loadedAgain = RoomSearchResult(
+      eventId: "$1", senderId: "@bob:example.org", senderName: "Bob",
+      date: Date(timeIntervalSince1970: 2), text: "lunch at noon", roomId: "!r")
+    let stale = RoomSearchResult(
+      eventId: "$8", senderId: "@ann:example.org", senderName: "Ann",
+      date: Date(timeIntervalSince1970: 3), text: "dinner", roomId: "!r")
+    server.onDevice = [loadedAgain, stale, old]
+    let viewModel = RoomSearchViewModel(
+      roomId: "!r", server: server, textTimeline: timeline, isEncrypted: { true })
+    let task = Task { await viewModel.start() }
+    while !timeline.calls.contains(.open) { await Task.yield() }
+    timeline.publish([item("1", "lunch at noon"), item("2", "see you")])
+    while viewModel.mode != .onDevice { await Task.yield() }
+    viewModel.query = "lunch"
+    while viewModel.results.count < 2 { await Task.yield() }
+    #expect(viewModel.results.map(\.eventId) == ["$1", "$9"])
+    #expect(viewModel.results.last?.roomId == nil)
+    #expect(server.askedOnDevice == ["lunch@!r"])
+    #expect(server.asked.isEmpty)
     timeline.finish()
     await task.value
   }

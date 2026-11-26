@@ -52,9 +52,13 @@ public protocol RoomSearchRepository: Sendable {
   /// The messages of every room the user is in that match `term`, newest first.
   func searchEverywhere(_ term: String, from nextBatch: String?) async throws(RoomSearchError)
     -> RoomSearchPage
+
+  func searchOnDevice(_ term: String, roomId: String) async -> [RoomSearchResult]
 }
 
 extension RoomSearchRepository {
+  public func searchOnDevice(_ term: String, roomId: String) async -> [RoomSearchResult] { [] }
+
   public func searchEverywhere(_ term: String, from nextBatch: String?)
     async throws(RoomSearchError) -> RoomSearchPage
   {
