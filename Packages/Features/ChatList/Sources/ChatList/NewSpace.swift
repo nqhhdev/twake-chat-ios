@@ -67,6 +67,7 @@ struct NewSpaceScreen: View {
         Section {
           TextField("Name", text: $viewModel.draft.name)
             .textInputAutocapitalization(.words)
+            .accessibilityIdentifier(A11yIdentifiers.newSpace.name)
             .submitLabel(.done)
           TextField("Description (optional)", text: $viewModel.draft.topic, axis: .vertical)
             .lineLimit(1...4)
@@ -92,6 +93,7 @@ struct NewSpaceScreen: View {
           } else {
             Button("Create") { Task { await viewModel.create() } }
               .disabled(!viewModel.canCreate)
+              .accessibilityIdentifier(A11yIdentifiers.newSpace.create)
           }
         }
       }

@@ -61,25 +61,41 @@ password login answered `403 M_FORBIDDEN`, so this path is not usable yet.
 
 ## Flows
 
-| Flow | Test | Checks | Status 2026-11-17 |
-|---|---|---|---|
-| 1 | `AuthenticationFlowTests` | welcome → company server → password → chat list → logout | pass |
-| 4 | `MessagingFlowTests` | send, reply, edit, quick reaction, delete in "E2E Chat" | pass |
-| 3 | `PaginationFlowTests` | idle on "E2E History" stays at the bottom; one scroll up keeps the message on screen | expects #80 (one page per trigger, scroll stays put) |
-| 10 | `ProfileFlowTests` | Settings shows "Alice E2E" | pass on the local stack (#82 did not reproduce here) |
-An E2EE group-decrypt flow and a media send/receive flow are not in this target: they need a second crypto-capable
-client and a seeded photo, which this Synapse-only harness does not provide (#79, #81, #83). They will be added as real
-tests when that harness exists, not as skipped placeholders.
+| Flow | Test | Checks |
+|---|---|---|
+| Sign in, chat list, sign out | `AuthenticationFlowTests` | welcome → company server → password → chat list → Settings → logout |
+| Chat list | `ChatListSearchFlowTests.testChatListFilters` | the seeded rooms; People hides a group, Groups and All show it |
+| Search | `ChatListSearchFlowTests.testSearchFindsChatsAndMessages` | a name filters the chats; the server's message search finds "Hello from Bob" and opens its chat |
+| Messaging | `MessagingFlowTests` | open "E2E Chat"; send, reply, edit, quick reaction, delete |
+| Picture | `PictureFlowTests` | the runner puts a picture on the pasteboard; Attach → Paste Picture → caption → send; the caption shows in the timeline |
+| Direct chat | `NewChatFlowTests.testStartADirectChat` | New chat → search ios-bob → the direct chat opens |
+| Group | `NewChatFlowTests.testCreateAGroup` | New chat → Group → name and ios-bob → Create → it opens and is in the list |
+| Spaces | `SpacesFoldersFlowTests.testCreateASpaceAndASubSpace` | More → New Space → the space opens; Add → New Sub-space → it is listed in the space |
+| Folders | `SpacesFoldersFlowTests.testCreateUseAndDeleteAFolder` | + chip → name, pick "E2E Chat" → the chip filters to it → delete from the chip menu |
+| Pagination | `PaginationFlowTests` | idle on "E2E History" stays at the bottom; one scroll up keeps the message on screen (#80) |
+| Profile | `ProfileFlowTests` | Settings shows "Alice E2E" |
 
-### Next
+Each test signs in on a fresh session, so every run leaves new devices, groups, spaces and messages on the account;
+names carry a random marker. Rows are found through the chat list's search when they are not on screen, since the
+list is lazy and other runs add rooms.
 
-- Flow 2: start a crypto-capable second client from `twake-space-chat/e2e` (`bob-*.mjs`,
-  `scripts/seed-encryption.mjs`) and cross-sign it, then bootstrap recovery on iOS (#79, #81). Needs ToM for the
-  recovery words. Add `testEncryptedGroupMessageDecrypts` when that is in place.
-- Media: seed an `m.image` from ios-bob, add photos to the simulator library, then add `testSendAndReceiveImage`.
-- CI: `.github/workflows/e2e.yml` is `workflow_dispatch` only (macOS minutes are billed at 10×). When dispatched it
-  uses `macos-15-intel` with Colima so Docker Synapse and the simulator share `http://localhost:8008`. Prefer
-  `scripts/e2e.sh all` locally. Format and architecture CI run on `ubuntu-24.04`.
+### Interruptions the harness clears
+
+`dismissInterruptions` (in `E2EApp.swift`) runs after sign-in for up to 20 seconds and before opening a room or
+Settings. It taps:
+- SpringBoard alerts: notifications (`Allow`), pasting from the test runner (`Allow Paste`).
+- AutoFill's "Save Password?" sheet after the password form (`Not Now`).
+- The app's "Unlock your encrypted messages" prompt (`Later`). The account has cross-signing from earlier runs, so
+  each new device is unverified; the app asks 3 or 13 seconds after the chat list shows.
+
+An E2EE group-decrypt flow is not in this target: it needs a second crypto-capable client, which this Synapse-only
+harness does not provide (#79, #81).
+
+### CI
+
+`.github/workflows/e2e.yml` runs on `workflow_dispatch` and once a week (Monday 03:00 UTC). It is not a required
+check of `main`. It uses `macos-15-intel` with Colima so Docker Synapse and the simulator share
+`http://localhost:8008`, and uploads `build/e2e.xcresult` and `build/e2e.log`.
 
 ## Borrowed from element-x-ios
 

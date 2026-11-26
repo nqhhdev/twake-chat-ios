@@ -9,8 +9,6 @@ final class MessagingFlowTests: XCTestCase {
     let app = E2EApp.launch()
     signIn(app)
     openRoom(app, named: "E2E Chat")
-    XCTAssertTrue(
-      message(app, containing: "Hello from Bob").waitForExistence(timeout: Self.timeout))
 
     let marker = String(UUID().uuidString.prefix(6))
     let original = "e2e \(marker) hello"
