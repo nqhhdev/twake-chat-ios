@@ -121,3 +121,4 @@
 * **Decision**: ADR 0035 (Proposed) sets the formats of spoilers (`data-mx-spoiler`, plain body `[Spoiler]`), picture descriptions (the caption), emotes (MSC2545, `data-mx-emoticon`) and scheduled messages (MSC4140, announced, never encrypted), and keeps link preview removal off until the web defines it.
 * **Change**: spoiler in the format bar (#178), picture descriptions (#179), presence dot on timeline avatars (#180), custom emotes (#186).
 * **Change**: translate a message with Apple's Translation framework (#181), transcribe a voice message on the device (#182), and schedule a message through MSC4140 delayed events where the server announces them, never in an encrypted room (#184). The MSC4140 check reads `ServerCapabilities.supports(_:)` (ADR 0034).
+* **Decision**: ADR 0041 (Proposed): an album (two or more pictures or videos) is sent as raw events carrying `app.twake.chat.batch`, with the files encrypted in the app in an encrypted room (#210).
