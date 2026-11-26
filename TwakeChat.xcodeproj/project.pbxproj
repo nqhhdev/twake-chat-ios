@@ -734,6 +734,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TWAKE_DEFAULT_HOMESERVER = "https://matrix.stg.lin-saas.com/";
+				TWAKE_ELEMENT_CALL_URL = "https://call.element.io";
 				TWAKE_PRIVACY_URL = "https://twake.app/en/privacy/";
 				TWAKE_PROXY_URL = "https://proxy.dev.twake.lin-saas.com";
 				TWAKE_PUSH_GATEWAY_URL = "https://push.twake.app/_matrix/push/v1/notify";
@@ -768,6 +769,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TWAKE_DEFAULT_HOMESERVER = "https://matrix.twake.app/";
+				TWAKE_ELEMENT_CALL_URL = "https://call.element.io";
 				TWAKE_PRIVACY_URL = "https://twake.app/policy";
 				TWAKE_PROXY_URL = "";
 				TWAKE_PUSH_GATEWAY_URL = "https://push.twake.app/_matrix/push/v1/notify";

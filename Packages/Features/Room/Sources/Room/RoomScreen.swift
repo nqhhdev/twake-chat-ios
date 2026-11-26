@@ -20,14 +20,23 @@ public struct RoomScreen: View {
   @State private var blocking: TimelineMessage?
   /// The room's Meet calls (#92); `nil` when the app gave no call repository.
   @State private var calls: MeetCallViewModel?
+  @State private var roomCall: RoomCallViewModel?
   @Environment(\.scenePhase) private var scenePhase
   private let meetCalls: (any MeetCallRepository)?
 
-  public init(viewModel: RoomViewModel, meetCalls: (any MeetCallRepository)? = nil) {
+  public init(
+    viewModel: RoomViewModel, meetCalls: (any MeetCallRepository)? = nil,
+    roomCalls: (any RoomCallRepository)? = nil
+  ) {
     self.viewModel = viewModel
     self.meetCalls = meetCalls
     _calls = State(
       initialValue: meetCalls.map { MeetCallViewModel(roomId: viewModel.roomId, repository: $0) })
+    _roomCall = State(
+      initialValue: roomCalls.map {
+        RoomCallViewModel(
+          roomId: viewModel.roomId, repository: $0, system: CallKitReporter.shared)
+      })
   }
 
   public var body: some View {
@@ -39,6 +48,10 @@ public struct RoomScreen: View {
         }
         if let warning = viewModel.identityWarnings.first {
           IdentityWarningBanner(warning: warning) { Task { await viewModel.accept(warning) } }
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
+        if let roomCall, roomCall.isAvailable, roomCall.state.isActive, roomCall.activeCall == nil {
+          ActiveCallBanner(calls: roomCall, title: viewModel.roomName)
             .transition(.move(edge: .top).combined(with: .opacity))
         }
         if viewModel.threadRootId == nil {
@@ -189,6 +202,7 @@ public struct RoomScreen: View {
     .sensoryFeedback(.success, trigger: viewModel.toast) { _, new in new != nil }
     .environment(calls)
     .task(id: viewModel.roomId) { await calls?.load() }
+    .roomCalls(roomCall, roomId: viewModel.roomId)
     .alert(
       calls?.errorMessage ?? "",
       isPresented: Binding(
@@ -252,7 +266,12 @@ public struct RoomScreen: View {
           .accessibilityHint("Shows the chat details")
         }
         // As in the Flutter chat: a call needs a Meet server and the right to post, since it is a message.
-        if let calls, calls.baseURL != nil, viewModel.canSendMessages, !viewModel.isArchived {
+        if let roomCall, roomCall.isAvailable, !viewModel.isArchived {
+          ToolbarItem(placement: .topBarTrailing) {
+            RoomCallButton(calls: roomCall, title: viewModel.roomName)
+          }
+        } else if let calls, calls.baseURL != nil, viewModel.canSendMessages, !viewModel.isArchived
+        {
           ToolbarItem(placement: .topBarTrailing) { MeetCallButton(calls: calls) }
         }
         ToolbarItem(placement: .topBarTrailing) {
