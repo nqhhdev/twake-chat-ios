@@ -37,7 +37,18 @@ struct MessageRow: View {
               name: message.senderName, size: 32, pictureID: message.senderAvatar?.source,
               load: message.senderAvatar.map { reference in
                 { @Sendable [viewModel] in await viewModel.picture(reference) }
-              })
+              }
+            )
+            .overlay(alignment: .bottomTrailing) {
+              if let dot = viewModel.presenceDot(of: message.senderId) {
+                AvatarPresenceDot(dot == .online ? .online : .away, avatarSize: 32)
+                  .offset(x: 3, y: 3)
+              }
+            }
+            .task(id: message.senderId) {
+              guard !isPreview else { return }
+              await viewModel.refreshPresence(of: message.senderId)
+            }
           } else {
             Color.clear.frame(width: 32, height: 1)
           }
@@ -211,7 +222,7 @@ struct MessageRow: View {
       } else {
         MessageBody(
           content: message.body, formatted: message.formatted,
-          isDeviceVerified: viewModel.sessionWarning == nil
+          isDeviceVerified: viewModel.sessionWarning == nil, emotes: viewModel
         )
         .frame(maxWidth: .infinity, alignment: .leading)
         if case .text(let text) = message.body, let link = RoomViewModel.previewLink(in: text) {
@@ -303,7 +314,12 @@ struct MessageRow: View {
           Task { await viewModel.toggleReaction(reaction.key, on: message) }
         } label: {
           HStack(spacing: 3) {
-            Text(reaction.key)
+            if reaction.key.hasPrefix("mxc://") {
+              EmoteImage(source: reaction.key, viewModel: viewModel, side: 18)
+                .accessibilityLabel("Emote")
+            } else {
+              Text(reaction.key)
+            }
             Text("\(reaction.count)")
               .contentTransition(.numericText(value: Double(reaction.count)))
           }

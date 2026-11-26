@@ -55,6 +55,14 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
 
   public func stickerPacks() async -> [StickerPack] { packs }
 
+  public var emoteList: [Emote] {
+    get { lock.withLock { _emoteList } }
+    set { lock.withLock { _emoteList = newValue } }
+  }
+  private var _emoteList: [Emote] = []
+
+  public func emotes() async -> [Emote] { emoteList }
+
   public func send(sticker: Sticker) async throws(TimelineError) {
     record(.sticker(sticker.id))
     try actionResult.get()

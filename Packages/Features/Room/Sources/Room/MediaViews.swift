@@ -39,6 +39,18 @@ struct MessageMediaView: View {
 
   /// The user's own picture, sent in the last minutes. The SDK keeps what it uploaded, so the picture shows from that
   /// copy at once; the server's thumbnail of a new upload took over a minute on a slow server, with a blank tile.
+  static func accessibilityLabel(of body: TimelineMessage.Body) -> String {
+    switch body {
+    case .image(let caption?) where !caption.trimmingCharacters(in: .whitespaces).isEmpty:
+      caption
+    case .video(let caption?) where !caption.trimmingCharacters(in: .whitespaces).isEmpty:
+      "Video: \(caption)"
+    case .video: "Video"
+    case .sticker(let text): "Sticker \(text)"
+    default: "Picture"
+    }
+  }
+
   static func wasJustSent(_ message: TimelineMessage, now: Date = Date()) -> Bool {
     guard message.isOwn, case .image = message.body else { return false }
     return now.timeIntervalSince(message.date) < 600
@@ -78,6 +90,7 @@ struct MessageMediaView: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
+    .accessibilityLabel(Self.accessibilityLabel(of: message.body))
     .fullScreenCover(item: $video) { file in VideoPlayerScreen(url: file.url) }
     .fullScreenCover(isPresented: $isViewerShown) {
       ImageViewer(

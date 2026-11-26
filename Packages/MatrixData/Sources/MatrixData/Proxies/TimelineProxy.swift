@@ -20,6 +20,7 @@ public actor TimelineProxy: TimelineRepository {
   private let clientProxy: @Sendable () async -> ClientProxy?
   private let index: MessageIndex?
   private var opened: Opened?
+  private var knownEmotes: [String: String] = [:]
 
   /// - Parameters:
   ///   - roomId: The room this timeline shows.
@@ -152,7 +153,7 @@ public actor TimelineProxy: TimelineRepository {
   public func send(text: String) async throws(TimelineError) {
     let timeline = try openedTimeline()
     do {
-      _ = try await timeline.send(msg: Self.content(text))
+      _ = try await timeline.send(msg: Self.content(text, emotes: knownEmotes))
     } catch {
       throw Self.failure("send", error)
     }
@@ -161,7 +162,7 @@ public actor TimelineProxy: TimelineRepository {
   public func send(emote text: String) async throws(TimelineError) {
     let timeline = try openedTimeline()
     do {
-      _ = try await timeline.send(msg: Self.content(text, isEmote: true))
+      _ = try await timeline.send(msg: Self.content(text, isEmote: true, emotes: knownEmotes))
     } catch {
       throw Self.failure("sendEmote", error)
     }
@@ -359,17 +360,43 @@ public actor TimelineProxy: TimelineRepository {
   }
 
   public func stickerPacks() async -> [StickerPack] {
+    var seen = Set<String>()
+    return await imagePacks().compactMap { pack in
+      ImagePackMapper.pack(
+        id: pack.id, content: pack.content, fallbackName: pack.fallbackName,
+        source: Self.mediaSourceJSON)
+    }
+    .filter { seen.insert($0.id).inserted }
+  }
+
+  public func emotes() async -> [Emote] {
+    var seen = Set<String>()
+    let emotes = await imagePacks().flatMap { pack in
+      ImagePackMapper.emotes(content: pack.content, source: Self.mediaSourceJSON)
+    }
+    .filter { seen.insert($0.shortcode).inserted }
+    knownEmotes = Dictionary(emotes.map { ($0.shortcode, $0.url) }, uniquingKeysWith: { a, _ in a })
+    return emotes
+  }
+
+  static func mediaSourceJSON(_ url: String) -> String? {
+    try? MediaSource.fromUrl(url: url).toJson()
+  }
+
+  private struct PackContent: @unchecked Sendable {
+    let id: String
+    let content: [String: Any]
+    let fallbackName: String
+  }
+
+  private func imagePacks() async -> [PackContent] {
     guard let opened else { return [] }
     let client = opened.client.client
-    let source: (String) -> String? = { try? MediaSource.fromUrl(url: $0).toJson() }
-    var packs: [StickerPack] = []
-    let user = ImagePackMapper.eventContent(
+    var packs: [PackContent] = []
+    if let user = ImagePackMapper.eventContent(
       try? await client.accountData(eventType: ImagePackMapper.userPackType))
-    if let user,
-      let pack = ImagePackMapper.pack(
-        id: "user", content: user, fallbackName: "My stickers", source: source)
     {
-      packs.append(pack)
+      packs.append(PackContent(id: "user", content: user, fallbackName: "My stickers"))
     }
     let room = ClientServerRequest.encode(roomId)
     if let request = ClientServerRequest.make(client: client, path: "rooms/\(room)/state"),
@@ -378,12 +405,12 @@ public actor TimelineProxy: TimelineRepository {
     {
       for event in events where event["type"] as? String == ImagePackMapper.roomPackType {
         guard let key = event["state_key"] as? String,
-          let content = event["content"] as? [String: Any],
-          let pack = ImagePackMapper.pack(
-            id: "room:\(roomId):\(key)", content: content,
-            fallbackName: key.isEmpty ? "Chat stickers" : key, source: source)
+          let content = event["content"] as? [String: Any]
         else { continue }
-        packs.append(pack)
+        packs.append(
+          PackContent(
+            id: "room:\(roomId):\(key)", content: content,
+            fallbackName: key.isEmpty ? "Chat stickers" : key))
       }
     }
     let packRooms = ImagePackMapper.eventContent(
@@ -395,15 +422,14 @@ public actor TimelineProxy: TimelineRepository {
         "rooms/\(ClientServerRequest.encode(other))/state/\(ImagePackMapper.roomPackType)/"
         + ClientServerRequest.encode(key)
       guard let request = ClientServerRequest.make(client: client, path: path),
-        let content = await ClientServerRequest.object(request),
-        let pack = ImagePackMapper.pack(
-          id: "room:\(other):\(key)", content: content,
-          fallbackName: key.isEmpty ? "Stickers" : key, source: source)
+        let content = await ClientServerRequest.object(request)
       else { continue }
-      packs.append(pack)
+      packs.append(
+        PackContent(
+          id: "room:\(other):\(key)", content: content,
+          fallbackName: key.isEmpty ? "Stickers" : key))
     }
-    var seen = Set<String>()
-    return packs.filter { seen.insert($0.id).inserted }
+    return packs
   }
 
   public func send(sticker: Sticker) async throws(TimelineError) {
@@ -515,7 +541,7 @@ public actor TimelineProxy: TimelineRepository {
   public func reply(text: String, to eventId: String) async throws(TimelineError) {
     let timeline = try openedTimeline()
     do {
-      try await timeline.sendReply(msg: Self.content(text), eventId: eventId)
+      try await timeline.sendReply(msg: Self.content(text, emotes: knownEmotes), eventId: eventId)
     } catch {
       throw Self.failure("reply", error)
     }
@@ -526,7 +552,7 @@ public actor TimelineProxy: TimelineRepository {
     do {
       try await timeline.edit(
         eventOrTransactionId: .eventId(eventId: eventId),
-        newContent: .roomMessage(content: Self.content(text)))
+        newContent: .roomMessage(content: Self.content(text, emotes: knownEmotes)))
     } catch {
       throw Self.failure("edit", error)
     }
@@ -669,12 +695,21 @@ public actor TimelineProxy: TimelineRepository {
 
   /// The message content of a Markdown text. A link to a user (`[Name](https://matrix.to/#/@user:server)`, as the
   /// composer writes a mention) also lists that user in the intentional mentions, so they are notified.
-  static func content(_ text: String, isEmote: Bool = false)
+  static func content(_ text: String, isEmote: Bool = false, emotes: [String: String] = [:])
     -> RoomMessageEventContentWithoutRelation
   {
-    let content =
-      isEmote
-      ? messageEventContentFromMarkdownAsEmote(md: text) : messageEventContentFromMarkdown(md: text)
+    let content: RoomMessageEventContentWithoutRelation
+    if let spoiler = RichMarkdown.content(text, emotes: emotes) {
+      content =
+        isEmote
+        ? messageEventContentFromHtmlAsEmote(body: spoiler.body, htmlBody: spoiler.html)
+        : messageEventContentFromHtml(body: spoiler.body, htmlBody: spoiler.html)
+    } else {
+      content =
+        isEmote
+        ? messageEventContentFromMarkdownAsEmote(md: text)
+        : messageEventContentFromMarkdown(md: text)
+    }
     let userIds = mentionedUserIds(in: text)
     let room = mentionsRoom(text)
     return userIds.isEmpty && !room

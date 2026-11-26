@@ -58,9 +58,9 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Send, reply, edit, delete, retry, reactions, recent reactions | `chat` | Phase 2, 2b | Built: `Room/ComposerView.swift`, `MessageActions.swift`, `MessageRow.swift` | Matrix | — |
 | Formatted messages, mentions, spoilers shown, Markdown sending | `chat/events` | Phase 2, 2b | Built: `Room/MessageBody.swift`, `Domain` `MatrixHTML` | Matrix | — |
 | Formatting toolbar | — | Phase 2 | Built: `Room/TextFormatting.swift` (#134) | Matrix | — |
-| Spoiler in the toolbar | — | MSG-23 | Not built | Matrix | #178 |
+| Spoiler in the toolbar | — | MSG-23 | Built: `TextFormatting.swift`, `MatrixData/Mappers/RichMarkdown.swift`, [ADR 0035](../../docs/adr/0035-timeline-extras-formats.md) | Matrix | #178 |
 | Emoji shortcodes, bot commands (MSC4332) | `command_hints` | README | Built: `Room/EmojiSuggestions.swift`, `Domain/Models/BotCommand.swift` | Matrix | — |
-| Custom emotes and packs (MSC2545) | `settings_emotes` | — | Not built | Matrix | #186 |
+| Custom emotes and packs (MSC2545) | `settings_emotes` | — | Built: shown, picked and sent (`RoomViewModel+Emotes.swift`); packs not editable, [ADR 0035](../../docs/adr/0035-timeline-extras-formats.md) | Matrix | #186 |
 | Stickers: shown / sent | `sticker_picker_dialog` | — | Built: `StickerViews.swift` (shown without a bubble), sent from MSC2545 packs, [ADR 0028](../../docs/adr/0028-gifs-stickers-checklists.md) | Matrix | #105 |
 | GIF picker | — | D63, D146 | Built: `GifPickerSheet.swift`; received GIFs not hidden when off, no owner switch yet | Twake (common proxy), ADR 0028 | #140 |
 | Typing line, receipts, Seen by, unread marker, mark unread | `seen_by_row` | Phase 2, 2b | Built: `Room/RoomScreen.swift`, `TimelineRows.swift` | Matrix | — |
@@ -77,9 +77,9 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Scribe in the composer | — | D53, D73, D215 | Not built; owner decision | Twake (Assistant) | #183 |
 | Scheduled send | — | CMP-03, not built on the web | Not built | Matrix (MSC4140, detected) | #184 |
 | Link preview, none in encrypted rooms | `domain/preview_url` | Phase 11, D211 | Built: `MatrixData/Proxies/LinkPreviewProxy.swift` | Matrix | — |
-| Author removes a link preview | — | CMP-09 | Not built; the web has no format | Matrix | #185 |
+| Author removes a link preview | — | CMP-09 | Off: the web has no format ([ADR 0035](../../docs/adr/0035-timeline-extras-formats.md)) | Matrix | #185 |
 | Tombstone and blocked user banners, device verification banner | `tombstone_display`, `blocked_user_banner`, `chat_device_verifycation_banner` | — | Built: `Room/RoomBanners.swift` | Matrix | — |
-| Status on the author's avatar | — | NOT-04 | Not built | Matrix | #180 |
+| Status on the author's avatar | — | NOT-04 | Built: `RoomViewModel+Presence.swift` (dot on the timeline avatar) | Matrix | #180 |
 | Hardware keyboard: Return sends, Up edits | `chat_input_row_web` | Phase 2b | Built: `ComposerKeys.swift` | Device | #142 |
 | Broadcast channels (`app.twake.chat.page`) | `newfeed` (`app.twake.chat.feed`) | Phase 3, D2, D90 | Built: `Domain/Models/Broadcast.swift`; web form kept (ADR 0023) | Matrix | — |
 | Twake Assistant in rooms | — | D74, D102, D128, D212 | Not built; owner decision | Twake (Assistant) | #190 |
@@ -93,7 +93,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Preview before sending, album, camera, paste, drag and drop | `send_media_native_dialog`, `domain/media_album` | Phase 2 | Built: `Room/AttachmentPicking.swift`, `AttachmentDrop.swift`; album format to verify | Matrix | #115 |
 | Upload progress, size limit from `/media/v3/config` | `send_file_dialog` | Phase 2 | Built: `MatrixData/Proxies/MediaProxy.swift` | Matrix | — |
 | Media, Files, Links tabs in chat info | `chat_details_page_view` | — | Built: `Room/RoomDetailsScreen.swift` | Matrix | — |
-| Alternative text on sent pictures | — | A11Y-04 | Not built | Matrix | #179 |
+| Alternative text on sent pictures | — | A11Y-04 | Built: sent as the picture's caption ([ADR 0035](../../docs/adr/0035-timeline-extras-formats.md)) | Matrix | #179 |
 | Twake Drive picker | `drive_picker` (unmerged) | D36, D200 | Not built; "+" › Files | Twake (Drive) | #175 |
 | Location: shown | — | — | Built: `Domain/Models/GeoPoint.swift`, `MessageBody.swift` | Matrix | — |
 

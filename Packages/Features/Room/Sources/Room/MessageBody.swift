@@ -10,6 +10,7 @@ struct MessageBody: View {
   var formatted: AttributedString?
   /// This device is verified, which decides the help under a message that cannot be decrypted.
   var isDeviceVerified = true
+  var emotes: RoomViewModel?
   /// The reader tapped the message: its spoilers show.
   @State private var revealsSpoilers = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -35,6 +36,8 @@ struct MessageBody: View {
         }
         .accessibilityHint(revealsSpoilers ? "Hides the spoiler" : "Shows the spoiler")
         .accessibilityAddTraits(.isButton)
+    } else if text.hasEmotes, let emotes {
+      EmoteText(text: text, viewModel: emotes)
     } else {
       Text(text)
     }

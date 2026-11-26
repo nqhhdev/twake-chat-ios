@@ -28,6 +28,14 @@ struct ComposerView: View {
         }
         .transition(.move(edge: .bottom).combined(with: .opacity))
       }
+      let emotes = viewModel.emoteSuggestions
+      if !emotes.isEmpty {
+        EmoteSuggestions(emotes: emotes, viewModel: viewModel) { emote in
+          viewModel.pickEmote(emote)
+          isFocused = true
+        }
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+      }
       let emojis = viewModel.emojiSuggestions
       if !emojis.isEmpty {
         EmojiSuggestions(suggestions: emojis) { emoji in

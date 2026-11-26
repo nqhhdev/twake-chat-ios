@@ -96,7 +96,16 @@ public enum SpoilerAttribute: AttributedStringKey {
   public static let name = "org.linagora.twake.spoiler"
 }
 
+public enum EmoteAttribute: AttributedStringKey {
+  public typealias Value = String
+  public static let name = "org.linagora.twake.emote"
+}
+
 extension AttributedString {
+  public var hasEmotes: Bool {
+    runs.contains { $0[EmoteAttribute.self] != nil }
+  }
+
   /// The text holds a part hidden as a spoiler.
   public var hasSpoiler: Bool {
     runs.contains { $0[SpoilerAttribute.self] == true }
@@ -118,6 +127,7 @@ private struct Builder {
   private var quoteDepth = 0
   /// For each open `span`, whether it hides a spoiler.
   private var spans: [Bool] = []
+  private var emote: String?
   /// Nothing has been written on the current line yet.
   private var atLineStart = true
 
@@ -177,7 +187,16 @@ private struct Builder {
         spans.append(body.lowercased().contains("data-mx-spoiler"))
       }
     case "img":
-      if let alt = Self.attribute("alt", in: body) { write(text: alt) }
+      guard let alt = Self.attribute("alt", in: body) else { return }
+      if body.lowercased().contains("data-mx-emoticon"),
+        let source = Self.attribute("src", in: body), source.hasPrefix("mxc://")
+      {
+        emote = source
+        write(text: alt)
+        emote = nil
+      } else {
+        write(text: alt)
+      }
     case "td", "th":
       if !isClosing, !atLineStart { append(" ", styled: false) }
     default: break
@@ -241,6 +260,7 @@ private struct Builder {
     if code > 0 || pre > 0 { intent.insert(.code) }
     if !intent.isEmpty { piece.inlinePresentationIntent = intent }
     if spans.contains(true) { piece[SpoilerAttribute.self] = true }
+    if let emote { piece[EmoteAttribute.self] = emote }
     if let link = links.last {
       if let link { piece.link = link }
     } else if code == 0, pre == 0 {
