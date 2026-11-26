@@ -71,6 +71,8 @@ the older one. `main` requires every job below; keep the names stable.
     members an explicit type (`ScenePhase.active`) or move the expression into a typed property.
   - `for (a, b) in optional.map(f) ?? [] where …` over labeled tuples fails with "pattern cannot match values of
     type". Bind the tuple (`for pair in … where pair.a …`) and read its labels.
+  - `let picker = try #require(picker(coordinator))`: inside `#require` or `#expect`, the helper's name resolves to
+    the constant being declared ("cannot call value of non-function type"). Write `self.picker(coordinator)`.
   - Any API from the iOS 27 SDK.
 - Both macOS jobs use `.github/actions/xcode-setup`: it selects Xcode, restores `build/SourcePackages` (keyed on the
   `Package.resolved`, `Package.swift` and project files) and `build/DerivedData` (per job, keyed on
