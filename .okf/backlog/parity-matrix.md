@@ -72,10 +72,10 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Polls (MSC3381) | — | Phase 10 | Built: `Room/Polls.swift`, `Domain/Models/Poll.swift` | Matrix | — |
 | Checklists next to polls | — | THR-11 | Off: no event format defined ([ADR 0028](../../docs/adr/0028-gifs-stickers-checklists.md)) | Matrix | #105 |
 | Voice messages (MSC3245), playback speed | `chat_audio_player_widget` | Phase 10 | Built: `Room/VoiceRecorder.swift`, `Players.swift`; interop to verify | Matrix | #108 |
-| Transcribe a voice message | — | MSG-13 | Not built | Device | #182 |
-| Translate a message | — | MSG-15 | Not built | Device (ADR 0026) | #181 |
+| Transcribe a voice message | — | MSG-13 | Built: on-device `SFSpeechRecognizer` (`SpeechTranscriber.swift`) | Device | #182 |
+| Translate a message | — | MSG-15 | Built: Apple Translation on the device (`MessageTranslationViews.swift`) | Device (ADR 0026) | #181 |
 | Scribe in the composer | — | D53, D73, D215 | Not built; owner decision | Twake (Assistant) | #183 |
-| Scheduled send | — | CMP-03, not built on the web | Not built | Matrix (MSC4140, detected) | #184 |
+| Scheduled send | — | CMP-03, web #1185 | Built: MSC4140 called directly, hidden in encrypted rooms ([ADR 0035](../../docs/adr/0035-timeline-extras-formats.md)) | Matrix (MSC4140, detected) | #184 |
 | Link preview, none in encrypted rooms | `domain/preview_url` | Phase 11, D211 | Built: `MatrixData/Proxies/LinkPreviewProxy.swift` | Matrix | — |
 | Author removes a link preview | — | CMP-09 | Off: the web has no format ([ADR 0035](../../docs/adr/0035-timeline-extras-formats.md)) | Matrix | #185 |
 | Tombstone and blocked user banners, device verification banner | `tombstone_display`, `blocked_user_banner`, `chat_device_verifycation_banner` | — | Built: `Room/RoomBanners.swift` | Matrix | — |
