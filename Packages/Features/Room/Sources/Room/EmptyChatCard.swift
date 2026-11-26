@@ -20,24 +20,26 @@ public struct EmptyChatCard: Equatable, Sendable {
   ) -> EmptyChatCard {
     if isBroadcast {
       return EmptyChatCard(
-        title: "Channel “\(roomName)” is created",
+        title: localized("Channel “\(roomName)” is created"),
         description:
-          "A broadcast channel shares news with its followers. Only the owner and moderators post in it; "
-          + "followers read the messages.",
+          localized(
+            "A broadcast channel shares news with its followers. Only the owner and moderators post in it; followers read the messages."
+          ),
         points: [])
     }
     guard canPost else {
-      return EmptyChatCard(title: "No message here yet", description: nil, points: [])
+      return EmptyChatCard(title: localized("No message here yet"), description: nil, points: [])
     }
     if isDirect {
       return EmptyChatCard(
-        title: "No message here yet", description: "Send a message to start the conversation",
-        points: isEncrypted ? ["End-to-end encrypted messages"] : [])
+        title: localized("No message here yet"),
+        description: localized("Send a message to start the conversation"),
+        points: isEncrypted ? [localized("End-to-end encrypted messages")] : [])
     }
     return EmptyChatCard(
-      title: "Congratulations on your new chat!", description: nil,
-      points: ["Up to 100,000 members", "Persistent chat history"]
-        + (isEncrypted ? ["End-to-end encrypted messages"] : [])
-        + ["Admins with different rights"])
+      title: localized("Congratulations on your new chat!"), description: nil,
+      points: [localized("Up to 100,000 members"), localized("Persistent chat history")]
+        + (isEncrypted ? [localized("End-to-end encrypted messages")] : [])
+        + [localized("Admins with different rights")])
   }
 }

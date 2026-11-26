@@ -80,7 +80,9 @@ public final class RoomCallViewModel {
 
   public var participantCount: Int { state.participants.count }
 
-  public var actionTitle: String { state.isActive ? "Join call" : "Start call" }
+  public var actionTitle: String {
+    state.isActive ? localized("Join call") : localized("Start call")
+  }
 
   public func load() async {
     isAvailable = await repository.isAvailable()
@@ -108,11 +110,11 @@ public final class RoomCallViewModel {
       }
       await system?.reportStarted(call.id, title: title)
     } catch RoomCallError.notAllowed {
-      errorMessage = "You may not join a call in this chat."
+      errorMessage = localized("You may not join a call in this chat.")
     } catch RoomCallError.notJoined {
-      errorMessage = "You are no longer in this chat."
+      errorMessage = localized("You are no longer in this chat.")
     } catch {
-      errorMessage = "The call could not be started. Please try again."
+      errorMessage = localized("The call could not be started. Please try again.")
     }
   }
 

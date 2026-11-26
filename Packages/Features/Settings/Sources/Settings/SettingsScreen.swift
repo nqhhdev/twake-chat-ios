@@ -96,13 +96,13 @@ public struct SettingsScreen: View {
         .contentShape(Rectangle())
         .onTapGesture { isRenaming = true }
         .accessibilityAddTraits(.isButton)
-        .accessibilityHint("Changes your picture and display name")
+        .accessibilityHint(localized("Changes your picture and display name"))
         Button {
           statusDraft = viewModel.statusMessage ?? ""
           isEditingStatus = true
         } label: {
           Label {
-            Text(viewModel.statusMessage ?? "Set a status")
+            Text(viewModel.statusMessage ?? localized("Set a status"))
               .foregroundStyle(
                 viewModel.statusMessage == nil ? SysColors.textSecondary : SysColors.onSurface
               )
@@ -116,7 +116,7 @@ public struct SettingsScreen: View {
           PersonalQRScreen(settings: viewModel)
         } label: {
           Label {
-            Text("Your personal QR").foregroundStyle(SysColors.onSurface)
+            Text(localized("Your personal QR")).foregroundStyle(SysColors.onSurface)
           } icon: {
             Image(systemName: "qrcode").foregroundStyle(SysColors.primary)
           }
@@ -125,18 +125,20 @@ public struct SettingsScreen: View {
       }
       Section {
         if viewModel.hasChatPage {
-          pageRow(.chat, title: "Chat", icon: "bubble.left.and.bubble.right", detail: nil)
+          pageRow(
+            .chat, title: localized("Chat"), icon: "bubble.left.and.bubble.right", detail: nil)
         }
-        pageRow(.security, title: "Privacy & Security", icon: "lock", detail: recoveryBadge)
-        pageRow(.notifications, title: "Notifications", icon: "bell", detail: nil)
-        pageRow(.storage, title: "Data and Storage", icon: "internaldrive", detail: nil)
-        pageRow(.about, title: "About", icon: "info.circle", detail: nil)
+        pageRow(
+          .security, title: localized("Privacy & Security"), icon: "lock", detail: recoveryBadge)
+        pageRow(.notifications, title: localized("Notifications"), icon: "bell", detail: nil)
+        pageRow(.storage, title: localized("Data and Storage"), icon: "internaldrive", detail: nil)
+        pageRow(.about, title: localized("About"), icon: "info.circle", detail: nil)
       }
       Section {
         Button(role: .destructive) {
           isConfirmingLogout = true
         } label: {
-          Label("Logout", systemImage: "rectangle.portrait.and.arrow.right")
+          Label(localized("Logout"), systemImage: "rectangle.portrait.and.arrow.right")
             .foregroundStyle(SysColors.error)
         }
         .disabled(viewModel.isLoggingOut)
@@ -159,7 +161,7 @@ public struct SettingsScreen: View {
       }
     }
     .listStyle(.insetGrouped)
-    .navigationTitle("Settings")
+    .navigationTitle(localized("Settings"))
     .navigationBarTitleDisplayMode(.large)
     .navigationDestination(for: SettingsPage.self) { page in
       SettingsPageView(page: page, viewModel: viewModel)
@@ -173,31 +175,33 @@ public struct SettingsScreen: View {
       if phase == .active { Task { await viewModel.refreshDisplayName() } }
     }
     .sheet(isPresented: $isRenaming) { EditProfileSheet(viewModel: viewModel) }
-    .alert("Status", isPresented: $isEditingStatus) {
-      TextField("What are you up to?", text: $statusDraft)
-      Button("Cancel", role: .cancel) {}
+    .alert(localized("Status"), isPresented: $isEditingStatus) {
+      TextField(localized("What are you up to?"), text: $statusDraft)
+      Button(localized("Cancel"), role: .cancel) {}
       if viewModel.statusMessage != nil {
-        Button("Clear", role: .destructive) { Task { await viewModel.setStatusMessage("") } }
+        Button(localized("Clear"), role: .destructive) {
+          Task { await viewModel.setStatusMessage("") }
+        }
       }
-      Button("Save") {
+      Button(localized("Save")) {
         let text = statusDraft
         Task { await viewModel.setStatusMessage(text) }
       }
     } message: {
-      Text("People see it on your profile.")
+      Text(localized("People see it on your profile."))
     }
     .confirmationDialog(
-      "Are you sure you want to log out?", isPresented: $isConfirmingLogout,
+      localized("Are you sure you want to log out?"), isPresented: $isConfirmingLogout,
       titleVisibility: .visible
     ) {
-      Button("Logout", role: .destructive) { Task { await viewModel.logOut() } }
+      Button(localized("Logout"), role: .destructive) { Task { await viewModel.logOut() } }
         .accessibilityIdentifier(A11yIdentifiers.settings.confirmLogout)
     }
   }
 
   /// A dot on Privacy & Security while older messages cannot be read yet.
   private var recoveryBadge: String? {
-    viewModel.recoveryStatus == .incomplete ? "Action needed" : nil
+    viewModel.recoveryStatus == .incomplete ? localized("Action needed") : nil
   }
 }
 
@@ -234,19 +238,21 @@ struct AppLockSection: View {
     let method = lock.unlockMethod
     Section {
       Toggle(
-        "Require \(method?.name ?? "Passcode")",
+        localized("Require \(method?.name ?? localized("Passcode"))"),
         isOn: Binding(
           get: { lock.isEnabled },
           set: { enabled in Task { await lock.setEnabled(enabled) } })
       )
       .disabled(method == nil)
     } header: {
-      Text("App Lock")
+      Text(localized("App Lock"))
     } footer: {
       if let method {
-        Text("Twake Chat asks for \(method.name) when it opens and each time you come back to it.")
+        Text(
+          localized(
+            "Twake Chat asks for \(method.name) when it opens and each time you come back to it."))
       } else {
-        Text("Set a passcode on this device to lock Twake Chat.")
+        Text(localized("Set a passcode on this device to lock Twake Chat."))
       }
     }
   }
@@ -261,17 +267,20 @@ struct ChatSettingsScreen: View {
     List {
       Section {
         Toggle(
-          "Hide unimportant room events", isOn: $viewModel.chatDisplay.hidesUnimportantEvents)
+          localized("Hide unimportant room events"),
+          isOn: $viewModel.chatDisplay.hidesUnimportantEvents)
       } footer: {
-        Text("Changes to a chat's encryption, description, join rules, history or permissions.")
+        Text(
+          localized(
+            "Changes to a chat's encryption, description, join rules, history or permissions."))
       }
       Section {
-        Toggle("Hide unknown events", isOn: $viewModel.chatDisplay.hidesUnknownEvents)
+        Toggle(localized("Hide unknown events"), isOn: $viewModel.chatDisplay.hidesUnknownEvents)
       } footer: {
-        Text("Events this app cannot show, listed by their type.")
+        Text(localized("Events this app cannot show, listed by their type."))
       }
     }
     .listStyle(.insetGrouped)
-    .twakeTitle("Chat")
+    .twakeTitle(localized("Chat"))
   }
 }

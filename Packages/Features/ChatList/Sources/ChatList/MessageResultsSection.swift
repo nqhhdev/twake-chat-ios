@@ -8,7 +8,7 @@ struct MessageResultsSection: View {
 
   var body: some View {
     if !viewModel.peopleResults.isEmpty {
-      Section("People") {
+      Section(localized("People")) {
         ForEach(viewModel.peopleResults) { person in
           Button {
             Task { await viewModel.open(person) }
@@ -66,11 +66,11 @@ struct MessageResultsSection: View {
       }
     } header: {
       if viewModel.isSearchingMessages || !viewModel.messageResults.isEmpty {
-        Text("Messages")
+        Text(localized("Messages"))
       }
     } footer: {
       if !viewModel.messageResults.isEmpty {
-        Text("Messages in encrypted chats are searched inside each chat.")
+        Text(localized("Messages in encrypted chats are searched inside each chat."))
       }
     }
   }

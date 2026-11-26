@@ -12,7 +12,7 @@ extension RoomViewModel {
     do {
       try await repository.send(sticker: sticker)
     } catch {
-      errorMessage = "Could not send the sticker. Please try again."
+      errorMessage = localized("Could not send the sticker. Please try again.")
     }
   }
 }

@@ -61,13 +61,13 @@ public final class DeleteAccountViewModel {
         await signOut()
       case .needsConfirmation(let next):
         if auth != nil || (next.webURL == nil && !next.acceptsPassword) {
-          errorMessage = "Could not confirm it is you. Please try again."
+          errorMessage = localized("Could not confirm it is you. Please try again.")
         } else {
           challenge = next
         }
       }
     } catch {
-      errorMessage = "Could not delete your account."
+      errorMessage = localized("Could not delete your account.")
     }
   }
 }
@@ -87,7 +87,7 @@ struct DeleteAccountSection: View {
         case nil: break
         }
       } label: {
-        Label("Delete Account", systemImage: "person.crop.circle.badge.xmark")
+        Label(localized("Delete Account"), systemImage: "person.crop.circle.badge.xmark")
           .foregroundStyle(SysColors.error)
       }
       .disabled(viewModel.route == nil || viewModel.isDeleting)
@@ -97,17 +97,19 @@ struct DeleteAccountSection: View {
       }
     } footer: {
       if case .commonSettings = viewModel.route {
-        Text("Your account is managed on your organisation's settings page.")
+        Text(localized("Your account is managed on your organisation's settings page."))
       }
     }
     .task { await viewModel.load() }
     .confirmationDialog(
-      "Delete your account?", isPresented: $isConfirming, titleVisibility: .visible
+      localized("Delete your account?"), isPresented: $isConfirming, titleVisibility: .visible
     ) {
-      Button("Delete Account", role: .destructive) { Task { await viewModel.delete() } }
+      Button(localized("Delete Account"), role: .destructive) { Task { await viewModel.delete() } }
     } message: {
       Text(
-        "Your account is closed for good: you leave every chat, sign out of every device and lose your encrypted messages. Nobody can use your Matrix ID again."
+        localized(
+          "Your account is closed for good: you leave every chat, sign out of every device and lose your encrypted messages. Nobody can use your Matrix ID again."
+        )
       )
     }
     .sheet(
@@ -120,22 +122,22 @@ struct DeleteAccountSection: View {
       }
     }
     .alert(
-      "Confirm it is you",
+      localized("Confirm it is you"),
       isPresented: Binding(
         get: {
           viewModel.challenge.map { $0.webURL == nil && $0.acceptsPassword } ?? false
         },
         set: { if !$0 { password = "" } })
     ) {
-      SecureField("Password", text: $password)
-      Button("Cancel", role: .cancel) { viewModel.cancel() }
-      Button("Delete Account", role: .destructive) {
+      SecureField(localized("Password"), text: $password)
+      Button(localized("Cancel"), role: .cancel) { viewModel.cancel() }
+      Button(localized("Delete Account"), role: .destructive) {
         let typed = password
         password = ""
         Task { await viewModel.confirm(password: typed) }
       }
     } message: {
-      Text("Enter your account password to delete your account.")
+      Text(localized("Enter your account password to delete your account."))
     }
   }
 }

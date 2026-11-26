@@ -39,7 +39,8 @@ extension RoomViewModel {
     switch await transcriber.transcribe(fileURL: url) {
     case .success(let text):
       let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-      transcriptions[id] = .transcribed(trimmed.isEmpty ? "No speech was recognised." : trimmed)
+      transcriptions[id] = .transcribed(
+        trimmed.isEmpty ? localized("No speech was recognised.") : trimmed)
     case .failure(let failure):
       transcriptions[id] = nil
       errorMessage = Self.transcriptionMessage(failure)
@@ -54,9 +55,10 @@ extension RoomViewModel {
   static func transcriptionMessage(_ failure: TranscriptionFailure) -> String {
     switch failure {
     case .denied:
-      "Allow speech recognition for Twake Chat in Settings to transcribe voice messages."
-    case .unavailable: "This device cannot transcribe this language without a connection."
-    case .failed: "Could not transcribe this voice message."
+      localized("Allow speech recognition for Twake Chat in Settings to transcribe voice messages.")
+    case .unavailable:
+      localized("This device cannot transcribe this language without a connection.")
+    case .failed: localized("Could not transcribe this voice message.")
     }
   }
 }

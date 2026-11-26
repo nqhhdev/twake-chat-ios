@@ -27,7 +27,7 @@ struct AppGridRow: View {
         NavigationLink {
           AppGridScreen(apps: viewModel.apps)
         } label: {
-          SettingsRow(title: "Twake Apps", icon: "square.grid.3x3", detail: nil)
+          SettingsRow(title: localized("Twake Apps"), icon: "square.grid.3x3", detail: nil)
         }
         .accessibilityIdentifier("settings.appGrid")
       }
@@ -62,6 +62,6 @@ struct AppGridScreen: View {
       }
       .padding()
     }
-    .navigationTitle("Twake Apps")
+    .navigationTitle(localized("Twake Apps"))
   }
 }

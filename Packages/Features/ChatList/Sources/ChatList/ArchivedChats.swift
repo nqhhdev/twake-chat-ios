@@ -23,14 +23,16 @@ public final class ArchivedChatsViewModel {
       rooms = try await repository.archivedRooms()
     } catch {
       rooms = []
-      errorMessage = "Could not load the archived chats."
+      errorMessage = localized("Could not load the archived chats.")
     }
   }
 
   /// Joins a left chat again; it goes back to the chat list. Returns whether it worked.
   @discardableResult
   public func rejoin(_ room: RoomSummary) async -> Bool {
-    await act(on: room, failure: "Could not join \(room.name) again. It may need an invitation.") {
+    await act(
+      on: room, failure: localized("Could not join \(room.name) again. It may need an invitation.")
+    ) {
       [repository] in try await repository.rejoin(roomId: room.id)
     }
   }
@@ -38,7 +40,7 @@ public final class ArchivedChatsViewModel {
   /// Deletes a left chat for good.
   @discardableResult
   public func delete(_ room: RoomSummary) async -> Bool {
-    await act(on: room, failure: "Could not delete \(room.name). Please try again.") {
+    await act(on: room, failure: localized("Could not delete \(room.name). Please try again.")) {
       [repository] in try await repository.forget(roomId: room.id)
     }
   }
@@ -79,8 +81,8 @@ struct ArchivedChatsScreen: View {
       if let rooms = viewModel.rooms {
         if rooms.isEmpty {
           ContentUnavailableView(
-            "No archived chats", systemImage: "archivebox",
-            description: Text("Chats you leave show here."))
+            localized("No archived chats"), systemImage: "archivebox",
+            description: Text(localized("Chats you leave show here.")))
         } else {
           List {
             ForEach(rooms) { room in
@@ -93,19 +95,23 @@ struct ArchivedChatsScreen: View {
               .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
               .disabled(viewModel.working.contains(room.id))
               .swipeActions(edge: .trailing) {
-                Button("Delete", systemImage: "trash", role: .destructive) { deleting = room }
+                Button(localized("Delete"), systemImage: "trash", role: .destructive) {
+                  deleting = room
+                }
               }
               .swipeActions(edge: .leading) {
-                Button("Rejoin", systemImage: "arrow.uturn.left") {
+                Button(localized("Rejoin"), systemImage: "arrow.uturn.left") {
                   Task { await viewModel.rejoin(room) }
                 }
                 .tint(SysColors.primary)
               }
               .contextMenu {
-                Button("Rejoin", systemImage: "arrow.uturn.left") {
+                Button(localized("Rejoin"), systemImage: "arrow.uturn.left") {
                   Task { await viewModel.rejoin(room) }
                 }
-                Button("Delete", systemImage: "trash", role: .destructive) { deleting = room }
+                Button(localized("Delete"), systemImage: "trash", role: .destructive) {
+                  deleting = room
+                }
               }
             }
             if let message = viewModel.errorMessage {
@@ -118,31 +124,32 @@ struct ArchivedChatsScreen: View {
         ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
-    .navigationTitle("Archived")
+    .navigationTitle(localized("Archived"))
     .toolbar {
       if viewModel.rooms?.isEmpty == false {
-        Button("Delete All", role: .destructive) { isConfirmingDeleteAll = true }
+        Button(localized("Delete All"), role: .destructive) { isConfirmingDeleteAll = true }
       }
     }
     .task { await viewModel.load() }
     .refreshable { await viewModel.load() }
     .confirmationDialog(
-      "Delete \(deleting?.name ?? "this chat")?",
+      localized("Delete \(deleting?.name ?? localized("this chat"))?"),
       isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
       titleVisibility: .visible
     ) {
-      Button("Delete", role: .destructive) {
+      Button(localized("Delete"), role: .destructive) {
         if let room = deleting { Task { await viewModel.delete(room) } }
       }
     } message: {
-      Text("Its messages will no longer be kept on this account. This cannot be undone.")
+      Text(localized("Its messages will no longer be kept on this account. This cannot be undone."))
     }
     .confirmationDialog(
-      "Delete all archived chats?", isPresented: $isConfirmingDeleteAll, titleVisibility: .visible
+      localized("Delete all archived chats?"), isPresented: $isConfirmingDeleteAll,
+      titleVisibility: .visible
     ) {
-      Button("Delete All", role: .destructive) { Task { await viewModel.deleteAll() } }
+      Button(localized("Delete All"), role: .destructive) { Task { await viewModel.deleteAll() } }
     } message: {
-      Text("This cannot be undone.")
+      Text(localized("This cannot be undone."))
     }
   }
 }

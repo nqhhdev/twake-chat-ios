@@ -94,7 +94,8 @@ public final class RoomDetailsViewModel {
 
   /// Makes a prepared picture the room's avatar (Flutter `chat_details_edit`), then shows the room as it is now.
   public func setPicture(_ picture: PreparedPicture) async {
-    await changePicture(failure: "Could not change the chat picture. Please try again.") {
+    await changePicture(failure: localized("Could not change the chat picture. Please try again."))
+    {
       [repository, roomId] in
       try await repository.setAvatar(
         PictureUpload(
@@ -105,7 +106,8 @@ public final class RoomDetailsViewModel {
 
   /// Removes the room's avatar; the chat shows its initial.
   public func removePicture() async {
-    await changePicture(failure: "Could not remove the chat picture. Please try again.") {
+    await changePicture(failure: localized("Could not remove the chat picture. Please try again."))
+    {
       [repository, roomId] in try await repository.removeAvatar(roomId: roomId)
     }
   }
@@ -132,7 +134,7 @@ public final class RoomDetailsViewModel {
     let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
     let topic = topic.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !name.isEmpty else {
-      errorMessage = "The name cannot be empty."
+      errorMessage = localized("The name cannot be empty.")
       return false
     }
     isSaving = true
@@ -142,7 +144,7 @@ public final class RoomDetailsViewModel {
       if name != details.name { try await repository.rename(name, roomId: roomId) }
       if topic != (details.topic ?? "") { try await repository.setTopic(topic, roomId: roomId) }
     } catch {
-      errorMessage = "Could not save the changes. Please try again."
+      errorMessage = localized("Could not save the changes. Please try again.")
       return false
     }
     await load()
@@ -166,7 +168,7 @@ public final class RoomDetailsViewModel {
     do {
       state = .loaded(try await repository.details(roomId: roomId))
     } catch {
-      state = .failed("Could not load the chat details.")
+      state = .failed(localized("Could not load the chat details."))
       return
     }
     members = (try? await repository.members(roomId: roomId)) ?? []
@@ -193,7 +195,7 @@ public final class RoomDetailsViewModel {
       }
     } catch {
       (notificationMode, followsDefault) = previous
-      errorMessage = "Could not change the notifications. Please try again."
+      errorMessage = localized("Could not change the notifications. Please try again.")
     }
   }
 
@@ -218,7 +220,7 @@ public final class RoomDetailsViewModel {
   @discardableResult
   public func ban(_ member: RoomMember) async -> Bool {
     guard member.canBeBanned else { return false }
-    return await change("Could not ban \(member.name). Please try again.") {
+    return await change(localized("Could not ban \(member.name). Please try again.")) {
       [repository, roomId] in try await repository.ban(userId: member.id, roomId: roomId)
     }
   }
@@ -226,7 +228,7 @@ public final class RoomDetailsViewModel {
   /// Lets a banned person back.
   @discardableResult
   public func unban(_ member: RoomMember) async -> Bool {
-    let done = await change("Could not unban \(member.name). Please try again.") {
+    let done = await change(localized("Could not unban \(member.name). Please try again.")) {
       [repository, roomId] in try await repository.unban(userId: member.id, roomId: roomId)
     }
     if done { withAnimation { banned?.removeAll { $0.id == member.id } } }
@@ -237,7 +239,8 @@ public final class RoomDetailsViewModel {
   @discardableResult
   public func setRole(_ role: RoomMember.Role, for member: RoomMember) async -> Bool {
     guard member.assignableRoles.contains(role), role != member.role else { return false }
-    return await change("Could not change the role of \(member.name). Please try again.") {
+    return await change(localized("Could not change the role of \(member.name). Please try again."))
+    {
       [repository, roomId] in
       try await repository.setRole(role, userId: member.id, roomId: roomId)
     }
@@ -266,7 +269,7 @@ public final class RoomDetailsViewModel {
       await loadChannel()
     } catch {
       channel = previous
-      errorMessage = "Could not change the GIFs of this chat. Please try again."
+      errorMessage = localized("Could not change the GIFs of this chat. Please try again.")
     }
   }
 
@@ -276,7 +279,8 @@ public final class RoomDetailsViewModel {
     guard case .loaded(let details) = state, details.canChangeAccess, rule != details.joinRule
     else { return }
     if rule == .public, details.isEncrypted { return }
-    await change("Could not change who can join. Please try again.") { [repository, roomId] in
+    await change(localized("Could not change who can join. Please try again.")) {
+      [repository, roomId] in
       try await repository.setJoinRule(rule, roomId: roomId)
     }
   }
@@ -284,7 +288,8 @@ public final class RoomDetailsViewModel {
   /// Turns encryption on for good.
   public func enableEncryption() async {
     guard case .loaded(let details) = state, details.canEnableEncryption else { return }
-    await change("Could not turn on encryption. Please try again.") { [repository, roomId] in
+    await change(localized("Could not turn on encryption. Please try again.")) {
+      [repository, roomId] in
       try await repository.enableEncryption(roomId: roomId)
     }
   }
@@ -317,7 +322,7 @@ public final class RoomDetailsViewModel {
       members = (try? await repository.members(roomId: roomId)) ?? members
       return true
     } catch {
-      errorMessage = "Could not remove \(member.name). Please try again."
+      errorMessage = localized("Could not remove \(member.name). Please try again.")
       return false
     }
   }
@@ -327,7 +332,7 @@ public final class RoomDetailsViewModel {
     guard let openDirectChat, !member.isOwn else { return }
     errorMessage = nil
     if await !openDirectChat(member.id) {
-      errorMessage = "Could not open the chat with \(member.name). Please try again."
+      errorMessage = localized("Could not open the chat with \(member.name). Please try again.")
     }
   }
 
@@ -340,7 +345,7 @@ public final class RoomDetailsViewModel {
     guard let blockUser, !member.isOwn else { return false }
     errorMessage = nil
     guard await blockUser(member.id) else {
-      errorMessage = "Could not block \(member.name). Please try again."
+      errorMessage = localized("Could not block \(member.name). Please try again.")
       return false
     }
     return true
@@ -355,7 +360,7 @@ public final class RoomDetailsViewModel {
       try await repository.leave(roomId: roomId)
       onLeft()
     } catch {
-      errorMessage = "Could not leave the chat. Please try again."
+      errorMessage = localized("Could not leave the chat. Please try again.")
     }
   }
 }

@@ -6,9 +6,9 @@ extension RoomMember.Role {
   /// The label beside a member's name; a plain member has none.
   var label: String? {
     switch self {
-    case .creator: "Owner"
-    case .administrator: "Admin"
-    case .moderator: "Moderator"
+    case .creator: localized("Owner")
+    case .administrator: localized("Admin")
+    case .moderator: localized("Moderator")
     case .user: nil
     }
   }
@@ -57,7 +57,7 @@ struct MemberProfileScreen: View {
               .background(SysColors.primary.opacity(0.12), in: .capsule)
           }
           if member.membership == .invited {
-            Text("Invited").font(.footnote).foregroundStyle(SysColors.textSecondary)
+            Text(localized("Invited")).font(.footnote).foregroundStyle(SysColors.textSecondary)
           }
           actions.padding(.top, 8)
         }
@@ -65,18 +65,20 @@ struct MemberProfileScreen: View {
         .listRowBackground(Color.clear)
       }
       if let status {
-        Section("Status") {
+        Section(localized("Status")) {
           Label(status, systemImage: "quote.bubble")
             .transition(.opacity)
         }
       }
       Section {
-        LabeledContent("Matrix ID") {
+        LabeledContent(localized("Matrix ID")) {
           Text(member.id).textSelection(.enabled).lineLimit(1).truncationMode(.middle)
         }
       }
       if let common, !common.isEmpty, !member.isOwn {
-        Section(common.count == 1 ? "1 group in common" : "\(common.count) groups in common") {
+        Section(
+          localized("\(common.count) groups in common")
+        ) {
           ForEach(common) { room in
             Label {
               Text(room.name).lineLimit(1)
@@ -90,7 +92,7 @@ struct MemberProfileScreen: View {
       if !member.assignableRoles.isEmpty {
         Section {
           Picker(
-            "Role",
+            localized("Role"),
             selection: Binding(
               get: { member.role },
               set: { role in
@@ -102,29 +104,33 @@ struct MemberProfileScreen: View {
               })
           ) {
             ForEach(member.assignableRoles, id: \.self) { role in
-              Text(role.label ?? "Member").tag(role)
+              Text(role.label ?? localized("Member")).tag(role)
             }
           }
           .disabled(isWorking)
         } footer: {
           Text(
-            "Admins can change the chat and people's roles; moderators can remove and ban members.")
+            localized(
+              "Admins can change the chat and people's roles; moderators can remove and ban members."
+            ))
         }
       }
       if member.canBeRemoved || member.canBeBanned || viewModel.canBlock(member) {
         Section {
           if member.canBeRemoved {
-            Button("Remove from chat", systemImage: "person.badge.minus", role: .destructive) {
+            Button(
+              localized("Remove from chat"), systemImage: "person.badge.minus", role: .destructive
+            ) {
               isConfirmingRemove = true
             }
           }
           if member.canBeBanned {
-            Button("Ban from chat", systemImage: "nosign", role: .destructive) {
+            Button(localized("Ban from chat"), systemImage: "nosign", role: .destructive) {
               isConfirmingBan = true
             }
           }
           if viewModel.canBlock(member) {
-            Button("Block", systemImage: "hand.raised", role: .destructive) {
+            Button(localized("Block"), systemImage: "hand.raised", role: .destructive) {
               isConfirmingBlock = true
             }
           }
@@ -146,9 +152,10 @@ struct MemberProfileScreen: View {
       withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { common = found }
     }
     .confirmationDialog(
-      "Ban \(member.name) from this chat?", isPresented: $isConfirmingBan, titleVisibility: .visible
+      localized("Ban \(member.name) from this chat?"), isPresented: $isConfirmingBan,
+      titleVisibility: .visible
     ) {
-      Button("Ban", role: .destructive) {
+      Button(localized("Ban"), role: .destructive) {
         Task {
           isWorking = true
           defer { isWorking = false }
@@ -156,13 +163,13 @@ struct MemberProfileScreen: View {
         }
       }
     } message: {
-      Text("They are removed and cannot join again until they are unbanned in Banned.")
+      Text(localized("They are removed and cannot join again until they are unbanned in Banned."))
     }
     .confirmationDialog(
-      "Remove \(member.name) from this chat?", isPresented: $isConfirmingRemove,
+      localized("Remove \(member.name) from this chat?"), isPresented: $isConfirmingRemove,
       titleVisibility: .visible
     ) {
-      Button("Remove", role: .destructive) {
+      Button(localized("Remove"), role: .destructive) {
         Task {
           isWorking = true
           defer { isWorking = false }
@@ -170,12 +177,12 @@ struct MemberProfileScreen: View {
         }
       }
     } message: {
-      Text("They can join again only if someone invites them.")
+      Text(localized("They can join again only if someone invites them."))
     }
     .confirmationDialog(
-      "Block \(member.name)?", isPresented: $isConfirmingBlock, titleVisibility: .visible
+      localized("Block \(member.name)?"), isPresented: $isConfirmingBlock, titleVisibility: .visible
     ) {
-      Button("Block", role: .destructive) {
+      Button(localized("Block"), role: .destructive) {
         Task {
           isWorking = true
           defer { isWorking = false }
@@ -183,7 +190,9 @@ struct MemberProfileScreen: View {
         }
       }
     } message: {
-      Text("You will no longer see their messages, in any chat. You can unblock them in Settings.")
+      Text(
+        localized(
+          "You will no longer see their messages, in any chat. You can unblock them in Settings."))
     }
   }
 
@@ -200,7 +209,8 @@ struct MemberProfileScreen: View {
         }
         .disabled(isWorking)
       }
-      ProfileAction(title: copied ? "Copied" : "Copy ID", systemImage: "doc.on.doc.fill") {
+      ProfileAction(title: copied ? localized("Copied") : "Copy ID", systemImage: "doc.on.doc.fill")
+      {
         UIPasteboard.general.string = member.id
         copied = true
         Task {

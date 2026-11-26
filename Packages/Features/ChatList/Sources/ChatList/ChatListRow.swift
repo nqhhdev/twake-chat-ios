@@ -30,7 +30,7 @@ struct ChatListRow: View {
             .lineLimit(1)
           if room.isEncrypted {
             Image(systemName: "lock.fill").font(.caption2).foregroundStyle(SysColors.textSecondary)
-              .accessibilityLabel("Encrypted")
+              .accessibilityLabel(localized("Encrypted"))
           }
           if room.isFavourite {
             Image(systemName: "star.fill").font(.caption2).foregroundStyle(.orange)
@@ -39,7 +39,7 @@ struct ChatListRow: View {
             Image(systemName: "bell.slash.fill").font(.caption2).foregroundStyle(
               SysColors.textSecondary
             )
-            .accessibilityLabel("Muted")
+            .accessibilityLabel(localized("Muted"))
           }
           Spacer(minLength: 4)
           if let date = room.lastActivity {
@@ -53,15 +53,17 @@ struct ChatListRow: View {
             if let typing = ChatListViewModel.typingLine(of: room) {
               Text(typing).foregroundStyle(SysColors.primary)
             } else if let draft = room.draft, !room.isSpace {
-              Text("\(Text("Draft:").foregroundStyle(SysColors.error)) \(draft)")
-                .foregroundStyle(SysColors.textSecondary)
+              Text(
+                "\(Text(localized("Draft:")).foregroundStyle(SysColors.error)) \(draft)"
+              )
+              .foregroundStyle(SysColors.textSecondary)
             } else if !room.isSpace, let state = room.lastMessageSendState,
               let preview = ChatListViewModel.preview(of: room)
             {
               Text("\(SendStateMark(state: state).image) \(preview)")
                 .foregroundStyle(SysColors.textSecondary)
             } else {
-              Text(room.isSpace ? "Space" : ChatListViewModel.preview(of: room) ?? " ")
+              Text(room.isSpace ? localized("Space") : ChatListViewModel.preview(of: room) ?? " ")
                 .foregroundStyle(SysColors.textSecondary)
             }
           }
@@ -99,7 +101,7 @@ struct UnreadBadge: View {
   var body: some View {
     HStack(spacing: 4) {
       if mentions > 0 {
-        Text("@")
+        Text(verbatim: "@")
           .textStyle(TextStyles.labelMedium)
           .foregroundStyle(SysColors.onPrimary)
           .frame(width: 20, height: 20)
@@ -107,7 +109,7 @@ struct UnreadBadge: View {
           .transition(.scale.combined(with: .opacity))
       }
       if unread > 0 {
-        Text(unread > 999 ? "999+" : "\(unread)")
+        Text(verbatim: unread > 999 ? "999+" : "\(unread)")
           .textStyle(TextStyles.labelMedium)
           .foregroundStyle(SysColors.onPrimary)
           .contentTransition(.numericText(value: Double(unread)))
@@ -117,7 +119,7 @@ struct UnreadBadge: View {
           .transition(.scale.combined(with: .opacity))
       } else if isMarkedUnread, mentions == 0 {
         Circle().fill(fill).frame(width: 12, height: 12)
-          .accessibilityLabel("Marked as unread")
+          .accessibilityLabel(localized("Marked as unread"))
           .transition(.scale.combined(with: .opacity))
       }
     }
@@ -131,11 +133,11 @@ struct SendStateMark {
 
   var image: Text {
     switch state {
-    case .sending: Text(Image(systemName: "clock")).accessibilityLabel("Sending")
-    case .sent: Text(Image(systemName: "checkmark")).accessibilityLabel("Sent")
+    case .sending: Text(Image(systemName: "clock")).accessibilityLabel(localized("Sending"))
+    case .sent: Text(Image(systemName: "checkmark")).accessibilityLabel(localized("Sent"))
     case .failed:
       Text(Image(systemName: "exclamationmark.circle.fill")).foregroundStyle(SysColors.error)
-        .accessibilityLabel("Not sent")
+        .accessibilityLabel(localized("Not sent"))
     }
   }
 }

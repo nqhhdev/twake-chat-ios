@@ -36,11 +36,11 @@ public struct RoomDetailsScreen: View {
   public var body: some View {
     content
       .background(SysColors.background)
-      .navigationTitle("Chat info")
+      .navigationTitle(localized("Chat info"))
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         if case .loaded(let details) = viewModel.state, details.canEdit {
-          Button("Edit") { isEditing = true }
+          Button(localized("Edit")) { isEditing = true }
         }
       }
       .sheet(isPresented: $isEditing) {
@@ -85,42 +85,46 @@ public struct RoomDetailsScreen: View {
         }
         Section {
           if let alias = details.alias {
-            LabeledContent("Address", value: alias)
+            LabeledContent(localized("Address"), value: alias)
           }
           if details.canEnableEncryption {
             Button {
               isConfirmingEncryption = true
             } label: {
-              LabeledContent("Encryption") {
-                Text("Turn On").foregroundStyle(SysColors.primary)
+              LabeledContent(localized("Encryption")) {
+                Text(localized("Turn On")).foregroundStyle(SysColors.primary)
               }
             }
             .foregroundStyle(SysColors.onSurface)
           } else {
-            LabeledContent("Encryption", value: details.isEncrypted ? "Enabled" : "Not enabled")
+            LabeledContent(
+              localized("Encryption"),
+              value: details.isEncrypted ? localized("Enabled") : localized("Not enabled"))
           }
           if !details.isDirect {
-            LabeledContent("Visibility", value: details.isPublic ? "Public" : "Private")
+            LabeledContent(
+              localized("Visibility"),
+              value: details.isPublic ? localized("Public") : localized("Private"))
           }
         }
         if !details.isDirect, details.canChangeAccess, let rule = details.joinRule {
           Section {
             Picker(
-              "Who can join",
+              localized("Who can join"),
               selection: Binding(
                 get: { rule }, set: { new in Task { await viewModel.setJoinRule(new) } })
             ) {
-              Text("Only invited people").tag(RoomDetails.JoinRule.invite)
-              Text("Anyone can ask").tag(RoomDetails.JoinRule.knock)
+              Text(localized("Only invited people")).tag(RoomDetails.JoinRule.invite)
+              Text(localized("Anyone can ask")).tag(RoomDetails.JoinRule.knock)
               if !details.isEncrypted || rule == .public {
-                Text("Anyone").tag(RoomDetails.JoinRule.public)
+                Text(localized("Anyone")).tag(RoomDetails.JoinRule.public)
               }
             }
           } header: {
-            Text("Access")
+            Text(localized("Access"))
           } footer: {
             if details.isEncrypted, rule != .public {
-              Text("An encrypted chat cannot be opened to anyone.")
+              Text(localized("An encrypted chat cannot be opened to anyone."))
             }
           }
         }
@@ -129,19 +133,20 @@ public struct RoomDetailsScreen: View {
             NavigationLink {
               BannedMembersScreen(viewModel: viewModel)
             } label: {
-              Label("Banned", systemImage: "nosign")
+              Label(localized("Banned"), systemImage: "nosign")
             }
           }
         }
-        Section("Notifications") {
+        Section(localized("Notifications")) {
           Picker(selection: notificationBinding) {
-            Text("Default").tag(NotificationChoice.followDefault)
-            Text("All messages").tag(NotificationChoice.mode(.allMessages))
-            Text("Mentions and keywords").tag(NotificationChoice.mode(.mentionsAndKeywords))
-            Text("Mute").tag(NotificationChoice.mode(.mute))
+            Text(localized("Default")).tag(NotificationChoice.followDefault)
+            Text(localized("All messages")).tag(NotificationChoice.mode(.allMessages))
+            Text(localized("Mentions and keywords")).tag(
+              NotificationChoice.mode(.mentionsAndKeywords))
+            Text(localized("Mute")).tag(NotificationChoice.mode(.mute))
           } label: {
             Label(
-              "Notifications",
+              localized("Notifications"),
               systemImage: viewModel.notificationMode == .mute && !viewModel.followsDefault
                 ? "bell.slash" : "bell")
           }
@@ -165,12 +170,12 @@ public struct RoomDetailsScreen: View {
             }
           }
         }
-        Section("\(details.joinedMemberCount) members") {
+        Section(localized("\(details.joinedMemberCount) members")) {
           if details.canInvite, viewModel.invitePeople != nil {
             Button {
               isInviting = true
             } label: {
-              Label("Add people", systemImage: "person.badge.plus")
+              Label(localized("Add people"), systemImage: "person.badge.plus")
             }
           }
           ForEach(viewModel.filteredMembers) { member in
@@ -182,26 +187,29 @@ public struct RoomDetailsScreen: View {
           }
         }
         Section {
-          Button("Leave chat", role: .destructive) { isConfirmingLeave = true }
+          Button(localized("Leave chat"), role: .destructive) { isConfirmingLeave = true }
             .disabled(viewModel.isLeaving)
           if let message = viewModel.errorMessage {
             Text(message).foregroundStyle(SysColors.error)
           }
         }
       }
-      .searchable(text: $viewModel.memberQuery, prompt: "Search members")
+      .searchable(text: $viewModel.memberQuery, prompt: localized("Search members"))
       .confirmationDialog(
-        "Turn on encryption?", isPresented: $isConfirmingEncryption, titleVisibility: .visible
-      ) {
-        Button("Turn On") { Task { await viewModel.enableEncryption() } }
-      } message: {
-        Text("Messages from now on are end-to-end encrypted. Encryption cannot be turned off.")
-      }
-      .confirmationDialog(
-        "Are you sure you want to leave the chat?", isPresented: $isConfirmingLeave,
+        localized("Turn on encryption?"), isPresented: $isConfirmingEncryption,
         titleVisibility: .visible
       ) {
-        Button("Leave", role: .destructive) { Task { await viewModel.leave() } }
+        Button(localized("Turn On")) { Task { await viewModel.enableEncryption() } }
+      } message: {
+        Text(
+          localized(
+            "Messages from now on are end-to-end encrypted. Encryption cannot be turned off."))
+      }
+      .confirmationDialog(
+        localized("Are you sure you want to leave the chat?"), isPresented: $isConfirmingLeave,
+        titleVisibility: .visible
+      ) {
+        Button(localized("Leave"), role: .destructive) { Task { await viewModel.leave() } }
       }
     }
   }
@@ -217,7 +225,7 @@ extension RoomDetailsScreen {
           { @Sendable [viewModel] in await viewModel.picture(reference) }
         })
       VStack(alignment: .leading, spacing: 0) {
-        Text(member.isOwn ? "\(member.name) (you)" : member.name)
+        Text(member.isOwn ? localized("\(member.name) (you)") : member.name)
           .textStyle(TextStyles.titleMedium)
           .lineLimit(1)
         Text(member.id)
@@ -227,7 +235,8 @@ extension RoomDetailsScreen {
       }
       Spacer()
       if member.membership == .invited {
-        Text("Invited").textStyle(TextStyles.labelSmall).foregroundStyle(SysColors.textSecondary)
+        Text(localized("Invited")).textStyle(TextStyles.labelSmall).foregroundStyle(
+          SysColors.textSecondary)
       } else if let role = member.role.label {
         Text(role).textStyle(TextStyles.labelSmall).foregroundStyle(SysColors.textSecondary)
       }
@@ -265,24 +274,24 @@ struct EditRoomSheet: View {
           .frame(maxWidth: .infinity)
           .listRowBackground(Color.clear)
         }
-        Section("Name") {
-          TextField("Name", text: $name)
+        Section(localized("Name")) {
+          TextField(localized("Name"), text: $name)
         }
-        Section("Description") {
-          TextField("Description", text: $topic, axis: .vertical).lineLimit(2...6)
+        Section(localized("Description")) {
+          TextField(localized("Description"), text: $topic, axis: .vertical).lineLimit(2...6)
         }
         if let message = viewModel.errorMessage {
           Text(message).foregroundStyle(SysColors.error)
         }
       }
-      .navigationTitle("Edit chat")
+      .navigationTitle(localized("Edit chat"))
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
+          Button(localized("Cancel")) { dismiss() }
         }
         ToolbarItem(placement: .confirmationAction) {
-          Button("Save") {
+          Button(localized("Save")) {
             Task { if await viewModel.save(name: name, topic: topic) { dismiss() } }
           }
           .disabled(viewModel.isSaving)
@@ -302,8 +311,8 @@ struct BannedMembersScreen: View {
       if let banned = viewModel.banned {
         if banned.isEmpty {
           ContentUnavailableView(
-            "Nobody is banned", systemImage: "nosign",
-            description: Text("People banned from this chat show here."))
+            localized("Nobody is banned"), systemImage: "nosign",
+            description: Text(localized("People banned from this chat show here.")))
         } else {
           List {
             ForEach(banned) { member in
@@ -319,7 +328,7 @@ struct BannedMembersScreen: View {
                     .lineLimit(1)
                 }
                 Spacer()
-                Button("Unban") { Task { await viewModel.unban(member) } }
+                Button(localized("Unban")) { Task { await viewModel.unban(member) } }
                   .buttonStyle(.bordered)
                   .buttonBorderShape(.capsule)
                   .controlSize(.small)
@@ -334,7 +343,7 @@ struct BannedMembersScreen: View {
         ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
-    .navigationTitle("Banned")
+    .navigationTitle(localized("Banned"))
     .navigationBarTitleDisplayMode(.inline)
     .task { await viewModel.loadBanned() }
   }

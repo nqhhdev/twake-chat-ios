@@ -28,7 +28,7 @@ struct PersonalQRScreen: View {
           if let shareImage, let link = viewModel.link {
             ShareLink(
               item: shareImage, message: Text(link.absoluteString),
-              preview: SharePreview("Your personal QR", image: shareImage)
+              preview: SharePreview(localized("Your personal QR"), image: shareImage)
             ) {
               actionLabel("Share QR code", systemImage: "square.and.arrow.up")
             }
@@ -37,7 +37,7 @@ struct PersonalQRScreen: View {
             viewModel.copyLink()
           } label: {
             actionLabel(
-              viewModel.didCopyLink ? "Copied" : "Copy link",
+              viewModel.didCopyLink ? localized("Copied") : localized("Copy link"),
               systemImage: viewModel.didCopyLink ? "checkmark" : "link")
           }
         }
@@ -48,7 +48,7 @@ struct PersonalQRScreen: View {
       .frame(maxWidth: .infinity)
     }
     .background(SysColors.surface)
-    .navigationTitle("Your personal QR")
+    .navigationTitle(localized("Your personal QR"))
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       if viewModel.canScan {
@@ -56,7 +56,7 @@ struct PersonalQRScreen: View {
           Button {
             isScanning = true
           } label: {
-            Label("Scan QR code", systemImage: "qrcode.viewfinder")
+            Label(localized("Scan QR code"), systemImage: "qrcode.viewfinder")
           }
         }
       }
@@ -108,7 +108,7 @@ struct PersonalQRCard: View {
             .interpolation(.none)
             .resizable()
             .scaledToFit()
-            .accessibilityLabel("QR code of \(userId)")
+            .accessibilityLabel(localized("QR code of \(userId)"))
           TwakeLogo(width: 52, height: 52)
             .padding(6)
             .background(Color.white)
@@ -123,7 +123,7 @@ struct PersonalQRCard: View {
         .multilineTextAlignment(.center)
         .lineLimit(2)
         .textSelection(.enabled)
-      Text("Scan this code to start a chat with me.")
+      Text(localized("Scan this code to start a chat with me."))
         .textStyle(TextStyles.bodyMedium)
         .foregroundStyle(Color.gray)
         .multilineTextAlignment(.center)

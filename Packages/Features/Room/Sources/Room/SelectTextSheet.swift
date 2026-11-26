@@ -10,11 +10,11 @@ struct SelectTextSheet: View {
   var body: some View {
     NavigationStack {
       SelectableText(text)
-        .navigationTitle("Select Text")
+        .navigationTitle(localized("Select Text"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
           ToolbarItem(placement: .confirmationAction) {
-            Button("Done") { dismiss() }
+            Button(localized("Done")) { dismiss() }
           }
         }
     }

@@ -133,7 +133,7 @@ public struct QuickSwitcherScreen: View {
         List {
           let chats = viewModel.chats
           if !chats.isEmpty {
-            Section("Your conversations") {
+            Section(localized("Your conversations")) {
               ForEach(chats) { room in
                 row(.chat(room)) { ChatListRow(room: room, viewModel: viewModel.list) }
               }
@@ -141,7 +141,7 @@ public struct QuickSwitcherScreen: View {
           }
           let groups = viewModel.groups
           if !groups.isEmpty {
-            Section("Groups you can join") {
+            Section(localized("Groups you can join")) {
               ForEach(groups) { room in row(.group(room)) { groupRow(room) } }
             }
           }
@@ -161,15 +161,15 @@ public struct QuickSwitcherScreen: View {
         }
       }
       .safeAreaInset(edge: .top) { field }
-      .navigationTitle("Open a chat")
+      .navigationTitle(localized("Open a chat"))
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Close", action: onClose).keyboardShortcut(.cancelAction)
+          Button(localized("Close"), action: onClose).keyboardShortcut(.cancelAction)
         }
       }
       .background {
-        Button("Close", action: onClose)
+        Button(localized("Close"), action: onClose)
           .keyboardShortcut("k", modifiers: .command)
           .opacity(0)
           .accessibilityHidden(true)
@@ -182,7 +182,7 @@ public struct QuickSwitcherScreen: View {
   private var field: some View {
     HStack(spacing: 8) {
       Image(systemName: "magnifyingglass").foregroundStyle(SysColors.textSecondary)
-      TextField("Search a chat or a group", text: $viewModel.query)
+      TextField(localized("Search a chat or a group"), text: $viewModel.query)
         .focused($isFieldFocused)
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
@@ -226,7 +226,7 @@ public struct QuickSwitcherScreen: View {
         })
       VStack(alignment: .leading, spacing: 2) {
         Text(room.name).font(.headline).foregroundStyle(SysColors.onSurface).lineLimit(1)
-        Text(room.memberCount == 1 ? "1 member" : "\(room.memberCount) members")
+        Text(localized("\(room.memberCount) members"))
           .font(.subheadline)
           .foregroundStyle(SysColors.textSecondary)
       }
@@ -241,15 +241,17 @@ public struct QuickSwitcherScreen: View {
     if viewModel.isWorking(room) {
       ProgressView()
     } else if viewModel.isRequested(room) {
-      Text("Requested").font(.subheadline).foregroundStyle(SysColors.textSecondary)
+      Text(localized("Requested")).font(.subheadline).foregroundStyle(SysColors.textSecondary)
     } else {
       switch room.access {
       case .open:
-        Text("Join").font(.subheadline.weight(.semibold)).foregroundStyle(SysColors.primary)
+        Text(localized("Join")).font(.subheadline.weight(.semibold)).foregroundStyle(
+          SysColors.primary)
       case .request:
-        Text("Ask to join").font(.subheadline.weight(.semibold)).foregroundStyle(SysColors.primary)
+        Text(localized("Ask to join")).font(.subheadline.weight(.semibold)).foregroundStyle(
+          SysColors.primary)
       case .inviteOnly:
-        Label("Invite only", systemImage: "lock")
+        Label(localized("Invite only"), systemImage: "lock")
           .font(.caption)
           .foregroundStyle(SysColors.textSecondary)
       }
@@ -263,7 +265,7 @@ extension View {
     make: @escaping @MainActor () -> QuickSwitcherViewModel
   ) -> some View {
     background {
-      Button("Open a chat") {
+      Button(localized("Open a chat")) {
         switcher.wrappedValue = switcher.wrappedValue == nil ? make() : nil
       }
       .keyboardShortcut("k", modifiers: .command)

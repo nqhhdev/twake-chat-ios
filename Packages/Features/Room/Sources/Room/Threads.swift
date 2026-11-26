@@ -59,12 +59,12 @@ extension RoomViewModel {
       try await threadPrefs.setThreadPref(pref, roomId: roomId, threadId: threadRootId)
       threadPref = pref
       switch pref {
-      case .follow: showToast("Following this thread")
-      case .unfollow: showToast("You no longer follow this thread")
-      case .mute: showToast("Thread muted")
+      case .follow: showToast(localized("Following this thread"))
+      case .unfollow: showToast(localized("You no longer follow this thread"))
+      case .mute: showToast(localized("Thread muted"))
       }
     } catch {
-      errorMessage = "Could not update this thread."
+      errorMessage = localized("Could not update this thread.")
     }
   }
 }
@@ -77,14 +77,14 @@ struct ThreadFollowMenu: View {
     let follow = viewModel.threadFollow
     Menu {
       if follow.isFollowing {
-        Button("Unfollow Thread", systemImage: "bell.slash") { set(.unfollow) }
+        Button(localized("Unfollow Thread"), systemImage: "bell.slash") { set(.unfollow) }
       } else {
-        Button("Follow Thread", systemImage: "bell") { set(.follow) }
+        Button(localized("Follow Thread"), systemImage: "bell") { set(.follow) }
       }
       if follow.isMuted {
-        Button("Unmute Thread", systemImage: "speaker.wave.2") { set(.follow) }
+        Button(localized("Unmute Thread"), systemImage: "speaker.wave.2") { set(.follow) }
       } else {
-        Button("Mute Thread", systemImage: "speaker.slash") { set(.mute) }
+        Button(localized("Mute Thread"), systemImage: "speaker.slash") { set(.mute) }
       }
     } label: {
       Image(
@@ -92,7 +92,8 @@ struct ThreadFollowMenu: View {
     }
     .accessibilityLabel(
       follow.isMuted
-        ? "Thread muted" : follow.isFollowing ? "Following thread" : "Not following thread")
+        ? localized("Thread muted")
+        : follow.isFollowing ? localized("Following thread") : localized("Not following thread"))
   }
 
   private func set(_ pref: ThreadPref) {
@@ -118,10 +119,12 @@ struct ThreadSummaryButton: View {
       HStack(spacing: 6) {
         Image(systemName: "bubble.left.and.text.bubble.right.fill")
           .foregroundStyle(SysColors.primary)
-        Text(thread.replyCount == 1 ? "1 reply" : "\(thread.replyCount) replies")
-          .textStyle(TextStyles.labelMedium)
-          .foregroundStyle(SysColors.primary)
-          .contentTransition(.numericText(value: Double(thread.replyCount)))
+        Text(
+          localized("\(thread.replyCount) replies")
+        )
+        .textStyle(TextStyles.labelMedium)
+        .foregroundStyle(SysColors.primary)
+        .contentTransition(.numericText(value: Double(thread.replyCount)))
         if let latest = latestLine {
           Text(latest)
             .textStyle(TextStyles.bodySmall)
@@ -143,8 +146,10 @@ struct ThreadSummaryButton: View {
     .transition(
       .scale(scale: 0.6, anchor: isOwn ? .topTrailing : .topLeading).combined(with: .opacity)
     )
-    .accessibilityLabel(thread.replyCount == 1 ? "1 reply" : "\(thread.replyCount) replies")
-    .accessibilityHint("Opens the thread")
+    .accessibilityLabel(
+      localized("\(thread.replyCount) replies")
+    )
+    .accessibilityHint(localized("Opens the thread"))
   }
 
   private var latestLine: String? {
@@ -169,8 +174,9 @@ struct ThreadsListSheet: View {
         if let threads {
           if threads.isEmpty {
             ContentUnavailableView(
-              "No Threads", systemImage: "bubble.left.and.text.bubble.right",
-              description: Text("Long-press a message and choose Reply in Thread to start one."))
+              localized("No Threads"), systemImage: "bubble.left.and.text.bubble.right",
+              description: Text(
+                localized("Long-press a message and choose Reply in Thread to start one.")))
           } else {
             List(threads) { thread in
               Button {
@@ -187,11 +193,11 @@ struct ThreadsListSheet: View {
         }
       }
       .animation(.easeInOut(duration: 0.25), value: threads)
-      .navigationTitle("Threads")
+      .navigationTitle(localized("Threads"))
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Done") { dismiss() }
+          Button(localized("Done")) { dismiss() }
         }
       }
       .task { threads = await viewModel.loadThreads() }
@@ -215,10 +221,12 @@ struct ThreadsListSheet: View {
       HStack(spacing: 6) {
         Image(systemName: "bubble.left.and.text.bubble.right.fill")
           .foregroundStyle(SysColors.primary)
-        Text(thread.replyCount == 1 ? "1 reply" : "\(thread.replyCount) replies")
-          .foregroundStyle(SysColors.primary)
+        Text(
+          localized("\(thread.replyCount) replies")
+        )
+        .foregroundStyle(SysColors.primary)
         if let latest = thread.latestText {
-          Text("\(thread.latestSenderName.map { "\($0): " } ?? "")\(latest)")
+          Text(localized("\(thread.latestSenderName.map { "\($0): " } ?? "")\(latest)"))
             .foregroundStyle(SysColors.textSecondary)
             .lineLimit(1)
         }

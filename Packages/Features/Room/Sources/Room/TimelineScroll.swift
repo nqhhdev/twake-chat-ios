@@ -43,7 +43,7 @@ struct TimelineScroll: View {
         } else if !viewModel.reachedStart {
           if viewModel.isHistoryPaused {
             // Loading stopped by itself (many pages with nothing to show, or pages failing): the user asks for more.
-            Button("Load earlier messages") { Task { await viewModel.resumeHistory() } }
+            Button(localized("Load earlier messages")) { Task { await viewModel.resumeHistory() } }
               .buttonStyle(.bordered)
               .padding()
           } else {
@@ -164,7 +164,7 @@ struct TimelineScroll: View {
             .shadow(color: .black.opacity(0.16), radius: 6, y: 2)
             .overlay(alignment: .top) {
               if newCount > 0 {
-                Text(newCount > 99 ? "99+" : "\(newCount)")
+                Text(verbatim: newCount > 99 ? "99+" : "\(newCount)")
                   .textStyle(TextStyles.labelSmall)
                   .foregroundStyle(SysColors.onPrimary)
                   .padding(.horizontal, 6)
@@ -179,7 +179,8 @@ struct TimelineScroll: View {
         }
         .accessibilityLabel(
           newCount > 0
-            ? "Scroll to the latest message, \(newCount) new" : "Scroll to the latest message"
+            ? localized("Scroll to the latest message, \(newCount) new")
+            : localized("Scroll to the latest message")
         )
         .padding(16)
         .transition(.scale(scale: 0.6).combined(with: .opacity))
@@ -271,7 +272,7 @@ struct NoticesRow: View {
       } label: {
         HStack(spacing: 6) {
           Image(systemName: "info.circle")
-          Text(isOpen ? "Hide changes" : "\(model.texts.count) changes")
+          Text(isOpen ? localized("Hide changes") : localized("\(model.texts.count) changes"))
           Image(systemName: "chevron.down")
             .rotationEffect(.degrees(isOpen ? 180 : 0))
         }
@@ -282,7 +283,8 @@ struct NoticesRow: View {
         .background(SysColors.surface, in: Capsule())
       }
       .buttonStyle(.plain)
-      .accessibilityHint(isOpen ? "Hides the room changes" : "Shows the room changes")
+      .accessibilityHint(
+        isOpen ? localized("Hides the room changes") : localized("Shows the room changes"))
       if isOpen {
         ForEach(Array(model.texts.enumerated()), id: \.offset) { _, text in
           Text(text)
@@ -339,14 +341,14 @@ private struct TimelinePlaceholderView: View {
       TimelineSkeleton(bubbleWidth: bubbleWidth)
     case .paused:
       VStack(spacing: 12) {
-        Text("No messages to show yet")
+        Text(localized("No messages to show yet"))
           .textStyle(TextStyles.titleMedium)
           .foregroundStyle(SysColors.onSurface)
-        Text("Earlier messages may still be on the server.")
+        Text(localized("Earlier messages may still be on the server."))
           .textStyle(TextStyles.bodyMedium)
           .foregroundStyle(SysColors.textSecondary)
           .multilineTextAlignment(.center)
-        Button("Load earlier messages", action: onLoadMore)
+        Button(localized("Load earlier messages"), action: onLoadMore)
           .buttonStyle(.bordered)
       }
       .frame(maxWidth: .infinity, minHeight: 320)

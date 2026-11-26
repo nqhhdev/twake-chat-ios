@@ -63,7 +63,7 @@ struct ComposerView: View {
           .transition(.move(edge: .bottom).combined(with: .opacity))
       }
       if viewModel.uploadCount > 0 {
-        ProgressView("Sending…")
+        ProgressView(localized("Sending…"))
           .textStyle(TextStyles.bodySmall)
           .padding(.vertical, 4)
           .transition(.opacity)
@@ -111,27 +111,28 @@ struct ComposerView: View {
       if mode != .new { isFocused = true }
     }
     .alert(
-      "Microphone access is off",
+      localized("Microphone access is off"),
       isPresented: Binding(get: { recorder.permissionDenied }, set: { _ in })
     ) {
-      Button("OK", role: .cancel) {}
+      Button(localized("OK"), role: .cancel) {}
     } message: {
-      Text("Allow Twake Chat to use the microphone in Settings to record voice messages.")
+      Text(
+        localized("Allow Twake Chat to use the microphone in Settings to record voice messages."))
     }
     .alert(
-      "Add a link",
+      localized("Add a link"),
       isPresented: Binding(get: { link != nil }, set: { if !$0 { link = nil } })
     ) {
-      TextField("Text", text: $linkText)
-      TextField("Address", text: $linkAddress)
+      TextField(localized("Text"), text: $linkText)
+      TextField(localized("Address"), text: $linkAddress)
         .keyboardType(.URL)
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
-      Button("Cancel", role: .cancel) {}
-      Button("Add", action: addLink)
+      Button(localized("Cancel"), role: .cancel) {}
+      Button(localized("Add"), action: addLink)
         .disabled(TextFormatting.webAddress(linkAddress) == nil)
     } message: {
-      Text("The address of a web page, starting with https:// or www.")
+      Text(localized("The address of a web page, starting with https:// or www."))
     }
   }
 
@@ -164,18 +165,20 @@ struct ComposerView: View {
   }
 
   private var field: some View {
-    TextField("Type a message", text: $viewModel.draft, selection: $selection, axis: .vertical)
-      .textStyle(TextStyles.bodyLarge)
-      .lineLimit(1...6)
-      .focused($isFocused)
-      .onKeyPress(keys: [.return, .upArrow, .escape], phases: .down) { press in
-        guard let key = ComposerKey(press.key, modifiers: press.modifiers) else { return .ignored }
-        return viewModel.handle(key) ? .handled : .ignored
-      }
-      .accessibilityIdentifier(A11yIdentifiers.room.composer)
-      .padding(.horizontal, 16)
-      .padding(.vertical, 10)
-      .background(SysColors.surface, in: .rect(cornerRadius: 24))
+    TextField(
+      localized("Type a message"), text: $viewModel.draft, selection: $selection, axis: .vertical
+    )
+    .textStyle(TextStyles.bodyLarge)
+    .lineLimit(1...6)
+    .focused($isFocused)
+    .onKeyPress(keys: [.return, .upArrow, .escape], phases: .down) { press in
+      guard let key = ComposerKey(press.key, modifiers: press.modifiers) else { return .ignored }
+      return viewModel.handle(key) ? .handled : .ignored
+    }
+    .accessibilityIdentifier(A11yIdentifiers.room.composer)
+    .padding(.horizontal, 16)
+    .padding(.vertical, 10)
+    .background(SysColors.surface, in: .rect(cornerRadius: 24))
   }
 
   private var sendButton: some View {
@@ -194,11 +197,11 @@ struct ComposerView: View {
     .keyboardShortcut(.return, modifiers: .command)
     .contextMenu {
       if viewModel.canScheduleDraft {
-        Button("Schedule Message", systemImage: "clock") { isScheduling = true }
+        Button(localized("Schedule Message"), systemImage: "clock") { isScheduling = true }
       }
     }
     .sheet(isPresented: $isScheduling) { ScheduleSheet(viewModel: viewModel) }
-    .accessibilityLabel(isEditing ? "Save the edit" : "Send message")
+    .accessibilityLabel(isEditing ? localized("Save the edit") : localized("Send message"))
     .accessibilityIdentifier(A11yIdentifiers.room.send)
     .transition(.scale(scale: 0.4).combined(with: .opacity))
   }
@@ -233,7 +236,7 @@ struct ComposerView: View {
             }
           }
       )
-      .accessibilityLabel("Hold to record a voice message")
+      .accessibilityLabel(localized("Hold to record a voice message"))
       .transition(.scale(scale: 0.4).combined(with: .opacity))
   }
 
@@ -253,7 +256,7 @@ struct ComposerView: View {
         .monospacedDigit()
         .contentTransition(.numericText())
       Spacer()
-      Label("Slide to cancel", systemImage: "chevron.left")
+      Label(localized("Slide to cancel"), systemImage: "chevron.left")
         .textStyle(TextStyles.bodyMedium)
         .foregroundStyle(SysColors.textSecondary)
         .opacity(1 - Double(min(1, -dragOffset / Self.cancelDistance)))
@@ -275,13 +278,16 @@ struct ComposerView: View {
       EmptyView()
     case .reply(_, let reply):
       ComposerBanner(
-        icon: "arrowshape.turn.up.left", title: "Reply to \(reply.senderName)", text: reply.text,
+        icon: "arrowshape.turn.up.left", title: localized("Reply to \(reply.senderName)"),
+        text: reply.text,
         cancel: viewModel.cancelComposerMode
       )
       .transition(.move(edge: .bottom).combined(with: .opacity))
     case .edit:
-      ComposerBanner(icon: "pencil", title: "Edit", text: nil, cancel: viewModel.cancelComposerMode)
-        .transition(.move(edge: .bottom).combined(with: .opacity))
+      ComposerBanner(
+        icon: "pencil", title: localized("Edit"), text: nil, cancel: viewModel.cancelComposerMode
+      )
+      .transition(.move(edge: .bottom).combined(with: .opacity))
     }
   }
 }
@@ -307,7 +313,7 @@ private struct ComposerBanner: View {
         Image(systemName: "xmark").foregroundStyle(SysColors.textSecondary)
       }
       .keyboardShortcut(.cancelAction)
-      .accessibilityLabel("Cancel")
+      .accessibilityLabel(localized("Cancel"))
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 8)
@@ -341,7 +347,7 @@ private struct FormatBar: View {
     .padding(.horizontal, 12)
     .padding(.top, 6)
     .accessibilityElement(children: .contain)
-    .accessibilityLabel("Formatting")
+    .accessibilityLabel(localized("Formatting"))
   }
 }
 
@@ -371,7 +377,7 @@ struct MentionSuggestions: View {
                 })
             }
             VStack(alignment: .leading, spacing: 0) {
-              Text(member == .everyone ? "Notify everyone" : member.name)
+              Text(member == .everyone ? localized("Notify everyone") : member.name)
                 .textStyle(TextStyles.bodyMedium)
                 .foregroundStyle(SysColors.onSurface)
                 .lineLimit(1)
@@ -387,7 +393,8 @@ struct MentionSuggestions: View {
           .contentShape(Rectangle())
         }
         .buttonStyle(MenuRowButtonStyle())
-        .accessibilityLabel(member == .everyone ? "Notify everyone" : "Mention \(member.name)")
+        .accessibilityLabel(
+          member == .everyone ? localized("Notify everyone") : localized("Mention \(member.name)"))
       }
     }
     .background(.regularMaterial, in: .rect(cornerRadius: 14))

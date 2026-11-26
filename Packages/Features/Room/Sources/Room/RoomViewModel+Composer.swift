@@ -55,13 +55,13 @@ extension RoomViewModel {
   /// Why an attachment was not sent, as the composer shows it.
   static func attachmentFailureMessage(_ error: TimelineError) -> String {
     switch error {
-    case .tooLarge: "This file is larger than the server allows."
-    case .unsupportedType: "This type of file cannot be sent."
-    case .network: "Could not reach the server. Check your connection and try again."
-    case .forbidden: "You are not allowed to send files in this chat."
-    case .uploadFailed: "Could not upload the file. Please try again."
+    case .tooLarge: localized("This file is larger than the server allows.")
+    case .unsupportedType: localized("This type of file cannot be sent.")
+    case .network: localized("Could not reach the server. Check your connection and try again.")
+    case .forbidden: localized("You are not allowed to send files in this chat.")
+    case .uploadFailed: localized("Could not upload the file. Please try again.")
     case .notSignedIn, .roomNotFound, .unavailable, .requestFailed:
-      "Could not send the attachment. Please try again."
+      localized("Could not send the attachment. Please try again.")
     }
   }
 
@@ -79,11 +79,11 @@ extension RoomViewModel {
     let batch = batch.filter { item in !tooLarge.contains { $0.id == item.id } }
     var limitMessage: String?
     if let limit, !tooLarge.isEmpty {
-      let size = Self.sizeText(limit) ?? "\(limit) bytes"
+      let size = Self.sizeText(limit) ?? localized("\(limit) bytes")
       limitMessage =
         tooLarge.count == 1
-        ? "This file is larger than the server allows (\(size))."
-        : "\(tooLarge.count) files are larger than the server allows (\(size))."
+        ? localized("This file is larger than the server allows (\(size)).")
+        : localized("\(tooLarge.count) files are larger than the server allows (\(size)).")
     }
     let batchId = Self.albumId(for: batch)
     for (index, item) in batch.enumerated() {
@@ -185,7 +185,8 @@ extension RoomViewModel {
     }
     if case .unknown = prepared {
       errorMessage =
-        "This command does not exist. Start with “//” to send a text that starts with “/”."
+        localized(
+          "This command does not exist. Start with “//” to send a text that starts with “/”.")
       return
     }
     let picked = mentions
@@ -214,7 +215,7 @@ extension RoomViewModel {
       draft = typed
       mentions = picked
       composerMode = mode
-      errorMessage = "Could not send your message. Please try again."
+      errorMessage = localized("Could not send your message. Please try again.")
     }
   }
 

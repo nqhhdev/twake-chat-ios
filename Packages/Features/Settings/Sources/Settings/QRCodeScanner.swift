@@ -27,11 +27,11 @@ struct QRScannerSheet: View {
   var body: some View {
     NavigationStack {
       content
-        .navigationTitle("Scan QR code")
+        .navigationTitle(localized("Scan QR code"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
           ToolbarItem(placement: .cancellationAction) {
-            Button("Cancel") { dismiss() }
+            Button(localized("Cancel")) { dismiss() }
           }
         }
     }
@@ -50,7 +50,7 @@ struct QRScannerSheet: View {
           .frame(width: 240, height: 240)
           .frame(maxWidth: .infinity, maxHeight: .infinity)
           .accessibilityHidden(true)
-        Text(error ?? "Point the camera at a Twake Chat or Matrix QR code.")
+        Text(error ?? localized("Point the camera at a Twake Chat or Matrix QR code."))
           .textStyle(TextStyles.bodyMedium)
           .foregroundStyle(.white)
           .multilineTextAlignment(.center)
@@ -66,18 +66,18 @@ struct QRScannerSheet: View {
       }
     case .denied:
       ContentUnavailableView {
-        Label("Camera access is off", systemImage: "camera")
+        Label(localized("Camera access is off"), systemImage: "camera")
       } description: {
-        Text("Allow Twake Chat to use the camera in Settings to scan QR codes.")
+        Text(localized("Allow Twake Chat to use the camera in Settings to scan QR codes."))
       } actions: {
-        Button("Open Settings") {
+        Button(localized("Open Settings")) {
           if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
         }
       }
     case .unavailable:
       ContentUnavailableView(
-        "No camera", systemImage: "camera",
-        description: Text("This device has no camera to scan QR codes."))
+        localized("No camera"), systemImage: "camera",
+        description: Text(localized("This device has no camera to scan QR codes.")))
     }
   }
 }

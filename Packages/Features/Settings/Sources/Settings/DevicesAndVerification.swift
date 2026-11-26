@@ -47,7 +47,7 @@ public final class VerificationViewModel: Identifiable {
       try await repository.requestVerification()
     } catch {
       step = nil
-      errorMessage = "Could not start the verification. Please try again."
+      errorMessage = localized("Could not start the verification. Please try again.")
     }
   }
 
@@ -87,11 +87,11 @@ public struct VerificationSheet: View {
       }
       .padding(24)
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .navigationTitle("Verify this device")
+      .navigationTitle(localized("Verify this device"))
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button(isFinished ? "Done" : "Cancel") {
+          Button(isFinished ? localized("Done") : localized("Cancel")) {
             Task {
               await viewModel.dismiss()
               dismissSheet()
@@ -113,25 +113,28 @@ public struct VerificationSheet: View {
     case .waitingForOtherDevice, nil:
       ProgressView()
       Text(
-        "Open Twake Chat on another device signed in to your account, and accept the request there."
+        localized(
+          "Open Twake Chat on another device signed in to your account, and accept the request there."
+        )
       )
       .multilineTextAlignment(.center)
       .foregroundStyle(SysColors.textSecondary)
     case .incomingRequest(let deviceName):
       Image(systemName: "lock.shield").font(.system(size: 44)).foregroundStyle(SysColors.primary)
-      Text("“\(deviceName)” wants to verify this device.").font(.headline).multilineTextAlignment(
-        .center)
+      Text(localized("“\(deviceName)” wants to verify this device.")).font(.headline)
+        .multilineTextAlignment(
+          .center)
       HStack(spacing: 12) {
-        Button("Decline", role: .cancel) { Task { await viewModel.dismiss() } }
+        Button(localized("Decline"), role: .cancel) { Task { await viewModel.dismiss() } }
           .buttonStyle(.bordered)
-        Button("Accept") { Task { await viewModel.accept() } }
+        Button(localized("Accept")) { Task { await viewModel.accept() } }
           .buttonStyle(.borderedProminent)
       }
     case .starting:
       ProgressView()
-      Text("Getting the emojis…").foregroundStyle(SysColors.textSecondary)
+      Text(localized("Getting the emojis…")).foregroundStyle(SysColors.textSecondary)
     case .emojis(let emojis):
-      Text("Check that the same emojis show, in the same order, on the other device.")
+      Text(localized("Check that the same emojis show, in the same order, on the other device."))
         .multilineTextAlignment(.center)
       LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 8)], spacing: 12) {
         ForEach(Array(emojis.enumerated()), id: \.offset) { _, emoji in
@@ -144,30 +147,34 @@ public struct VerificationSheet: View {
       }
       matchButtons
     case .numbers(let numbers):
-      Text("Check that the same numbers show on the other device.").multilineTextAlignment(.center)
+      Text(localized("Check that the same numbers show on the other device."))
+        .multilineTextAlignment(.center)
       Text(numbers.map(String.init).joined(separator: "  "))
         .font(.system(size: 34, weight: .semibold, design: .monospaced))
       matchButtons
     case .verified:
       Image(systemName: "checkmark.seal.fill").font(.system(size: 56)).foregroundStyle(
         SysColors.success)
-      Text("This device is verified.").font(.headline)
+      Text(localized("This device is verified.")).font(.headline)
     case .cancelled:
       Image(systemName: "xmark.circle").font(.system(size: 48)).foregroundStyle(
         SysColors.textSecondary)
-      Text("The verification was cancelled.")
+      Text(localized("The verification was cancelled."))
     case .failed:
       Image(systemName: "exclamationmark.triangle").font(.system(size: 48)).foregroundStyle(
         SysColors.error)
-      Text("The verification did not finish. Please try again.").multilineTextAlignment(.center)
+      Text(localized("The verification did not finish. Please try again.")).multilineTextAlignment(
+        .center)
     }
   }
 
   private var matchButtons: some View {
     HStack(spacing: 12) {
-      Button("They don’t match", role: .destructive) { Task { await viewModel.decline() } }
-        .buttonStyle(.bordered)
-      Button("They match") { Task { await viewModel.confirm() } }
+      Button(localized("They don’t match"), role: .destructive) {
+        Task { await viewModel.decline() }
+      }
+      .buttonStyle(.bordered)
+      Button(localized("They match")) { Task { await viewModel.confirm() } }
         .buttonStyle(.borderedProminent)
     }
   }
@@ -194,7 +201,7 @@ public final class DevicesViewModel {
     do {
       state = .loaded(try await repository.devices())
     } catch {
-      state = .failed("Could not load your devices.")
+      state = .failed(localized("Could not load your devices."))
     }
   }
 
@@ -239,13 +246,13 @@ public final class DevicesViewModel {
         await load()
       case .needsConfirmation(let challenge):
         if auth != nil || (challenge.webURL == nil && !challenge.acceptsPassword) {
-          errorMessage = "Could not confirm it is you. Please try again."
+          errorMessage = localized("Could not confirm it is you. Please try again.")
         } else {
           pendingSignOut = (ids, challenge)
         }
       }
     } catch {
-      errorMessage = "Could not sign the device out."
+      errorMessage = localized("Could not sign the device out.")
     }
   }
 
@@ -258,7 +265,7 @@ public final class DevicesViewModel {
       try await repository.rename(deviceId: device.id, to: name)
       await load()
     } catch {
-      errorMessage = "Could not rename the device."
+      errorMessage = localized("Could not rename the device.")
     }
   }
 }
@@ -293,16 +300,16 @@ struct DevicesScreen: View {
               }
             }
             .contextMenu {
-              Button("Rename", systemImage: "pencil") {
+              Button(localized("Rename"), systemImage: "pencil") {
                 newName = device.name
                 renaming = device
               }
             }
             .swipeActions {
               if !device.isCurrent {
-                Button("Sign Out", role: .destructive) { confirmingSignOut = [device] }
+                Button(localized("Sign Out"), role: .destructive) { confirmingSignOut = [device] }
               }
-              Button("Rename") {
+              Button(localized("Rename")) {
                 newName = device.name
                 renaming = device
               }
@@ -312,7 +319,7 @@ struct DevicesScreen: View {
           }
           if viewModel.otherDevices.count > 1 {
             Section {
-              Button("Sign out of all other devices", role: .destructive) {
+              Button(localized("Sign out of all other devices"), role: .destructive) {
                 confirmingSignOut = viewModel.otherDevices
               }
               .disabled(viewModel.isSigningOut)
@@ -327,21 +334,24 @@ struct DevicesScreen: View {
         .overlay { if viewModel.isSigningOut { ProgressView().controlSize(.large) } }
       }
     }
-    .navigationTitle("Devices")
+    .navigationTitle(localized("Devices"))
     .task { await viewModel.load() }
     .confirmationDialog(
       confirmingSignOut.map {
-        $0.count == 1 ? "Sign out \($0[0].name)?" : "Sign out of \($0.count) devices?"
+        $0.count == 1
+          ? localized("Sign out \($0[0].name)?") : localized("Sign out of \($0.count) devices?")
       } ?? "",
       isPresented: Binding(
         get: { confirmingSignOut != nil }, set: { if !$0 { confirmingSignOut = nil } }),
       titleVisibility: .visible
     ) {
-      Button("Sign Out", role: .destructive) {
+      Button(localized("Sign Out"), role: .destructive) {
         if let devices = confirmingSignOut { Task { await viewModel.signOut(devices) } }
       }
     } message: {
-      Text("Those devices will no longer receive messages, and lose access to encrypted ones.")
+      Text(
+        localized(
+          "Those devices will no longer receive messages, and lose access to encrypted ones."))
     }
     .sheet(
       isPresented: Binding(
@@ -353,7 +363,7 @@ struct DevicesScreen: View {
       }
     }
     .alert(
-      "Confirm it is you",
+      localized("Confirm it is you"),
       isPresented: Binding(
         get: {
           viewModel.pendingSignOut.map {
@@ -363,27 +373,27 @@ struct DevicesScreen: View {
         },
         set: { if !$0 { password = "" } })
     ) {
-      SecureField("Password", text: $password)
-      Button("Cancel", role: .cancel) { viewModel.cancelSignOut() }
-      Button("Sign Out", role: .destructive) {
+      SecureField(localized("Password"), text: $password)
+      Button(localized("Cancel"), role: .cancel) { viewModel.cancelSignOut() }
+      Button(localized("Sign Out"), role: .destructive) {
         let typed = password
         password = ""
         Task { await viewModel.confirmSignOut(password: typed) }
       }
     } message: {
-      Text("Enter your account password to sign the devices out.")
+      Text(localized("Enter your account password to sign the devices out."))
     }
     .alert(
-      "Rename device",
+      localized("Rename device"),
       isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })
     ) {
-      TextField("Name", text: $newName)
-      Button("Cancel", role: .cancel) {}
-      Button("Save") {
+      TextField(localized("Name"), text: $newName)
+      Button(localized("Cancel"), role: .cancel) {}
+      Button(localized("Save")) {
         if let device = renaming { Task { await viewModel.rename(device, to: newName) } }
       }
     } message: {
-      Text("Other people can see this name.")
+      Text(localized("Other people can see this name."))
     }
   }
 
@@ -400,9 +410,9 @@ struct DevicesScreen: View {
   }
 
   private func detail(for device: DeviceSession) -> String {
-    if device.isCurrent { return "This device" }
+    if device.isCurrent { return localized("This device") }
     guard let lastSeen = device.lastSeen else { return device.id }
-    return "Last seen \(lastSeen.formatted(.relative(presentation: .named)))"
+    return localized("Last seen \(lastSeen.formatted(.relative(presentation: .named)))")
   }
 }
 

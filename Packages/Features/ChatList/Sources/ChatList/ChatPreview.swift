@@ -81,16 +81,16 @@ public final class ChatPreviewViewModel {
       switch message.body {
       case .text(let text), .notice(let text), .sticker(let text): (text, nil, false)
       case .emote(let text): ("\(message.senderName) \(text)", nil, false)
-      case .image(let caption): (caption ?? "Picture", "photo", false)
-      case .video(let caption): (caption ?? "Video", "video", false)
-      case .audio(let caption): (caption ?? "Audio", "waveform", false)
+      case .image(let caption): (caption ?? localized("Picture"), "photo", false)
+      case .video(let caption): (caption ?? localized("Video"), "video", false)
+      case .audio(let caption): (caption ?? localized("Audio"), "waveform", false)
       case .file(let name): (name, "doc", false)
       case .location(let text, _): (text, "mappin.and.ellipse", false)
       case .poll(let question): (question, "chart.bar", false)
-      case .redacted: ("This message has been deleted", "trash", true)
+      case .redacted: (localized("This message has been deleted"), "trash", true)
       case .unableToDecrypt:
-        ("This message cannot be read on this device yet.", "lock.badge.clock", true)
-      case .unsupported: ("Unknown event", nil, true)
+        (localized("This message cannot be read on this device yet."), "lock.badge.clock", true)
+      case .unsupported: (localized("Unknown event"), nil, true)
       }
     return Line(
       id: id, senderName: message.senderName, isOwn: message.isOwn, text: text,
@@ -136,10 +136,10 @@ struct ChatPreview: View {
     case .loading:
       ProgressView()
     case .failed:
-      Text("The messages could not be loaded.")
+      Text(localized("The messages could not be loaded."))
         .foregroundStyle(SysColors.textSecondary)
     case .loaded(let lines) where lines.isEmpty:
-      Text("No messages yet.")
+      Text(localized("No messages yet."))
         .foregroundStyle(SysColors.textSecondary)
     case .loaded(let lines):
       VStack(spacing: 6) {
