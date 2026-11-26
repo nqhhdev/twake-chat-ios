@@ -110,3 +110,7 @@
 * **Change**: The chat row's long-press menu starts with Open (#132); a tap on the preview itself cannot open the chat with SwiftUI's context menu, recorded in ADR 0036.
 * **Decision**: ADR 0037 (Proposed): on a server announcing `t.server` the Contacts tab keeps contacts in ToM's `/_twake/addressbook`; with `app.twake.chat.enable_invitations` phone contacts are invited through `/_twake/v1/invite`, a sign-up link is shared and the invitations' status is read from ToM (#187, #188).
 * **Change**: ToM address book and invitations built (`TomContactsProxy`, `TomContactsAPI`, `TwakeContactsViewModel`, `TwakeContactsViews`); the Parity Matrix rows are updated.
+
+## 2026-11-26
+* **Decision**: ADR 0035 (Proposed) sets the formats of spoilers (`data-mx-spoiler`, plain body `[Spoiler]`), picture descriptions (the caption), emotes (MSC2545, `data-mx-emoticon`) and scheduled messages (MSC4140, announced, never encrypted), and keeps link preview removal off until the web defines it.
+* **Change**: spoiler in the format bar (#178), picture descriptions (#179), presence dot on timeline avatars (#180), custom emotes (#186).

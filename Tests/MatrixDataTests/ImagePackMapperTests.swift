@@ -21,12 +21,12 @@ struct ImagePackMapperTests {
   ]
 
   @Test func aPackKeepsItsStickersWithTheirSizeAndName() throws {
-    let pack = try #require(
+    let mapped = try #require(
       ImagePackMapper.pack(id: "user", content: content, fallbackName: "Mine", source: source))
-    #expect(pack.name == "Cats")
-    #expect(pack.avatar?.source == "source:mxc://example.org/avatar")
-    #expect(pack.stickers.map(\.id) == ["user/both", "user/happy"])
-    let happy = pack.stickers[1]
+    #expect(mapped.name == "Cats")
+    #expect(mapped.avatar?.source == "source:mxc://example.org/avatar")
+    #expect(mapped.stickers.map(\.id) == ["user/both", "user/happy"])
+    let happy = mapped.stickers[1]
     #expect(happy.body == "Happy cat")
     #expect(happy.url == "mxc://example.org/happy")
     #expect(
@@ -34,7 +34,7 @@ struct ImagePackMapperTests {
         == MediaReference(
           source: "source:mxc://example.org/happy", mimeType: "image/png", size: 1234, width: 256,
           height: 128))
-    #expect(pack.stickers[0].body == "both")
+    #expect(mapped.stickers[0].body == "both")
   }
 
   @Test func aPackForEmoticonsOnlyOffersNoSticker() {
