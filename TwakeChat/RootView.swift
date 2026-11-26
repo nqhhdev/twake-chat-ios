@@ -515,6 +515,14 @@ final class RootCoordinator {
   /// even when the server cannot be told) and shows the sign-in form. While it runs, `start()` does nothing. When the
   /// repository reports an error the session may still be saved, so the screen stays with an error and the user can
   /// try again, as on the signed-in screen: the user is never shown as signed out while a session is still saved.
+  func retire() async {
+    await lifecycle.stop()
+  }
+
+  func discardSession() async {
+    try? await repository.logout()
+  }
+
   func logOutAfterFailedRestore() async {
     guard state == .restoreFailed, !started else { return }
     started = true

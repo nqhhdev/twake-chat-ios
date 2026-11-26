@@ -57,6 +57,14 @@ final class AppLifecycle {
     }
   }
 
+  func stop() async {
+    pausing?.cancel()
+    pausing = nil
+    endBackgroundTask()
+    isPaused = true
+    await sync?.pauseSync()
+  }
+
   private func pauseNow() {
     pausing?.cancel()
     pausing = nil
