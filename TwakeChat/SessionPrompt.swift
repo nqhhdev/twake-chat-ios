@@ -86,9 +86,14 @@ struct SessionPromptBanner: View {
   private var message: String {
     switch warning {
     case .unverified:
-      "Verify this device with another one, or with your recovery key, to read your encrypted messages."
+      String(
+        localized:
+          "Verify this device with another one, or with your recovery key, to read your encrypted messages."
+      )
     case .recoveryIncomplete:
-      "Enter your recovery key to read the encrypted messages sent before you signed in here."
+      String(
+        localized:
+          "Enter your recovery key to read the encrypted messages sent before you signed in here.")
     }
   }
 }
