@@ -132,13 +132,16 @@ extension RoomViewModel {
 
   /// Forwards several messages to one room, oldest first.
   public func forward(_ messages: [TimelineMessage], to room: RoomSummary) async {
+    let (messages, refusedGifs) = await withoutRefusedGifs(messages, to: room)
     var failed = false
     for message in messages {
       guard let eventId = message.eventId else { continue }
       do { try await repository.forward(eventId: eventId, to: room.id) } catch { failed = true }
     }
     endSelecting()
-    if failed {
+    if refusedGifs {
+      errorMessage = Self.gifsOffForwardRefusal(room)
+    } else if failed {
       errorMessage = localized("Could not forward every message.")
     } else {
       showToast(localized("Forwarded to \(room.name)"))
@@ -147,6 +150,10 @@ extension RoomViewModel {
 
   public func forward(_ message: TimelineMessage, to room: RoomSummary) async {
     guard let eventId = message.eventId else { return }
+    if await withoutRefusedGifs([message], to: room).refused {
+      errorMessage = Self.gifsOffForwardRefusal(room)
+      return
+    }
     do {
       try await repository.forward(eventId: eventId, to: room.id)
       showToast(localized("Forwarded to \(room.name)"))
@@ -285,5 +292,21 @@ extension RoomViewModel {
 
   public static func text(of body: TimelineMessage.Body) -> String? {
     body.plainText
+  }
+}
+
+extension RoomViewModel {
+  func withoutRefusedGifs(_ messages: [TimelineMessage], to room: RoomSummary) async -> (
+    kept: [TimelineMessage], refused: Bool
+  ) {
+    let isGif = { (message: TimelineMessage) in Self.isHiddenGif(message, gifsOff: true) }
+    guard messages.contains(where: isGif), await !repository.gifsEnabled(in: room.id) else {
+      return (messages, false)
+    }
+    return (messages.filter { !isGif($0) }, true)
+  }
+
+  static func gifsOffForwardRefusal(_ room: RoomSummary) -> String {
+    localized("GIFs are off in \(room.name), so GIFs are not forwarded there.")
   }
 }

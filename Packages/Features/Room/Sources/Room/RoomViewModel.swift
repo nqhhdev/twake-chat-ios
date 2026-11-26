@@ -398,7 +398,7 @@ public final class RoomViewModel {
   /// the chat settings hide.
   public var rows: [ChatRow] {
     guard case .loaded(let items) = state else { return [] }
-    return TimelineRows.rows(from: display().visible(items))
+    return TimelineRows.rows(from: display().visible(items), gifsOff: gifsOff)
   }
 
   /// Counts sent messages, so the send button and haptics react to each send.

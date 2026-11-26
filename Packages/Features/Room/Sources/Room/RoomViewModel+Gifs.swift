@@ -22,9 +22,25 @@ extension RoomViewModel {
     gifsAvailable = await gifs.searchPlaceholder() != nil
   }
 
-  static func isHiddenGif(_ message: TimelineMessage, gifsOff: Bool) -> Bool {
+  nonisolated static func isHiddenGif(_ message: TimelineMessage, gifsOff: Bool) -> Bool {
     guard gifsOff, case .image = message.body else { return false }
-    return message.media?.mimeType?.lowercased() == "image/gif"
+    return isGif(mimeType: message.media?.mimeType)
+  }
+
+  nonisolated static func isGif(mimeType: String?) -> Bool {
+    mimeType?.lowercased() == "image/gif"
+  }
+
+  static let gifsOffRefusal = localized(
+    "GIFs are off in this chat, so GIF files cannot be sent here.")
+
+  func sendable(_ loaded: [AttachmentLoader.Loaded]) -> [AttachmentLoader.Loaded] {
+    guard gifsOff else { return loaded }
+    let gifs = loaded.filter { Self.isGif(mimeType: $0.mimeType) }
+    guard !gifs.isEmpty else { return loaded }
+    gifs.forEach(AttachmentLoader.remove)
+    errorMessage = Self.gifsOffRefusal
+    return loaded.filter { !Self.isGif(mimeType: $0.mimeType) }
   }
 
   func makeGifPicker() -> GifPicker? {

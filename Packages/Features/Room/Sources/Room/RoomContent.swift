@@ -64,8 +64,9 @@ public final class RoomContentViewModel {
       return
     }
     isOpen = true
+    let gifsOff = !(await repository.gifsEnabled())
     for await list in items {
-      entries = Self.entries(in: list, kind: kind)
+      entries = Self.entries(in: list, kind: kind, gifsOff: gifsOff)
       if list.contains(where: { $0.kind == .timelineStart }) { reachedStart = true }
     }
     isOpen = false
@@ -132,9 +133,13 @@ public final class RoomContentViewModel {
 
   /// The messages of `kind` in a timeline, newest first, as the Flutter tabs pick them: pictures and videos with
   /// their media, files, and text with a web link.
-  static func entries(in items: [TimelineItem], kind: RoomContentKind) -> [RoomContentEntry] {
+  static func entries(in items: [TimelineItem], kind: RoomContentKind, gifsOff: Bool = false)
+    -> [RoomContentEntry]
+  {
     items.reversed().compactMap { item in
-      guard case .message(let message) = item.kind else { return nil }
+      guard case .message(let message) = item.kind,
+        !RoomViewModel.isHiddenGif(message, gifsOff: gifsOff)
+      else { return nil }
       switch (kind, message.body) {
       case (.media, .image), (.media, .video), (.files, .file):
         guard message.media != nil else { return nil }
