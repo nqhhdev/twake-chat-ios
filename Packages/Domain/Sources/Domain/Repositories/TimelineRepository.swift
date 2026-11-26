@@ -106,6 +106,16 @@ public protocol TimelineRepository: Sendable {
 
   func emotes() async -> [Emote]
 
+  func canSchedule() async -> Bool
+
+  func schedule(text: String, at date: Date, replyTo: String?) async throws(ScheduleError)
+
+  func scheduledMessages() async -> [ScheduledMessage]
+
+  func cancelScheduled(id: String) async -> Bool
+
+  func sendScheduledNow(id: String) async -> Bool
+
   func send(sticker: Sticker) async throws(TimelineError)
 
   /// Sends `text` as a message that runs `command`.
@@ -200,6 +210,13 @@ extension TimelineRepository {
   public func gifsEnabled() async -> Bool { true }
   public func stickerPacks() async -> [StickerPack] { [] }
   public func emotes() async -> [Emote] { [] }
+  public func canSchedule() async -> Bool { false }
+  public func schedule(text: String, at date: Date, replyTo: String?) async throws(ScheduleError) {
+    throw .unsupported
+  }
+  public func scheduledMessages() async -> [ScheduledMessage] { [] }
+  public func cancelScheduled(id: String) async -> Bool { false }
+  public func sendScheduledNow(id: String) async -> Bool { false }
   public func send(sticker: Sticker) async throws(TimelineError) { throw .requestFailed }
 }
 

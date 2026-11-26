@@ -28,6 +28,9 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
     case acceptIdentity(String)
     case command(String, String)
     case sticker(String)
+    case schedule(String, Date, String?)
+    case cancelScheduled(String)
+    case sendScheduledNow(String)
   }
 
   /// What `botCommands()` answers.
@@ -62,6 +65,54 @@ public final class FakeTimelineRepository: TimelineRepository, @unchecked Sendab
   private var _emoteList: [Emote] = []
 
   public func emotes() async -> [Emote] { emoteList }
+
+  public var schedulingOn: Bool {
+    get { lock.withLock { _schedulingOn } }
+    set { lock.withLock { _schedulingOn = newValue } }
+  }
+  private var _schedulingOn = false
+
+  public var scheduleResult: Result<Void, ScheduleError> {
+    get { lock.withLock { _scheduleResult } }
+    set { lock.withLock { _scheduleResult = newValue } }
+  }
+  private var _scheduleResult: Result<Void, ScheduleError> = .success(())
+
+  public var scheduledList: [ScheduledMessage] {
+    get { lock.withLock { _scheduledList } }
+    set { lock.withLock { _scheduledList = newValue } }
+  }
+  private var _scheduledList: [ScheduledMessage] = []
+
+  public var updatesScheduled = true
+
+  public func canSchedule() async -> Bool { schedulingOn }
+
+  public func schedule(text: String, at date: Date, replyTo: String?) async throws(ScheduleError) {
+    record(.schedule(text, date, replyTo))
+    try scheduleResult.get()
+    lock.withLock {
+      _scheduledList.append(
+        ScheduledMessage(id: "d\(_scheduledList.count)", text: text, sendAt: date, replyTo: replyTo)
+      )
+    }
+  }
+
+  public func scheduledMessages() async -> [ScheduledMessage] { scheduledList }
+
+  public func cancelScheduled(id: String) async -> Bool {
+    record(.cancelScheduled(id))
+    guard updatesScheduled else { return false }
+    lock.withLock { _scheduledList.removeAll { $0.id == id } }
+    return true
+  }
+
+  public func sendScheduledNow(id: String) async -> Bool {
+    record(.sendScheduledNow(id))
+    guard updatesScheduled else { return false }
+    lock.withLock { _scheduledList.removeAll { $0.id == id } }
+    return true
+  }
 
   public func send(sticker: Sticker) async throws(TimelineError) {
     record(.sticker(sticker.id))

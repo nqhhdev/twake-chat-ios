@@ -69,6 +69,11 @@ public final class RoomViewModel {
   public internal(set) var stickerPacks: [StickerPack] = []
   var presenceDots: [String: Presence.Dot] = [:]
   public internal(set) var emotes: [Emote] = []
+  public internal(set) var translations: [String: MessageTranslation] = [:]
+  public internal(set) var transcriptions: [String: MessageTranscription] = [:]
+  @ObservationIgnored var transcriber: any VoiceTranscribing = SpeechTranscriber()
+  public internal(set) var canSchedule = false
+  public internal(set) var scheduled: [ScheduledMessage] = []
   var emoteImages: [String: UIImage] = [:]
   @ObservationIgnored var emoteLoads: Set<String> = []
   @ObservationIgnored var presenceFetchedAt: [String: ContinuousClock.Instant] = [:]
@@ -368,8 +373,11 @@ public final class RoomViewModel {
       async let gifs: Void = loadGifsAvailability()
       async let stickers: Void = loadStickerPacks()
       async let emotes: Void = loadEmotes()
+      async let scheduling: Void = loadScheduling()
       let commands = await repository.botCommands()
-      _ = await (pinned, roomState, reactions, saved, threadPref, gifs, stickers, emotes)
+      _ = await (
+        pinned, roomState, reactions, saved, threadPref, gifs, stickers, emotes, scheduling
+      )
       botCommands = commands
     }
     defer { extras.cancel() }

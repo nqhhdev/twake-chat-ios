@@ -48,11 +48,14 @@ struct AppComposition: Sendable {
       folders: FoldersProxy(authentication: repository),
       linkPreviews: LinkPreviewProxy(authentication: repository),
       makeTimeline: {
-        TimelineProxy(roomId: $0, authentication: repository, only: $1, index: messageIndex)
+        TimelineProxy(
+          roomId: $0, authentication: repository, only: $1, index: messageIndex,
+          capabilities: capabilities)
       },
       makeThreadTimeline: {
         TimelineProxy(
-          roomId: $0, authentication: repository, threadRoot: $1, index: messageIndex)
+          roomId: $0, authentication: repository, threadRoot: $1, index: messageIndex,
+          capabilities: capabilities)
       },
       media: MediaProxy(authentication: repository),
       roomDetails: RoomDetailsProxy(authentication: repository),
