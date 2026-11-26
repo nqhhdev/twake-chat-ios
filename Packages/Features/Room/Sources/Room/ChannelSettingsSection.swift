@@ -9,11 +9,11 @@ struct ChannelSettingsSection: View {
   var body: some View {
     Section {
       Toggle(isOn: gifsBinding) {
-        Label("GIFs", systemImage: "photo.on.rectangle.angled")
+        Label(localized("GIFs"), systemImage: "photo.on.rectangle.angled")
       }
       .disabled(!channel.isOwner || viewModel.isChangingChannel)
     } header: {
-      Text("Channel")
+      Text(localized("Channel"))
     } footer: {
       Text(footer)
     }
@@ -28,7 +28,9 @@ struct ChannelSettingsSection: View {
   private var footer: String {
     let state =
       channel.gifsEnabled
-      ? "Members can send GIFs here." : "GIFs are off: the GIF picker is hidden in this chat."
-    return channel.isOwner ? state : state + " Only the owner of the chat changes it."
+      ? localized("Members can send GIFs here.")
+      : localized("GIFs are off: the GIF picker is hidden in this chat.")
+    return channel.isOwner
+      ? state : state + " " + localized("Only the owner of the chat changes it.")
   }
 }

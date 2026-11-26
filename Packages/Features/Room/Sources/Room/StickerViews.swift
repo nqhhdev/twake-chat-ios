@@ -40,11 +40,11 @@ struct StickerPickerSheet: View {
         }
         .padding(16)
       }
-      .navigationTitle("Stickers")
+      .navigationTitle(localized("Stickers"))
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
+          Button(localized("Cancel")) { dismiss() }
         }
       }
     }
@@ -93,7 +93,7 @@ struct StickerMessage: View {
       StickerImage(media: media, repository: repository)
         .frame(width: size.width, height: size.height)
         .accessibilityElement()
-        .accessibilityLabel(Text("Sticker \(Self.text(of: message))"))
+        .accessibilityLabel(Text(localized("Sticker \(Self.text(of: message))")))
       Text(message.date, format: .dateTime.hour().minute())
         .textStyle(TextStyles.labelSmall)
         .foregroundStyle(SysColors.textSecondary)

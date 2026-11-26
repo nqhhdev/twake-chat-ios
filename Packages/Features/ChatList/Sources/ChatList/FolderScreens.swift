@@ -30,11 +30,11 @@ struct FolderEditorScreen: View {
       List {
         Section {
           HStack {
-            TextField("😀", text: $viewModel.emoji)
+            TextField("😀" as String, text: $viewModel.emoji)
               .frame(width: 44)
               .multilineTextAlignment(.center)
-              .accessibilityLabel("Emoji")
-            TextField("Folder name", text: $viewModel.name)
+              .accessibilityLabel(localized("Emoji"))
+            TextField(localized("Folder name"), text: $viewModel.name)
               .textInputAutocapitalization(.words)
               .accessibilityIdentifier(A11yIdentifiers.folderEditor.name)
           }
@@ -43,7 +43,7 @@ struct FolderEditorScreen: View {
             Text(error).foregroundStyle(SysColors.error)
           }
         }
-        Section("Include by kind") {
+        Section(localized("Include by kind")) {
           ForEach(Folder.ChatType.allCases, id: \.self) { type in
             Toggle(
               type.title,
@@ -52,7 +52,7 @@ struct FolderEditorScreen: View {
                 set: { viewModel.setIncluded(type, $0) }))
           }
         }
-        Section("Chats") {
+        Section(localized("Chats")) {
           ForEach(viewModel.chats) { chat in
             Button {
               viewModel.toggle(chat)
@@ -72,18 +72,20 @@ struct FolderEditorScreen: View {
           Text(message).foregroundStyle(SysColors.error)
         }
       }
-      .searchable(text: $viewModel.query, prompt: "Search chats")
-      .navigationTitle(viewModel.previous == nil ? "New Folder" : "Edit Folder")
+      .searchable(text: $viewModel.query, prompt: localized("Search chats"))
+      .navigationTitle(
+        viewModel.previous == nil ? localized("New Folder") : localized("Edit Folder")
+      )
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
+          Button(localized("Cancel")) { dismiss() }
         }
         ToolbarItem(placement: .confirmationAction) {
           if viewModel.isSaving {
             ProgressView()
           } else {
-            Button("Save") { Task { await viewModel.save() } }
+            Button(localized("Save")) { Task { await viewModel.save() } }
               .disabled(!viewModel.canSave)
               .accessibilityIdentifier(A11yIdentifiers.folderEditor.save)
           }

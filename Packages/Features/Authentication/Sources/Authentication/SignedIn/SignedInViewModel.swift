@@ -51,7 +51,7 @@ public final class SignedInViewModel {
     do {
       try await repository.logout()
     } catch {
-      errorMessage = "Could not log out. Please try again."
+      errorMessage = localized("Could not log out. Please try again.")
       return
     }
     if let ssoLogoutURL {

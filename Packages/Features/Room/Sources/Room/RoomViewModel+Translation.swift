@@ -38,7 +38,7 @@ extension RoomViewModel {
     let translated = text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     if translated.isEmpty {
       translations[eventId] = nil
-      errorMessage = "Could not translate this message."
+      errorMessage = localized("Could not translate this message.")
     } else {
       translations[eventId] = .translated(translated)
     }

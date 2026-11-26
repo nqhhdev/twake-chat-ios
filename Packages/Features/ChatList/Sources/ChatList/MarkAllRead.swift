@@ -16,7 +16,7 @@ struct MarkAllReadButton: View {
   let rooms: [RoomSummary]
 
   var body: some View {
-    Button("Mark All as Read", systemImage: "envelope.open") {
+    Button(localized("Mark All as Read"), systemImage: "envelope.open") {
       Task { await viewModel.markAllRead(rooms) }
     }
     .disabled(rooms.isEmpty)

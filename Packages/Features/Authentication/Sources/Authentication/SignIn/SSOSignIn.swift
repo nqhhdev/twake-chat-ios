@@ -44,10 +44,10 @@ struct SSOSignIn: Sendable {
 enum SignInMessages {
   static func message(for error: AuthenticationError) -> String {
     switch error {
-    case .invalidCredentials: "Invalid username or password"
-    case .serverUnreachable: "No connection to the server"
-    case .invalidHomeserverURL: "Wrong server name"
-    case .unknown: "Oops, something went wrong…"
+    case .invalidCredentials: localized("Invalid username or password")
+    case .serverUnreachable: localized("No connection to the server")
+    case .invalidHomeserverURL: localized("Wrong server name")
+    case .unknown: localized("Oops, something went wrong…")
     }
   }
 }

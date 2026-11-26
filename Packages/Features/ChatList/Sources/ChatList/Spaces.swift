@@ -54,7 +54,7 @@ public final class SpaceViewModel {
       }
     } catch {
       children = children ?? []
-      errorMessage = "Could not load this space."
+      errorMessage = localized("Could not load this space.")
     }
     await loadChildStyles()
   }
@@ -84,7 +84,7 @@ public final class SpaceViewModel {
     do {
       _ = try await repository.join(child)
     } catch {
-      errorMessage = "Could not join \(child.name). It may need an invitation."
+      errorMessage = localized("Could not join \(child.name). It may need an invitation.")
       return
     }
     if let index = children?.firstIndex(where: { $0.id == child.id }) {
@@ -106,7 +106,7 @@ public final class SpaceViewModel {
       do {
         roomId = try await repository.join(child)
       } catch {
-        errorMessage = "Could not join \(child.name). It may need an invitation."
+        errorMessage = localized("Could not join \(child.name). It may need an invitation.")
         return
       }
       if let index = children?.firstIndex(where: { $0.id == child.id }) {
@@ -136,7 +136,7 @@ public final class SpaceViewModel {
         RoomSummary(
           id: roomId, name: name, lastMessageText: nil, lastMessageSender: nil, lastActivity: nil))
     } catch {
-      errorMessage = "Could not create the channel."
+      errorMessage = localized("Could not create the channel.")
     }
   }
 
@@ -211,7 +211,7 @@ struct SpaceScreen: View {
           .pageAccentRing(viewModel.pageStyle, size: 72)
           Text(viewModel.space.name).font(.title3.weight(.semibold)).multilineTextAlignment(.center)
           if let children = viewModel.children {
-            Text(children.count == 1 ? "1 room" : "\(children.count) rooms")
+            Text(localized("\(children.count) rooms"))
               .font(.subheadline)
               .foregroundStyle(SysColors.textSecondary)
           }
@@ -242,7 +242,7 @@ struct SpaceScreen: View {
           }
         }
         if children.isEmpty, viewModel.errorMessage == nil {
-          Text("This space has no rooms yet.")
+          Text(localized("This space has no rooms yet."))
             .foregroundStyle(SysColors.textSecondary)
             .frame(maxWidth: .infinity)
             .listRowBackground(Color.clear)
@@ -257,23 +257,23 @@ struct SpaceScreen: View {
     .listStyle(.insetGrouped)
     .navigationTitle(viewModel.space.name)
     .navigationBarTitleDisplayMode(.inline)
-    .alert("New channel", isPresented: $isNaming) {
-      TextField("Name", text: $newName)
-      Button("Cancel", role: .cancel) {}
-      Button("Create") {
+    .alert(localized("New channel"), isPresented: $isNaming) {
+      TextField(localized("Name"), text: $newName)
+      Button(localized("Cancel"), role: .cancel) {}
+      Button(localized("Create")) {
         let name = newName
         newName = ""
         Task { await viewModel.createChannel(named: name) }
       }
     } message: {
-      Text("Members of \(viewModel.space.name) can find it in the space.")
+      Text(localized("Members of \(viewModel.space.name) can find it in the space."))
     }
     .toolbar {
       if viewModel.canAddChannel {
         ToolbarItem(placement: .topBarTrailing) {
-          Menu("Add", systemImage: "plus") {
-            Button("New Channel", systemImage: "number") { isNaming = true }
-            Button("New Sub-space", systemImage: "cube") {
+          Menu(localized("Add"), systemImage: "plus") {
+            Button(localized("New Channel"), systemImage: "number") { isNaming = true }
+            Button(localized("New Sub-space"), systemImage: "cube") {
               newSubspace = viewModel.makeNewSubspace { newSubspace = nil }
             }
             .accessibilityIdentifier(A11yIdentifiers.space.newSubspace)
@@ -284,7 +284,7 @@ struct SpaceScreen: View {
       }
       if viewModel.markRead != nil {
         ToolbarItem(placement: .topBarTrailing) {
-          Button("Mark All as Read", systemImage: "envelope.open") {
+          Button(localized("Mark All as Read"), systemImage: "envelope.open") {
             Task { await viewModel.markAllRead() }
           }
           .disabled(viewModel.isMarkingRead || viewModel.children == nil)
@@ -321,12 +321,12 @@ struct SpaceScreen: View {
         ProgressView()
       } else if !child.isJoined, child.isSpace {
         // Its own button: the row opens the sub-space to look inside, Join makes the user a member.
-        Button("Join") { Task { await viewModel.join(subspace: child) } }
+        Button(localized("Join")) { Task { await viewModel.join(subspace: child) } }
           .font(.subheadline.weight(.semibold))
           .foregroundStyle(SysColors.primary)
           .buttonStyle(.borderless)
       } else if !child.isJoined {
-        Text("Join")
+        Text(localized("Join"))
           .font(.subheadline.weight(.semibold))
           .foregroundStyle(SysColors.primary)
       }
@@ -334,7 +334,7 @@ struct SpaceScreen: View {
   }
 
   private func detail(_ child: SpaceChild) -> String {
-    let members = child.memberCount == 1 ? "1 member" : "\(child.memberCount) members"
+    let members = localized("\(child.memberCount) members")
     guard let topic = child.topic else { return members }
     return "\(topic) · \(members)"
   }

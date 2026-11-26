@@ -270,8 +270,8 @@ enum TimelineItemMapper {
       case .message(let message): text = preview(body(message.msgType))
       case .sticker(let body, _, _): text = body
       case .poll(let question, _, _, _, _, _, _): text = question
-      case .redacted: text = "This message has been deleted"
-      case .unableToDecrypt: text = "Waiting for this message"
+      case .redacted: text = localized("This message has been deleted")
+      case .unableToDecrypt: text = localized("Waiting for this message")
       default: text = nil
       }
     }
@@ -284,14 +284,14 @@ enum TimelineItemMapper {
     case .text(let text), .emote(let text), .notice(let text), .location(let text, _),
       .sticker(let text):
       text
-    case .image(let caption): caption ?? "🖼️ Picture"
-    case .video(let caption): caption ?? "🎥 Video"
-    case .audio(let caption): caption ?? "🎤 Audio"
+    case .image(let caption): caption ?? localized("🖼️ Picture")
+    case .video(let caption): caption ?? localized("🎥 Video")
+    case .audio(let caption): caption ?? localized("🎤 Audio")
     case .file(let name): "📁 \(name)"
     case .poll(let question): question
-    case .redacted: "This message has been deleted"
-    case .unableToDecrypt: "Waiting for this message"
-    case .unsupported: "Unknown event"
+    case .redacted: localized("This message has been deleted")
+    case .unableToDecrypt: localized("Waiting for this message")
+    case .unsupported: localized("Unknown event")
     }
   }
 
@@ -299,14 +299,14 @@ enum TimelineItemMapper {
     -> String?
   {
     switch change {
-    case .joined: "👋 \(target) joined the chat"
-    case .left: "🚪 \(target) left the chat"
-    case .banned, .kickedAndBanned: "🚫 \(sender) banned \(target)"
-    case .unbanned: "\(sender) unbanned \(target)"
-    case .kicked: "👞 \(sender) kicked \(target)"
-    case .invited: "📩 \(sender) invited \(target)"
-    case .invitationAccepted: "👍 \(target) accepted the invitation"
-    case .invitationRejected: "\(target) rejected the invitation"
+    case .joined: localized("👋 \(target) joined the chat")
+    case .left: localized("🚪 \(target) left the chat")
+    case .banned, .kickedAndBanned: localized("🚫 \(sender) banned \(target)")
+    case .unbanned: localized("\(sender) unbanned \(target)")
+    case .kicked: localized("👞 \(sender) kicked \(target)")
+    case .invited: localized("📩 \(sender) invited \(target)")
+    case .invitationAccepted: localized("👍 \(target) accepted the invitation")
+    case .invitationRejected: localized("\(target) rejected the invitation")
     default: nil
     }
   }
@@ -318,26 +318,29 @@ enum TimelineItemMapper {
     text: String, visibility: Domain.TimelineItem.Visibility
   )? {
     switch content {
-    case .roomCreate: ("💬 \(sender) created the chat", .always)
-    case .roomName(let name?): ("\(sender) changed the chat name to: '\(name)'", .always)
-    case .roomAvatar: ("\(sender) changed the chat avatar", .always)
-    case .roomEncryption: ("🔐 \(sender) activated end to end encryption", .unimportant)
+    case .roomCreate: (localized("💬 \(sender) created the chat"), .always)
+    case .roomName(let name?): (localized("\(sender) changed the chat name to: '\(name)'"), .always)
+    case .roomAvatar: (localized("\(sender) changed the chat avatar"), .always)
+    case .roomEncryption: (localized("🔐 \(sender) activated end to end encryption"), .unimportant)
     case .roomTopic(let topic?):
-      ("\(sender) changed the chat description to: '\(topic)'", .unimportant)
-    case .roomTopic(nil): ("\(sender) removed the chat description", .unimportant)
+      (localized("\(sender) changed the chat description to: '\(topic)'"), .unimportant)
+    case .roomTopic(nil): (localized("\(sender) removed the chat description"), .unimportant)
     case .roomJoinRules(let rule):
       (joinRuleText(rule, sender: sender), .unimportant)
     case .roomHistoryVisibility(let visibility):
-      ("\(sender) changed the history visibility to: \(historyText(visibility))", .unimportant)
-    case .roomGuestAccess: ("\(sender) changed the guest access rules", .unimportant)
-    case .roomPowerLevels: ("\(sender) changed the chat permissions", .unimportant)
+      (
+        localized("\(sender) changed the history visibility to: \(historyText(visibility))"),
+        .unimportant
+      )
+    case .roomGuestAccess: (localized("\(sender) changed the guest access rules"), .unimportant)
+    case .roomPowerLevels: (localized("\(sender) changed the chat permissions"), .unimportant)
     case .roomName(nil), .roomCanonicalAlias, .roomPinnedEvents, .roomServerAcl: nil
     case .policyRuleRoom: (unknown("m.policy.rule.room"), .unknown)
     case .policyRuleServer: (unknown("m.policy.rule.server"), .unknown)
     case .policyRuleUser: (unknown("m.policy.rule.user"), .unknown)
     case .roomAliases: (unknown("m.room.aliases"), .unknown)
     case .roomThirdPartyInvite: (unknown("m.room.third_party_invite"), .unknown)
-    case .roomTombstone: ("This chat has been upgraded", .always)
+    case .roomTombstone: (localized("This chat has been upgraded"), .always)
     case .spaceChild: (unknown("m.space.child"), .unknown)
     case .spaceParent: (unknown("m.space.parent"), .unknown)
     case .custom(let eventType): (unknown(eventType), .unknown)
@@ -345,26 +348,26 @@ enum TimelineItemMapper {
   }
 
   /// The Flutter app's line for an event it cannot show (`unknownEvent`).
-  static func unknown(_ eventType: String) -> String { "Unknown event '\(eventType)'" }
+  static func unknown(_ eventType: String) -> String { localized("Unknown event '\(eventType)'") }
 
   private static func joinRuleText(_ rule: JoinRule?, sender: String) -> String {
     let name: String? =
       switch rule {
-      case .public: "Anyone can join"
-      case .invite: "Invited users only"
-      case .knock: "Anyone can ask to join"
+      case .public: localized("Anyone can join")
+      case .invite: localized("Invited users only")
+      case .knock: localized("Anyone can ask to join")
       default: nil
       }
-    guard let name else { return "\(sender) changed the join rules" }
-    return "\(sender) changed the join rules to: \(name)"
+    guard let name else { return localized("\(sender) changed the join rules") }
+    return localized("\(sender) changed the join rules to: \(name)")
   }
 
   private static func historyText(_ visibility: HistoryVisibility) -> String {
     switch visibility {
-    case .invited: "From the invitation"
-    case .joined: "From joining"
-    case .shared: "Visible for all participants"
-    default: "Visible for everyone"
+    case .invited: localized("From the invitation")
+    case .joined: localized("From joining")
+    case .shared: localized("Visible for all participants")
+    default: localized("Visible for everyone")
     }
   }
 

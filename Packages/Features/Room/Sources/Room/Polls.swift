@@ -35,11 +35,12 @@ struct PollView: View {
   }
 
   private var footer: String {
-    let votes = poll.voterCount == 1 ? "1 vote" : "\(poll.voterCount) votes"
-    if poll.isEnded { return "Final results · \(votes)" }
-    if !poll.isDisclosed { return "Results will show when the poll ends" }
+    let votes = localized("\(poll.voterCount) votes")
+    if poll.isEnded { return localized("Final results · \(votes)") }
+    if !poll.isDisclosed { return localized("Results will show when the poll ends") }
     if poll.ownAnswerIds.isEmpty {
-      return poll.maxSelections > 1 ? "Choose up to \(poll.maxSelections) · \(votes)" : votes
+      return poll.maxSelections > 1
+        ? localized("Choose up to \(poll.maxSelections) · \(votes)") : votes
     }
     return votes
   }
@@ -66,7 +67,7 @@ struct PollView: View {
               .transition(.scale.combined(with: .opacity))
           }
           if poll.showsResults {
-            Text("\(answer.voterIds.count)")
+            Text(verbatim: "\(answer.voterIds.count)")
               .textStyle(TextStyles.labelMedium)
               .foregroundStyle(SysColors.textSecondary)
               .contentTransition(.numericText(value: Double(answer.voterIds.count)))
@@ -94,7 +95,10 @@ struct PollView: View {
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(answer.text)
     .accessibilityValue(
-      poll.showsResults ? "\(answer.voterIds.count) votes\(chosen ? ", your choice" : "")" : ""
+      poll.showsResults
+        ? (chosen
+          ? localized("\(answer.voterIds.count) votes, your choice")
+          : localized("\(answer.voterIds.count) votes")) : ""
     )
     .accessibilityAddTraits(chosen ? [.isButton, .isSelected] : .isButton)
   }
@@ -113,15 +117,15 @@ struct CreatePollSheet: View {
   var body: some View {
     NavigationStack {
       Form {
-        Section("Question") {
-          TextField("Ask a question", text: $draft.question, axis: .vertical)
+        Section(localized("Question")) {
+          TextField(localized("Ask a question"), text: $draft.question, axis: .vertical)
             .focused($focused, equals: -1)
             .submitLabel(.next)
         }
         Section {
           ForEach(draft.answers.indices, id: \.self) { index in
             HStack {
-              TextField("Option \(index + 1)", text: answerBinding(index))
+              TextField(localized("Option \(index + 1)"), text: answerBinding(index))
                 .focused($focused, equals: index)
                 .submitLabel(.next)
                 .onSubmit { focused = index + 1 < draft.answers.count ? index + 1 : nil }
@@ -132,29 +136,29 @@ struct CreatePollSheet: View {
                   Image(systemName: "minus.circle.fill").foregroundStyle(SysColors.error)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Remove option \(index + 1)")
+                .accessibilityLabel(localized("Remove option \(index + 1)"))
               }
             }
             .transition(.move(edge: .top).combined(with: .opacity))
           }
         } header: {
-          Text("Options")
+          Text(localized("Options"))
         } footer: {
-          Text("Up to \(PollDraft.maxAnswers) options.")
+          Text(localized("Up to \(PollDraft.maxAnswers) options."))
         }
         Section {
-          Toggle("Multiple answers", isOn: $draft.allowsMultipleChoices)
-          Toggle("Hide results until the end", isOn: $draft.hidesResults)
+          Toggle(localized("Multiple answers"), isOn: $draft.allowsMultipleChoices)
+          Toggle(localized("Hide results until the end"), isOn: $draft.hidesResults)
         }
       }
-      .navigationTitle("New Poll")
+      .navigationTitle(localized("New Poll"))
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
+          Button(localized("Cancel")) { dismiss() }
         }
         ToolbarItem(placement: .confirmationAction) {
-          Button("Send") {
+          Button(localized("Send")) {
             isSending = true
             Task {
               if await viewModel.createPoll(draft) { dismiss() }

@@ -51,7 +51,7 @@ struct MessageActionsOverlay: View {
           .ignoresSafeArea()
           .opacity(appeared ? 1 : 0)
           .onTapGesture { close() }
-          .accessibilityLabel("Close")
+          .accessibilityLabel(localized("Close"))
           .accessibilityAddTraits(.isButton)
         VStack(alignment: side, spacing: Self.gap) {
           tapbackBar
@@ -108,105 +108,124 @@ struct MessageActionsOverlay: View {
     var list: [Action] = []
     if message.eventId != nil {
       list.append(
-        .init(title: "Reply", icon: "arrowshape.turn.up.left") { viewModel.reply(to: message) })
+        .init(title: localized("Reply"), icon: "arrowshape.turn.up.left") {
+          viewModel.reply(to: message)
+        })
     }
     if message.eventId != nil, viewModel.canOpenThreads {
       list.append(
-        .init(title: "Reply in Thread", icon: "bubble.left.and.text.bubble.right") {
+        .init(title: localized("Reply in Thread"), icon: "bubble.left.and.text.bubble.right") {
           viewModel.openThread(on: message)
         })
     }
     if let text = RoomViewModel.text(of: message.body) {
-      list.append(.init(title: "Copy", icon: "doc.on.doc") { UIPasteboard.general.string = text })
+      list.append(
+        .init(title: localized("Copy"), icon: "doc.on.doc") { UIPasteboard.general.string = text })
     }
     if selectableText != nil {
       list.append(
-        .init(title: "Select Text", icon: "selection.pin.in.out", keepsLayerOpen: true) {
+        .init(title: localized("Select Text"), icon: "selection.pin.in.out", keepsLayerOpen: true) {
           isSelectingText = true
         })
     }
     if message.eventId != nil {
-      list.append(.init(title: "Forward", icon: "arrowshape.turn.up.right") { onForward(message) })
+      list.append(
+        .init(title: localized("Forward"), icon: "arrowshape.turn.up.right") { onForward(message) })
       if message.media != nil {
         list.append(
-          .init(title: "Share", icon: "square.and.arrow.up") {
+          .init(title: localized("Share"), icon: "square.and.arrow.up") {
             Task { await viewModel.share(focus.album?.messages ?? [message]) }
           })
       }
       let media = focus.album?.messages ?? [message]
       if RoomViewModel.canSaveToPhotos(media) {
         list.append(
-          .init(title: "Save to Photos", icon: "square.and.arrow.down") {
+          .init(title: localized("Save to Photos"), icon: "square.and.arrow.down") {
             Task { await viewModel.saveToPhotos(media) }
           })
       }
-      list.append(.init(title: "Copy Link", icon: "link") { viewModel.copyLink(to: message) })
+      list.append(
+        .init(title: localized("Copy Link"), icon: "link") { viewModel.copyLink(to: message) })
       if viewModel.canSave {
         let saved = viewModel.isSaved(message)
         list.append(
-          .init(title: saved ? "Unsave" : "Save", icon: saved ? "bookmark.slash" : "bookmark") {
+          .init(
+            title: saved ? localized("Unsave") : localized("Save"),
+            icon: saved ? "bookmark.slash" : "bookmark"
+          ) {
             Task { await viewModel.toggleSaved(message) }
           })
       }
       list.append(
-        .init(title: "Select", icon: "checkmark.circle") { viewModel.startSelecting(message) })
+        .init(title: localized("Select"), icon: "checkmark.circle") {
+          viewModel.startSelecting(message)
+        })
       let pinned = viewModel.isPinned(message)
       list.append(
-        .init(title: pinned ? "Unpin" : "Pin", icon: pinned ? "pin.slash" : "pin") {
+        .init(
+          title: pinned ? localized("Unpin") : localized("Pin"), icon: pinned ? "pin.slash" : "pin"
+        ) {
           Task { await viewModel.togglePin(message) }
         })
     }
     if viewModel.canTranscribe(message) {
       list.append(
-        .init(title: "Transcribe", icon: "text.quote") {
+        .init(title: localized("Transcribe"), icon: "text.quote") {
           Task { await viewModel.transcribe(message) }
         })
     } else if case .transcribed = viewModel.transcription(of: message) {
       list.append(
-        .init(title: "Hide Transcription", icon: "text.badge.minus") {
+        .init(title: localized("Hide Transcription"), icon: "text.badge.minus") {
           viewModel.hideTranscription(of: message)
         })
     }
     if viewModel.canTranslate(message) {
-      list.append(.init(title: "Translate", icon: "translate") { viewModel.translate(message) })
+      list.append(
+        .init(title: localized("Translate"), icon: "translate") { viewModel.translate(message) })
     } else if case .translated = viewModel.translation(of: message) {
       list.append(
-        .init(title: "Show Original", icon: "arrow.uturn.backward") {
+        .init(title: localized("Show Original"), icon: "arrow.uturn.backward") {
           viewModel.showOriginal(message)
         })
     }
     if message.isOwn, case .text = message.body {
-      list.append(.init(title: "Edit", icon: "pencil") { viewModel.edit(message) })
+      list.append(.init(title: localized("Edit"), icon: "pencil") { viewModel.edit(message) })
     }
     if message.isOwn, message.eventId != nil {
-      list.append(.init(title: "Seen by", icon: "eye") { viewModel.showReaders(of: message) })
+      list.append(
+        .init(title: localized("Seen by"), icon: "eye") { viewModel.showReaders(of: message) })
     }
     if message.isEdited, message.eventId != nil {
       list.append(
-        .init(title: "Edit History", icon: "clock.arrow.circlepath") {
+        .init(title: localized("Edit History"), icon: "clock.arrow.circlepath") {
           viewModel.historyMessage = message
         })
     }
     if message.eventId != nil {
       list.append(
-        .init(title: "Message Info", icon: "info.circle") { viewModel.infoMessage = message })
+        .init(title: localized("Message Info"), icon: "info.circle") {
+          viewModel.infoMessage = message
+        })
     }
     if viewModel.canEndPoll(message) {
       list.append(
-        .init(title: "End Poll", icon: "checkmark.circle") {
+        .init(title: localized("End Poll"), icon: "checkmark.circle") {
           Task { await viewModel.endPoll(message) }
         })
     }
     if viewModel.canDelete(message) {
       list.append(
-        .init(title: "Delete", icon: "trash", isDestructive: true) {
+        .init(title: localized("Delete"), icon: "trash", isDestructive: true) {
           Task { await viewModel.delete(message) }
         })
     }
     if !message.isOwn, message.eventId != nil {
-      list.append(.init(title: "Report", icon: "exclamationmark.bubble") { onReport(message) })
       list.append(
-        .init(title: "Block", icon: "hand.raised", isDestructive: true) { onBlock(message) })
+        .init(title: localized("Report"), icon: "exclamationmark.bubble") { onReport(message) })
+      list.append(
+        .init(title: localized("Block"), icon: "hand.raised", isDestructive: true) {
+          onBlock(message)
+        })
     }
     return list
   }
@@ -260,7 +279,7 @@ struct MessageActionsOverlay: View {
           .background(SysColors.surface, in: Circle())
       }
       .buttonStyle(PressScaleButtonStyle())
-      .accessibilityLabel("More reactions")
+      .accessibilityLabel(localized("More reactions"))
       ForEach(viewModel.reactionBar, id: \.self) { key in
         let isMine = message.reactions.contains { $0.key == key && $0.includesOwn }
         Button {
@@ -273,7 +292,7 @@ struct MessageActionsOverlay: View {
             .background(SysColors.primary.opacity(isMine ? 0.18 : 0), in: Circle())
         }
         .buttonStyle(PressScaleButtonStyle())
-        .accessibilityLabel(isMine ? "Remove \(key)" : "React \(key)")
+        .accessibilityLabel(isMine ? localized("Remove \(key)") : localized("React \(key)"))
         .accessibilityIdentifier(A11yIdentifiers.room.reaction(key))
       }
       more
@@ -366,15 +385,21 @@ struct MoreReactionsSheet: View {
 
   static let groups: [(String, [String])] = [
     (
-      "Smileys",
+      localized("Smileys"),
       [
         "😀", "😃", "😄", "😁", "😆", "🥹", "😅", "🤣", "🙂", "😉", "😊", "😇", "🥰", "😍", "🤩", "😘",
         "😋", "😜", "🤪", "🤔", "🤨", "😐", "🙄", "😏", "😮‍💨", "😌", "😴", "🤯", "🥳", "😎", "🤓", "😕",
         "🙁", "😳", "🥺", "😭", "😤", "😡", "🤬", "😱", "😨", "🤗", "🤭", "🫡", "🤫", "😶", "🫠", "🤐",
       ]
     ),
-    ("Gestures", ["👍", "👎", "👏", "🙌", "🫶", "🤝", "🙏", "✌️", "🤞", "🤟", "👌", "🤌", "👋", "💪", "👀", "🫡"]),
-    ("Hearts", ["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "💔", "❤️‍🔥", "💯", "✨", "🔥", "⭐️", "🎉", "✅"]),
+    (
+      localized("Gestures"),
+      ["👍", "👎", "👏", "🙌", "🫶", "🤝", "🙏", "✌️", "🤞", "🤟", "👌", "🤌", "👋", "💪", "👀", "🫡"]
+    ),
+    (
+      localized("Hearts"),
+      ["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "💔", "❤️‍🔥", "💯", "✨", "🔥", "⭐️", "🎉", "✅"]
+    ),
   ]
 
   var body: some View {
@@ -391,14 +416,14 @@ struct MoreReactionsSheet: View {
                   Text(key).font(.system(size: 30)).frame(width: 44, height: 44)
                 }
                 .buttonStyle(PressScaleButtonStyle())
-                .accessibilityLabel("React \(key)")
+                .accessibilityLabel(localized("React \(key)"))
               }
             }
           }
         }
         .padding(16)
       }
-      .navigationTitle("Reactions")
+      .navigationTitle(localized("Reactions"))
       .navigationBarTitleDisplayMode(.inline)
     }
     .presentationDetents([.medium, .large])

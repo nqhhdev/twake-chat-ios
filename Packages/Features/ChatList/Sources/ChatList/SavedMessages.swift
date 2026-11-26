@@ -14,8 +14,8 @@ struct SavedMessagesScreen: View {
       if let messages {
         if messages.isEmpty {
           ContentUnavailableView(
-            "No saved messages", systemImage: "bookmark",
-            description: Text("Long press a message and choose Save to keep it here."))
+            localized("No saved messages"), systemImage: "bookmark",
+            description: Text(localized("Long press a message and choose Save to keep it here.")))
         } else {
           List {
             ForEach(messages) { message in
@@ -30,7 +30,7 @@ struct SavedMessagesScreen: View {
               }
               .buttonStyle(.plain)
               .swipeActions {
-                Button("Remove", systemImage: "bookmark.slash", role: .destructive) {
+                Button(localized("Remove"), systemImage: "bookmark.slash", role: .destructive) {
                   Task { await forget(message) }
                 }
               }
@@ -42,7 +42,7 @@ struct SavedMessagesScreen: View {
         ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
-    .navigationTitle("Saved messages")
+    .navigationTitle(localized("Saved messages"))
     .task { messages = await repository.savedMessages() }
     .refreshable { messages = await repository.savedMessages() }
   }
@@ -64,7 +64,7 @@ struct SavedMessagesScreen: View {
       if let sender = message.senderName {
         Text(sender).font(.subheadline.weight(.semibold))
       }
-      Text(message.text ?? "This message is not available.")
+      Text(message.text ?? localized("This message is not available."))
         .font(.subheadline)
         .foregroundStyle(message.text == nil ? SysColors.textSecondary : SysColors.onSurface)
         .lineLimit(3)

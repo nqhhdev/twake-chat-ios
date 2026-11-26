@@ -65,10 +65,10 @@ enum SaveToPhotosOutcome: Equatable {
 
   var text: String {
     switch self {
-    case .saved(count: 1): "Saved to Photos"
-    case .saved(let count): "Saved \(count) items to Photos"
-    case .accessDenied: "Allow Twake Chat to add to Photos in Settings."
-    case .failed: "Could not save to Photos."
+    case .saved(count: 1): localized("Saved to Photos")
+    case .saved(let count): localized("Saved \(count) items to Photos")
+    case .accessDenied: localized("Allow Twake Chat to add to Photos in Settings.")
+    case .failed: localized("Could not save to Photos.")
     }
   }
 

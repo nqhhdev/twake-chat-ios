@@ -62,15 +62,15 @@ public final class PasswordLoginViewModel {
     }
   }
 
-  static let emptyUsernameMessage = "Please enter your Matrix Id or username"
-  static let emptyPasswordMessage = "Please enter your password"
+  static let emptyUsernameMessage = localized("Please enter your Matrix Id or username")
+  static let emptyPasswordMessage = localized("Please enter your password")
 
   static func message(for error: AuthenticationError) -> String {
     switch error {
-    case .invalidCredentials: "Invalid username or password"
-    case .serverUnreachable: "No connection to the server"
-    case .invalidHomeserverURL: "This is not a valid Matrix homeserver address"
-    case .unknown: "Oops, something went wrong…"
+    case .invalidCredentials: localized("Invalid username or password")
+    case .serverUnreachable: localized("No connection to the server")
+    case .invalidHomeserverURL: localized("This is not a valid Matrix homeserver address")
+    case .unknown: localized("Oops, something went wrong…")
     }
   }
 }

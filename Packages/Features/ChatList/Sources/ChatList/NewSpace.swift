@@ -42,7 +42,9 @@ public final class NewSpaceViewModel: Identifiable {
           id: roomId, name: draft.trimmedName, lastMessageText: nil, lastMessageSender: nil,
           lastActivity: nil, isSpace: true, isPublic: draft.isPublic))
     } catch {
-      errorMessage = isSubspace ? "Could not create the sub-space." : "Could not create the space."
+      errorMessage =
+        isSubspace
+        ? localized("Could not create the sub-space.") : localized("Could not create the space.")
     }
   }
 }
@@ -65,15 +67,17 @@ struct NewSpaceScreen: View {
           .listRowBackground(Color.clear)
         }
         Section {
-          TextField("Name", text: $viewModel.draft.name)
+          TextField(localized("Name"), text: $viewModel.draft.name)
             .textInputAutocapitalization(.words)
             .accessibilityIdentifier(A11yIdentifiers.newSpace.name)
             .submitLabel(.done)
-          TextField("Description (optional)", text: $viewModel.draft.topic, axis: .vertical)
-            .lineLimit(1...4)
+          TextField(
+            localized("Description (optional)"), text: $viewModel.draft.topic, axis: .vertical
+          )
+          .lineLimit(1...4)
         }
         Section {
-          Toggle("Public", isOn: $viewModel.draft.isPublic)
+          Toggle(localized("Public"), isOn: $viewModel.draft.isPublic)
         } footer: {
           Text(visibilityFooter)
         }
@@ -81,17 +85,17 @@ struct NewSpaceScreen: View {
           Section { Text(message).foregroundStyle(SysColors.error) }
         }
       }
-      .navigationTitle(viewModel.isSubspace ? "New Sub-space" : "New Space")
+      .navigationTitle(viewModel.isSubspace ? localized("New Sub-space") : localized("New Space"))
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
+          Button(localized("Cancel")) { dismiss() }
         }
         ToolbarItem(placement: .confirmationAction) {
           if viewModel.isCreating {
             ProgressView()
           } else {
-            Button("Create") { Task { await viewModel.create() } }
+            Button(localized("Create")) { Task { await viewModel.create() } }
               .disabled(!viewModel.canCreate)
               .accessibilityIdentifier(A11yIdentifiers.newSpace.create)
           }
@@ -102,8 +106,9 @@ struct NewSpaceScreen: View {
   }
 
   private var visibilityFooter: String {
-    if viewModel.draft.isPublic { return "Anyone on the server can find it and join." }
+    if viewModel.draft.isPublic { return localized("Anyone on the server can find it and join.") }
     return viewModel.isSubspace
-      ? "Members of the parent space can join it." : "Only people you invite can join."
+      ? localized("Members of the parent space can join it.")
+      : localized("Only people you invite can join.")
   }
 }

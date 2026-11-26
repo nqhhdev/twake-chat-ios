@@ -72,7 +72,7 @@ struct AudioMessageRow: View {
         }
       }
       .buttonStyle(PressScaleButtonStyle())
-      .accessibilityLabel(isPlaying ? "Pause" : "Play")
+      .accessibilityLabel(isPlaying ? localized("Pause") : localized("Play"))
       VStack(alignment: .leading, spacing: 4) {
         TimelineView(.animation(paused: !isPlaying)) { context in
           HStack(spacing: 2) {
@@ -97,7 +97,7 @@ struct AudioMessageRow: View {
         case .transcribing:
           HStack(spacing: 6) {
             ProgressView().controlSize(.mini)
-            Text("Transcribing…")
+            Text(localized("Transcribing…"))
           }
           .textStyle(TextStyles.labelSmall)
           .foregroundStyle(SysColors.textSecondary)
@@ -106,7 +106,7 @@ struct AudioMessageRow: View {
             .textStyle(TextStyles.bodySmall)
             .foregroundStyle(SysColors.onSurface)
             .fixedSize(horizontal: false, vertical: true)
-            .accessibilityLabel("Transcription: \(text)")
+            .accessibilityLabel(localized("Transcription: \(text)"))
         case nil:
           EmptyView()
         }
@@ -120,7 +120,7 @@ struct AudioMessageRow: View {
           .background(SysColors.primaryContainer, in: Capsule())
       }
       .buttonStyle(PressScaleButtonStyle())
-      .accessibilityLabel("Playback speed")
+      .accessibilityLabel(localized("Playback speed"))
       .accessibilityValue(speedSetting.speed.label)
     }
     .task(id: isPlaying) {
@@ -198,7 +198,7 @@ struct VideoPlayerScreen: View {
           .frame(width: 40, height: 40)
           .background(.black.opacity(0.5), in: Circle())
       }
-      .accessibilityLabel("Close")
+      .accessibilityLabel(localized("Close"))
       .padding(16)
     }
     .onAppear {

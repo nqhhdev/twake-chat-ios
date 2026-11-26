@@ -63,7 +63,7 @@ final class LinkRouter {
         joining = Joining(preview: preview, via: via, eventId: eventId)
       }
     } catch {
-      errorMessage = "This chat could not be found."
+      errorMessage = String(localized: "This chat could not be found.")
     }
   }
 
@@ -80,8 +80,8 @@ final class LinkRouter {
     } catch {
       errorMessage =
         joining.preview.isPublic
-        ? "Could not join this chat. Please try again."
-        : "This chat is private: someone in it has to invite you."
+        ? String(localized: "Could not join this chat. Please try again.")
+        : String(localized: "This chat is private: someone in it has to invite you.")
     }
   }
 
@@ -89,7 +89,9 @@ final class LinkRouter {
   func message(_ userId: String) async {
     person = nil
     guard let openDirectChat else { return }
-    if await !openDirectChat(userId) { errorMessage = "Could not open the chat with \(userId)." }
+    if await !openDirectChat(userId) {
+      errorMessage = String(localized: "Could not open the chat with \(userId).")
+    }
   }
 
   func clearError() { errorMessage = nil }

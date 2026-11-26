@@ -105,7 +105,7 @@ public final class RoomViewModel {
         identityWarnings.removeAll { $0.userId == warning.userId }
       }
     } catch {
-      errorMessage = "Could not update \(warning.name)'s identity."
+      errorMessage = localized("Could not update \(warning.name)'s identity.")
     }
   }
 
@@ -314,7 +314,7 @@ public final class RoomViewModel {
     do {
       items = try await openTimeline()
     } catch {
-      if thisStart == startCount { state = .failed("Could not open this chat.") }
+      if thisStart == startCount { state = .failed(localized("Could not open this chat.")) }
       return
     }
     // Keys the NSE stored, or a recovery that just finished, are retried now that the timeline is open.

@@ -71,7 +71,7 @@ public final class PublicRoomsViewModel {
     } catch {
       rooms = []
       reachedEnd = true
-      errorMessage = "Could not load the public groups."
+      errorMessage = localized("Could not load the public groups.")
       return
     }
     for await page in stream {
@@ -107,17 +107,17 @@ public final class PublicRoomsViewModel {
             id: roomId, name: room.name, lastMessageText: nil, lastMessageSender: nil,
             lastActivity: nil, avatar: room.avatar))
       } catch {
-        errorMessage = "Could not join \(room.name). Please try again."
+        errorMessage = localized("Could not join \(room.name). Please try again.")
       }
     case .request:
       do {
         try await repository.requestToJoin(roomId: room.id)
         requested.insert(room.id)
       } catch {
-        errorMessage = "Could not ask to join \(room.name). Please try again."
+        errorMessage = localized("Could not ask to join \(room.name). Please try again.")
       }
     case .inviteOnly:
-      errorMessage = "\(room.name) needs an invitation."
+      errorMessage = localized("\(room.name) needs an invitation.")
     }
   }
 }
@@ -133,9 +133,9 @@ struct PublicRoomsScreen: View {
       if let rooms = viewModel.rooms {
         if rooms.isEmpty, viewModel.reachedEnd || viewModel.errorMessage != nil {
           ContentUnavailableView {
-            Label("No public groups", systemImage: "person.3")
+            Label(localized("No public groups"), systemImage: "person.3")
           } description: {
-            Text(viewModel.errorMessage ?? "Try another name.")
+            Text(viewModel.errorMessage ?? localized("Try another name."))
           }
         } else {
           List {
@@ -159,8 +159,8 @@ struct PublicRoomsScreen: View {
         ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
-    .navigationTitle("Public Groups")
-    .searchable(text: $viewModel.query, prompt: "Search groups")
+    .navigationTitle(localized("Public Groups"))
+    .searchable(text: $viewModel.query, prompt: localized("Search groups"))
     .onAppear { viewModel.start() }
     .onDisappear { viewModel.stop() }
   }
@@ -177,7 +177,7 @@ struct PublicRoomsScreen: View {
         if let topic = room.topic {
           Text(topic).font(.subheadline).foregroundStyle(SysColors.textSecondary).lineLimit(2)
         }
-        Text(room.memberCount == 1 ? "1 member" : "\(room.memberCount) members")
+        Text(localized("\(room.memberCount) members"))
           .font(.caption)
           .foregroundStyle(SysColors.textSecondary)
       }
@@ -190,21 +190,21 @@ struct PublicRoomsScreen: View {
     if viewModel.working.contains(room.id) {
       ProgressView()
     } else if viewModel.requested.contains(room.id) {
-      Text("Requested").font(.subheadline).foregroundStyle(SysColors.textSecondary)
+      Text(localized("Requested")).font(.subheadline).foregroundStyle(SysColors.textSecondary)
     } else {
       switch room.access {
       case .open:
-        Button("Join") { Task { await viewModel.open(room) } }
+        Button(localized("Join")) { Task { await viewModel.open(room) } }
           .buttonStyle(.borderedProminent)
           .buttonBorderShape(.capsule)
           .controlSize(.small)
       case .request:
-        Button("Request") { Task { await viewModel.open(room) } }
+        Button(localized("Request")) { Task { await viewModel.open(room) } }
           .buttonStyle(.bordered)
           .buttonBorderShape(.capsule)
           .controlSize(.small)
       case .inviteOnly:
-        Label("Invite only", systemImage: "lock")
+        Label(localized("Invite only"), systemImage: "lock")
           .font(.caption)
           .foregroundStyle(SysColors.textSecondary)
       }

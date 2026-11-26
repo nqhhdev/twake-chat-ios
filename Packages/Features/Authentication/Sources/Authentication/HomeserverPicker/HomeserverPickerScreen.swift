@@ -21,25 +21,27 @@ public struct HomeserverPickerScreen: View {
             .font(.system(size: 20, weight: .medium))
             .frame(width: 48, height: 48)
         }
-        .accessibilityLabel("Back")
+        .accessibilityLabel(localized("Back"))
         .foregroundStyle(SysColors.onBackground)
         Spacer()
       }
       .padding(.horizontal, 4)
       Spacer()
-      Text("Select your server")
+      Text(localized("Select your server"))
         .textStyle(TextStyles.headlineMedium)
         .foregroundStyle(SysColors.onBackground)
         .padding(.bottom, 48)
       field
         .padding(.horizontal, 16)
       if viewModel.isWrongServerName {
-        Text("Server address was sent to you by company admin. Check the invitation email.")
-          .textStyle(TextStyles.bodyMedium)
-          .foregroundStyle(SysColors.outline)
-          .multilineTextAlignment(.center)
-          .padding(.horizontal, 16)
-          .padding(.top, 4)
+        Text(
+          localized("Server address was sent to you by company admin. Check the invitation email.")
+        )
+        .textStyle(TextStyles.bodyMedium)
+        .foregroundStyle(SysColors.outline)
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
       }
       if let errorMessage = viewModel.errorMessage {
         Text(errorMessage)
@@ -56,7 +58,7 @@ public struct HomeserverPickerScreen: View {
           if viewModel.isLoading {
             ProgressView().tint(SysColors.onPrimary.color(for: .light))
           } else {
-            Text("Continue").textStyle(TextStyles.labelLarge)
+            Text(localized("Continue")).textStyle(TextStyles.labelLarge)
           }
         }
         // The style pads by 16 on each side: 24 here makes the button 56 high, as the welcome screen's buttons.
@@ -77,10 +79,10 @@ public struct HomeserverPickerScreen: View {
   private var field: some View {
     let isWrong = viewModel.isWrongServerName
     return VStack(alignment: .leading, spacing: 4) {
-      Text(isWrong ? "Wrong server name" : "Homeserver")
+      Text(isWrong ? localized("Wrong server name") : localized("Homeserver"))
         .textStyle(TextStyles.bodySmall)
         .foregroundStyle(isWrong ? SysColors.error : SysColors.onSurface)
-      TextField("Enter your homeserver", text: $viewModel.server)
+      TextField(localized("Enter your homeserver"), text: $viewModel.server)
         .textStyle(TextStyles.bodyLarge)
         .textContentType(.URL)
         .keyboardType(.URL)
