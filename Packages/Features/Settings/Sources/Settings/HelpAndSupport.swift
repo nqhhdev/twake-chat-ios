@@ -32,7 +32,7 @@ public final class HelpViewModel {
     errorMessage = nil
     guard let supportContact, let openDirectChat else { return }
     if await !openDirectChat(supportContact) {
-      errorMessage = "Could not open the chat with support."
+      errorMessage = localized("Could not open the chat with support.")
     }
   }
 }
@@ -45,7 +45,7 @@ struct HelpSection: View {
       Section {
         if let url = viewModel.helpURL {
           Link(destination: url) {
-            SettingsRow(title: "Help", icon: "questionmark.circle", detail: nil)
+            SettingsRow(title: localized("Help"), icon: "questionmark.circle", detail: nil)
           }
           .accessibilityIdentifier("settings.help")
         }
@@ -54,7 +54,8 @@ struct HelpSection: View {
             Task { await viewModel.chatWithSupport() }
           } label: {
             SettingsRow(
-              title: "Chat with Support", icon: "bubble.left.and.text.bubble.right", detail: nil)
+              title: localized("Chat with Support"), icon: "bubble.left.and.text.bubble.right",
+              detail: nil)
           }
           .accessibilityIdentifier("settings.supportChat")
         }

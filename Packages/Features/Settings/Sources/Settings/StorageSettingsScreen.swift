@@ -22,43 +22,43 @@ struct StorageSettingsScreen: View {
               .textSelection(.enabled)
               .swipeActions {
                 if viewModel.canChangeLinkedAddresses {
-                  Button("Remove", role: .destructive) { removing = address }
+                  Button(localized("Remove"), role: .destructive) { removing = address }
                 }
               }
           }
           if viewModel.canChangeLinkedAddresses {
-            Button("Add e-mail", systemImage: "plus") { isAddingEmail = true }
+            Button(localized("Add e-mail"), systemImage: "plus") { isAddingEmail = true }
               .disabled(viewModel.isChangingAddresses)
-            Button("Add phone number", systemImage: "plus") { isAddingPhone = true }
+            Button(localized("Add phone number"), systemImage: "plus") { isAddingPhone = true }
               .disabled(viewModel.isChangingAddresses)
           }
         } header: {
-          Text("E-mails and phones")
+          Text(localized("E-mails and phones"))
         } footer: {
-          Text("People who have these in their contacts can find you.")
+          Text(localized("People who have these in their contacts can find you."))
         }
       }
       if let visibility = viewModel.contactsVisibility {
         Section {
           Picker(
-            "Who sees them",
+            localized("Who sees them"),
             selection: Binding(
               get: { visibility },
               set: { new in Task { await viewModel.setContactsVisibility(new) } })
           ) {
-            Text("Nobody").tag(ContactsVisibility.nobody)
-            Text("My contacts").tag(ContactsVisibility.contacts)
-            Text("Everyone").tag(ContactsVisibility.everyone)
+            Text(localized("Nobody")).tag(ContactsVisibility.nobody)
+            Text(localized("My contacts")).tag(ContactsVisibility.contacts)
+            Text(localized("Everyone")).tag(ContactsVisibility.everyone)
           }
           .pickerStyle(.inline)
           .labelsHidden()
         } header: {
-          Text("Who sees my e-mail and phone")
+          Text(localized("Who sees my e-mail and phone"))
         }
         .transition(.opacity)
       }
       Section {
-        LabeledContent("Cache") {
+        LabeledContent(localized("Cache")) {
           if let size = viewModel.cacheSize {
             Text(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
               .contentTransition(.numericText(value: Double(size)))
@@ -66,18 +66,20 @@ struct StorageSettingsScreen: View {
             ProgressView()
           }
         }
-        Button("Clear Cache", role: .destructive) { isConfirming = true }
+        Button(localized("Clear Cache"), role: .destructive) { isConfirming = true }
           .disabled(viewModel.isClearingCache)
       } footer: {
         Text(
-          "Messages and media load again from the server. Your keys and session stay on this device."
+          localized(
+            "Messages and media load again from the server. Your keys and session stay on this device."
+          )
         )
       }
       if let message = viewModel.errorMessage {
         Section { Text(message).foregroundStyle(SysColors.error) }
       }
     }
-    .twakeTitle("Data and Storage")
+    .twakeTitle(localized("Data and Storage"))
     .overlay { if viewModel.isClearingCache { ProgressView().controlSize(.large) } }
     .animation(.spring(response: 0.4, dampingFraction: 0.85), value: viewModel.cacheSize)
     .animation(.easeInOut(duration: 0.25), value: viewModel.contactsVisibility)
@@ -88,49 +90,51 @@ struct StorageSettingsScreen: View {
       async let visibility: Void = viewModel.loadContactsVisibility()
       _ = await (size, addresses, visibility)
     }
-    .confirmationDialog("Clear the cache?", isPresented: $isConfirming, titleVisibility: .visible) {
-      Button("Clear Cache", role: .destructive) { Task { await viewModel.clearCache() } }
+    .confirmationDialog(
+      localized("Clear the cache?"), isPresented: $isConfirming, titleVisibility: .visible
+    ) {
+      Button(localized("Clear Cache"), role: .destructive) { Task { await viewModel.clearCache() } }
     }
     .overlay { if viewModel.isChangingAddresses { ProgressView().controlSize(.large) } }
     .modifier(LinkedAddressDialogs(viewModel: viewModel))
-    .alert("Add an e-mail", isPresented: $isAddingEmail) {
-      TextField("E-mail", text: $newEmail)
+    .alert(localized("Add an e-mail"), isPresented: $isAddingEmail) {
+      TextField(localized("E-mail"), text: $newEmail)
         .keyboardType(.emailAddress)
         .textContentType(.emailAddress)
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
-      Button("Cancel", role: .cancel) { newEmail = "" }
-      Button("Send link") {
+      Button(localized("Cancel"), role: .cancel) { newEmail = "" }
+      Button(localized("Send link")) {
         let typed = newEmail
         newEmail = ""
         Task { await viewModel.addEmail(typed) }
       }
     } message: {
-      Text("We will send a link to this address to confirm it is yours.")
+      Text(localized("We will send a link to this address to confirm it is yours."))
     }
-    .alert("Add a phone number", isPresented: $isAddingPhone) {
-      TextField("+33 6 12 34 56 78", text: $newPhone)
+    .alert(localized("Add a phone number"), isPresented: $isAddingPhone) {
+      TextField("+33 6 12 34 56 78" as String, text: $newPhone)
         .keyboardType(.phonePad)
         .textContentType(.telephoneNumber)
-      Button("Cancel", role: .cancel) { newPhone = "" }
-      Button("Send code") {
+      Button(localized("Cancel"), role: .cancel) { newPhone = "" }
+      Button(localized("Send code")) {
         let typed = newPhone
         newPhone = ""
         Task { await viewModel.addPhone(typed) }
       }
     } message: {
-      Text("We will send a code to this number by text message to confirm it is yours.")
+      Text(localized("We will send a code to this number by text message to confirm it is yours."))
     }
     .confirmationDialog(
-      "Remove \(removing?.address ?? "")?",
+      localized("Remove \(removing?.address ?? "")?"),
       isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
       titleVisibility: .visible
     ) {
-      Button("Remove", role: .destructive) {
+      Button(localized("Remove"), role: .destructive) {
         if let address = removing { Task { await viewModel.removeLinkedAddress(address) } }
       }
     } message: {
-      Text("People will no longer find you by it.")
+      Text(localized("People will no longer find you by it."))
     }
   }
 }
@@ -143,7 +147,7 @@ private struct LinkedAddressDialogs: ViewModifier {
   func body(content: Content) -> some View {
     content
       .alert(
-        "Enter the code",
+        localized("Enter the code"),
         isPresented: Binding(
           get: {
             viewModel.pendingPhone != nil && viewModel.linkChallenge == nil
@@ -151,11 +155,11 @@ private struct LinkedAddressDialogs: ViewModifier {
           },
           set: { if !$0 { code = "" } })
       ) {
-        TextField("Code", text: $code)
+        TextField(localized("Code"), text: $code)
           .keyboardType(.numberPad)
           .textContentType(.oneTimeCode)
-        Button("Cancel", role: .cancel) { viewModel.cancelLinking() }
-        Button("Confirm") {
+        Button(localized("Cancel"), role: .cancel) { viewModel.cancelLinking() }
+        Button(localized("Confirm")) {
           let typed = code
           code = ""
           Task { await viewModel.submitPhoneCode(typed) }
@@ -164,11 +168,12 @@ private struct LinkedAddressDialogs: ViewModifier {
         let phone = viewModel.pendingPhone?.phone ?? ""
         Text(
           viewModel.phoneCodeRejected
-            ? "This code is not right. Check the text message sent to \(phone) and try again."
-            : "We sent a code to \(phone). Enter it to confirm the number is yours.")
+            ? localized(
+              "This code is not right. Check the text message sent to \(phone) and try again.")
+            : localized("We sent a code to \(phone). Enter it to confirm the number is yours."))
       }
       .alert(
-        "Check your inbox",
+        localized("Check your inbox"),
         isPresented: Binding(
           get: {
             viewModel.pendingEmail != nil && viewModel.linkChallenge == nil
@@ -176,14 +181,15 @@ private struct LinkedAddressDialogs: ViewModifier {
           },
           set: { _ in })
       ) {
-        Button("Cancel", role: .cancel) { viewModel.cancelLinking() }
-        Button("I opened the link") { Task { await viewModel.finishLinkingEmail() } }
+        Button(localized("Cancel"), role: .cancel) { viewModel.cancelLinking() }
+        Button(localized("I opened the link")) { Task { await viewModel.finishLinkingEmail() } }
       } message: {
         let email = viewModel.pendingEmail?.email ?? ""
         Text(
           viewModel.emailNotConfirmed
-            ? "The link was not opened yet. Open the link sent to \(email), then try again."
-            : "We sent a link to \(email). Open it, then come back here.")
+            ? localized(
+              "The link was not opened yet. Open the link sent to \(email), then try again.")
+            : localized("We sent a link to \(email). Open it, then come back here."))
       }
       .sheet(
         isPresented: Binding(
@@ -195,16 +201,16 @@ private struct LinkedAddressDialogs: ViewModifier {
         }
       }
       .alert(
-        "Confirm it is you",
+        localized("Confirm it is you"),
         isPresented: Binding(
           get: {
             viewModel.linkChallenge.map { $0.webURL == nil && $0.acceptsPassword } ?? false
           },
           set: { if !$0 { password = "" } })
       ) {
-        SecureField("Password", text: $password)
-        Button("Cancel", role: .cancel) { viewModel.cancelLinking() }
-        Button("Add") {
+        SecureField(localized("Password"), text: $password)
+        Button(localized("Cancel"), role: .cancel) { viewModel.cancelLinking() }
+        Button(localized("Add")) {
           let typed = password
           password = ""
           Task { await viewModel.confirmLinking(password: typed) }
@@ -212,8 +218,8 @@ private struct LinkedAddressDialogs: ViewModifier {
       } message: {
         Text(
           viewModel.pendingPhone == nil
-            ? "Enter your account password to add the e-mail."
-            : "Enter your account password to add the phone number.")
+            ? localized("Enter your account password to add the e-mail.")
+            : localized("Enter your account password to add the phone number."))
       }
   }
 }

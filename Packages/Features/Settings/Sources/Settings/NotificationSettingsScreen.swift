@@ -13,19 +13,19 @@ struct NotificationSettingsScreen: View {
             get: { viewModel.doNotDisturb },
             set: { on in Task { await viewModel.setDoNotDisturb(on) } })
         ) {
-          Label("Do Not Disturb", systemImage: "moon.fill")
+          Label(localized("Do Not Disturb"), systemImage: "moon.fill")
         }
         .tint(.indigo)
       } footer: {
-        Text("No notifications on any of your devices until you turn it off.")
+        Text(localized("No notifications on any of your devices until you turn it off."))
       }
-      modePicker("Direct Chats", selection: viewModel.directMode, isDirect: true)
-      modePicker("Group chats", selection: viewModel.groupMode, isDirect: false)
+      modePicker(localized("Direct Chats"), selection: viewModel.directMode, isDirect: true)
+      modePicker(localized("Group chats"), selection: viewModel.groupMode, isDirect: false)
       if let message = viewModel.errorMessage {
         Section { Text(message).foregroundStyle(SysColors.error) }
       }
     }
-    .twakeTitle("Notifications")
+    .twakeTitle(localized("Notifications"))
   }
 
   private func modePicker(_ title: String, selection: NotificationMode, isDirect: Bool) -> some View

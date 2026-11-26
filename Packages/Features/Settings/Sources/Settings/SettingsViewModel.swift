@@ -111,7 +111,7 @@ public final class SettingsViewModel {
       blockedUsers = try await repository.blockedUsers()
     } catch {
       blockedUsers = []
-      errorMessage = "Could not load the blocked people."
+      errorMessage = localized("Could not load the blocked people.")
     }
   }
 
@@ -122,7 +122,7 @@ public final class SettingsViewModel {
       try await repository.unblock(userId: user.id)
       withAnimation { blockedUsers?.removeAll { $0.id == user.id } }
     } catch {
-      errorMessage = "Could not unblock \(user.name). Please try again."
+      errorMessage = localized("Could not unblock \(user.name). Please try again.")
     }
   }
 
@@ -141,7 +141,7 @@ public final class SettingsViewModel {
           data: picture.jpeg, mimeType: "image/jpeg", width: picture.side, height: picture.side))
       avatar = await repository.avatar()
     } catch {
-      errorMessage = "Could not change your picture. Please try again."
+      errorMessage = localized("Could not change your picture. Please try again.")
     }
   }
 
@@ -155,7 +155,7 @@ public final class SettingsViewModel {
       try await repository.removeAvatar()
       avatar = nil
     } catch {
-      errorMessage = "Could not remove your picture. Please try again."
+      errorMessage = localized("Could not remove your picture. Please try again.")
     }
   }
 
@@ -172,7 +172,7 @@ public final class SettingsViewModel {
       displayName = name
       return true
     } catch {
-      errorMessage = "Could not change your name. Please try again."
+      errorMessage = localized("Could not change your name. Please try again.")
       return false
     }
   }
@@ -208,9 +208,9 @@ public final class SettingsViewModel {
     do {
       pendingEmail = try await repository.sendEmailConfirmation(to: email)
     } catch .addressInUse {
-      errorMessage = "This e-mail is already used by another account."
+      errorMessage = localized("This e-mail is already used by another account.")
     } catch {
-      errorMessage = "Could not send the confirmation e-mail. Please try again."
+      errorMessage = localized("Could not send the confirmation e-mail. Please try again.")
     }
   }
 
@@ -224,12 +224,14 @@ public final class SettingsViewModel {
     do {
       pendingPhone = try await repository.sendPhoneConfirmation(to: number, regionCode: regionCode)
     } catch .addressInUse {
-      errorMessage = "This phone number is already used by another account."
+      errorMessage = localized("This phone number is already used by another account.")
     } catch .phoneNotSupported {
       errorMessage =
-        "This phone number cannot be added. Check the number, with its country code, or ask your server's administrator."
+        localized(
+          "This phone number cannot be added. Check the number, with its country code, or ask your server's administrator."
+        )
     } catch {
-      errorMessage = "Could not send the code. Please try again."
+      errorMessage = localized("Could not send the code. Please try again.")
     }
   }
 
@@ -248,7 +250,7 @@ public final class SettingsViewModel {
     } catch {
       isChangingAddresses = false
       cancelLinking()
-      errorMessage = "Could not check the code. Please try again."
+      errorMessage = localized("Could not check the code. Please try again.")
       return
     }
     isChangingAddresses = false
@@ -281,7 +283,7 @@ public final class SettingsViewModel {
 
   private func link(auth: DeviceAuth?, isNewConfirmation: Bool) async {
     guard pendingEmail != nil || pendingPhone != nil, !isChangingAddresses else { return }
-    let noun = pendingPhone == nil ? "e-mail" : "phone number"
+    let isPhone = pendingPhone != nil
     errorMessage = nil
     isChangingAddresses = true
     defer { isChangingAddresses = false }
@@ -299,7 +301,7 @@ public final class SettingsViewModel {
       }
       if isNewConfirmation || (challenge.webURL == nil && !challenge.acceptsPassword) {
         cancelLinking()
-        errorMessage = "Could not confirm it is you. Please try again."
+        errorMessage = localized("Could not confirm it is you. Please try again.")
       } else {
         emailNotConfirmed = false
         linkChallenge = challenge
@@ -309,10 +311,16 @@ public final class SettingsViewModel {
       emailNotConfirmed = true
     } catch .addressInUse {
       cancelLinking()
-      errorMessage = "This \(noun) is already used by another account."
+      errorMessage =
+        isPhone
+        ? localized("This phone number is already used by another account.")
+        : localized("This e-mail is already used by another account.")
     } catch {
       cancelLinking()
-      errorMessage = "Could not add the \(noun). Please try again."
+      errorMessage =
+        isPhone
+        ? localized("Could not add the phone number. Please try again.")
+        : localized("Could not add the e-mail. Please try again.")
     }
   }
 
@@ -326,7 +334,7 @@ public final class SettingsViewModel {
       try await repository.removeLinkedAddress(address)
       linkedAddresses?.removeAll { $0 == address }
     } catch {
-      errorMessage = "Could not remove \(address.address). Please try again."
+      errorMessage = localized("Could not remove \(address.address). Please try again.")
     }
   }
 
@@ -346,7 +354,7 @@ public final class SettingsViewModel {
       try await repository.setContactsVisibility(visibility)
     } catch {
       contactsVisibility = previous
-      errorMessage = "Could not change who sees your e-mail and phone."
+      errorMessage = localized("Could not change who sees your e-mail and phone.")
     }
   }
 
@@ -367,7 +375,7 @@ public final class SettingsViewModel {
       try await repository.clearCache()
       cacheSize = await repository.cacheSize()
     } catch {
-      errorMessage = "Could not clear the cache. Please try again."
+      errorMessage = localized("Could not clear the cache. Please try again.")
     }
   }
 
@@ -382,7 +390,7 @@ public final class SettingsViewModel {
       try await repository.setStatusMessage(trimmed)
     } catch {
       statusMessage = previous
-      errorMessage = "Could not change your status. Please try again."
+      errorMessage = localized("Could not change your status. Please try again.")
     }
   }
 
@@ -396,7 +404,7 @@ public final class SettingsViewModel {
       try await repository.setDoNotDisturb(on)
     } catch {
       doNotDisturb = previous
-      errorMessage = "Could not change Do Not Disturb. Please try again."
+      errorMessage = localized("Could not change Do Not Disturb. Please try again.")
     }
   }
 
@@ -407,7 +415,7 @@ public final class SettingsViewModel {
       try await repository.setDefaultNotificationMode(mode, isDirect: isDirect)
     } catch {
       if isDirect { directMode = previous } else { groupMode = previous }
-      errorMessage = "Could not change the notifications. Please try again."
+      errorMessage = localized("Could not change the notifications. Please try again.")
     }
   }
 
@@ -423,9 +431,9 @@ public final class SettingsViewModel {
       recoveryStatus = await repository.recoveryStatus()
       NotificationCenter.default.post(name: .encryptionKeysImported, object: nil)
     } catch .wrongRecoveryKey {
-      errorMessage = "Wrong recovery key"
+      errorMessage = localized("Wrong recovery key")
     } catch {
-      errorMessage = "Oops, something went wrong…"
+      errorMessage = localized("Oops, something went wrong…")
     }
   }
 
@@ -439,7 +447,7 @@ public final class SettingsViewModel {
       newRecoveryKey = try await repository.enableRecovery()
       recoveryStatus = await repository.recoveryStatus()
     } catch {
-      errorMessage = "Could not set up the chat backup. Please try again."
+      errorMessage = localized("Could not set up the chat backup. Please try again.")
     }
   }
 
@@ -458,7 +466,7 @@ public final class SettingsViewModel {
       let step = try await repository.startIdentityReset()
       if step == .done { await identityWasReset() } else { identityReset = step }
     } catch {
-      errorMessage = "Could not reset your identity. Please try again."
+      errorMessage = localized("Could not reset your identity. Please try again.")
     }
   }
 
@@ -474,7 +482,8 @@ public final class SettingsViewModel {
     } catch {
       errorMessage =
         password == nil
-        ? "The reset was not approved. Please try again." : "Wrong password, or the reset failed."
+        ? localized("The reset was not approved. Please try again.")
+        : localized("Wrong password, or the reset failed.")
     }
   }
 
@@ -494,14 +503,14 @@ public final class SettingsViewModel {
     isLoggingOut = true
     defer { isLoggingOut = false }
     errorMessage = nil
-    if await !logOutAction() { errorMessage = "Could not log out. Please try again." }
+    if await !logOutAction() { errorMessage = localized("Could not log out. Please try again.") }
   }
 
   public static func title(of mode: NotificationMode) -> String {
     switch mode {
-    case .allMessages: "All messages"
-    case .mentionsAndKeywords: "Mentions and keywords"
-    case .mute: "Mute"
+    case .allMessages: localized("All messages")
+    case .mentionsAndKeywords: localized("Mentions and keywords")
+    case .mute: localized("Mute")
     }
   }
 
