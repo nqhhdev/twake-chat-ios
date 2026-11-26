@@ -421,6 +421,11 @@ public final class ChatListViewModel {
     do { try await action() } catch { actionErrorMessage = failure }
   }
 
+  public var showsNoResults: Bool {
+    visibleRooms.isEmpty && peopleResults.isEmpty && messageResults.isEmpty
+      && !isSearchingMessages
+  }
+
   public var visibleRooms: [RoomSummary] {
     guard case .loaded(let rooms) = state else { return [] }
     let text = query.trimmingCharacters(in: .whitespaces)

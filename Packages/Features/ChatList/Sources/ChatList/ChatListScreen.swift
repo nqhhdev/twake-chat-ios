@@ -188,7 +188,7 @@ public struct ChatListScreen: View {
     case .failed(let message):
       ContentUnavailableView(message, systemImage: "exclamationmark.triangle")
     case .loaded:
-      if viewModel.visibleRooms.isEmpty {
+      if viewModel.showsNoResults {
         ContentUnavailableView.search(text: viewModel.query)
       } else {
         list
