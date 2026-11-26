@@ -1275,4 +1275,27 @@ struct RoomThreadTests {
     #expect(details.presenceCalls.allSatisfy { $0 == "@bob:example.org" })
   }
 
+  @Test func lowPowerModeReadsPresenceLessOften() async {
+    let details = FakeRoomDetailsRepository()
+    details.detailsResult = .success(
+      RoomDetails(
+        id: "!dm:example.org", name: "Bob", topic: nil, alias: nil, isDirect: true,
+        isEncrypted: true, isPublic: false, joinedMemberCount: 2,
+        directUserId: "@bob:example.org"))
+    details.presence = Presence(isOnline: true)
+    let viewModel = RoomViewModel(
+      roomId: "!dm:example.org", roomName: "Bob", repository: FakeTimelineRepository(),
+      media: FakeMediaRepository(), details: details)
+    await viewModel.loadRoomState()
+    let task = Task {
+      await viewModel.watchPresence(
+        every: .milliseconds(10), lowPower: .seconds(60), isLowPower: { true })
+    }
+    while details.presenceCalls.isEmpty { await Task.yield() }
+    try? await Task.sleep(for: .milliseconds(100))
+    #expect(details.presenceCalls.count == 1)
+    task.cancel()
+    _ = await task.result
+  }
+
 }
