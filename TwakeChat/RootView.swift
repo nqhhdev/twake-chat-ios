@@ -76,7 +76,7 @@ final class RootCoordinator {
   /// Opens Matrix links in the app; the shell shows what it finds.
   @ObservationIgnored private(set) var links: LinkRouter!
   /// What other apps share into the app, waiting for a chat.
-  @ObservationIgnored let shares = ShareCenter()
+  @ObservationIgnored let shares: ShareCenter
   @ObservationIgnored let shareSuggestions = ShareSuggestions()
   @ObservationIgnored private let verificationRepository: (any VerificationRepository)?
   /// Unlocks this device with the recovery key kept on ToM (ADR 0024); `nil` (tests) never runs.
@@ -132,8 +132,10 @@ final class RootCoordinator {
     signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator,
     capabilities: (any ServerCapabilitiesRepository)? = nil,
     accountDeletion: (any AccountDeletionRepository)? = nil,
-    analytics: (any AnalyticsRepository)? = nil
+    analytics: (any AnalyticsRepository)? = nil,
+    shares: ShareCenter = ShareCenter()
   ) {
+    self.shares = shares
     self.analyticsRepository = analytics
     self.capabilities = capabilities
     self.accountDeletion = accountDeletion

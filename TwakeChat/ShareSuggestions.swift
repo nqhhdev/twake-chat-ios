@@ -19,6 +19,7 @@ final class ShareSuggestions {
   static let avatarSize = 96
 
   private let system: System
+  var accountUserId: String?
   private var avatars: [MediaReference: Data] = [:]
 
   init(system: System = .live) {
@@ -43,7 +44,8 @@ final class ShareSuggestions {
   ) async {
     let image = await avatarData(avatar, media: media).map { INImage(imageData: $0) }
     let interaction = INInteraction(
-      intent: Self.intent(roomId: roomId, name: name, image: image), response: nil)
+      intent: Self.intent(roomId: roomId, name: name, image: image, accountUserId: accountUserId),
+      response: nil)
     interaction.direction = .outgoing
     interaction.groupIdentifier = roomId
     system.donate(interaction)
@@ -58,11 +60,18 @@ final class ShareSuggestions {
     system.forgetAll()
   }
 
-  static func intent(roomId: String, name: String, image: INImage?) -> INSendMessageIntent {
+  static func intent(
+    roomId: String, name: String, image: INImage?, accountUserId: String? = nil
+  ) -> INSendMessageIntent {
+    let me = accountUserId.map {
+      INPerson(
+        personHandle: INPersonHandle(value: nil, type: .unknown), nameComponents: nil,
+        displayName: nil, image: nil, contactIdentifier: nil, customIdentifier: $0, isMe: true)
+    }
     let intent = INSendMessageIntent(
       recipients: nil, outgoingMessageType: .outgoingMessageText, content: nil,
       speakableGroupName: INSpeakableString(spokenPhrase: name), conversationIdentifier: roomId,
-      serviceName: nil, sender: nil, attachments: nil)
+      serviceName: nil, sender: me, attachments: nil)
     if let image {
       intent.setImage(image, forParameterNamed: \.speakableGroupName)
     }

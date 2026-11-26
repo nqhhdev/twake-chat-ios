@@ -83,7 +83,7 @@ public actor PusherProxy: PushRepository {
   }
 
   /// Names the account in a push without revealing its Matrix id: the SHA-256 of the id, in hex.
-  static func clientIdentifier(_ userId: String) -> String {
+  public static func clientIdentifier(_ userId: String) -> String {
     SHA256.hash(data: Data(userId.utf8)).map { String(format: "%02x", $0) }.joined()
   }
 }

@@ -31,13 +31,21 @@ final class ShareViewController: UIViewController {
     }
     let items = SharedItems(
       text: texts.isEmpty ? nil : texts.joined(separator: "\n"), files: files,
-      roomId: (extensionContext?.intent as? INSendMessageIntent)?.conversationIdentifier)
+      roomId: (extensionContext?.intent as? INSendMessageIntent)?.conversationIdentifier,
+      accountUserId: Self.accountUserId(of: extensionContext?.intent as? INSendMessageIntent))
     guard !items.isEmpty, (try? inbox.finish(items)) != nil else {
       inbox.clear()
       return close()
     }
     openApp()
     close()
+  }
+
+  private static func accountUserId(of intent: INSendMessageIntent?) -> String? {
+    guard let intent else { return nil }
+    return AccountLabel.accountUserId(
+      senderIsMe: intent.sender?.isMe == true, senderId: intent.sender?.customIdentifier,
+      meRecipientId: intent.recipients?.first(where: \.isMe)?.customIdentifier)
   }
 
   private enum Read {
