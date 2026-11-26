@@ -5,7 +5,7 @@ import MatrixRustSDK
 /// `DevicesRepository` on the Matrix client-server API (`/_matrix/client/v3/devices`), which the pinned SDK does not
 /// expose, called with the session's access token, as `TwakeContactLookup` calls the ToM server. Nothing here logs:
 /// the token and the device names are the user's.
-public actor DevicesProxy: DevicesRepository {
+public actor DevicesProxy: DevicesRepository, AccountDeletionRepository {
   private let clientProxy: @Sendable () async -> ClientProxy?
   private let session: URLSession
 
@@ -66,6 +66,32 @@ public actor DevicesProxy: DevicesRepository {
     guard status == 401,
       let challenge = Self.challenge(
         from: data, homeserver: request.url?.deletingLastPathComponent())
+    else { throw .requestFailed }
+    return .needsConfirmation(challenge)
+  }
+
+  public func deactivateAccount(auth: DeviceAuth?) async throws(DevicesError) -> AccountDeletion {
+    var payload: [String: Any] = ["erase": false]
+    if let auth {
+      let userId = try? await clientProxy()?.userId
+      payload["auth"] = try await Self.authBody(auth, userId: userId)
+    }
+    let body = try? JSONSerialization.data(withJSONObject: payload)
+    let (_, request) = try await request(path: "account/deactivate", method: "POST", body: body)
+    let data: Data
+    let status: Int
+    do {
+      let (answer, response) = try await session.data(for: request)
+      data = answer
+      status = (response as? HTTPURLResponse)?.statusCode ?? 0
+    } catch {
+      throw .requestFailed
+    }
+    if status == 200 { return .done }
+    guard status == 401,
+      let challenge = Self.challenge(
+        from: data, homeserver: request.url?.deletingLastPathComponent().deletingLastPathComponent()
+      )
     else { throw .requestFailed }
     return .needsConfirmation(challenge)
   }

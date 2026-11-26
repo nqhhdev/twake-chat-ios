@@ -8,17 +8,24 @@ import MatrixRustSDK
 public actor MeetCallProxy: MeetCallRepository {
   private let clientProxy: @Sendable () async -> ClientProxy?
   private let meet: TwakeMeet
-  /// The call services found for a user, so each room does not read the well-known again.
-  private var services: (userId: String, found: TwakeMeet.Services)?
+  private let capabilities: any ServerCapabilitiesRepository
 
-  public init(authentication: MatrixAuthenticationRepository) {
+  public init(
+    authentication: MatrixAuthenticationRepository,
+    capabilities: any ServerCapabilitiesRepository
+  ) {
     clientProxy = { await authentication.clientProxy }
     meet = TwakeMeet()
+    self.capabilities = capabilities
   }
 
   public func meetBaseURL() async -> URL? {
-    guard let client = await clientProxy() else { return nil }
-    return await services(client)?.meetBase
+    guard await clientProxy() != nil else { return nil }
+    return Self.meetBase(of: await capabilities.current())
+  }
+
+  static func meetBase(of capabilities: ServerCapabilities) -> URL? {
+    capabilities.callFoci.lazy.compactMap(MeetLink.base).first
   }
 
   public func startCall(inRoom roomId: String, base: URL, text: String) async throws(MeetCallError)
@@ -45,7 +52,7 @@ public actor MeetCallProxy: MeetCallRepository {
   /// The slug of the new call: ToM's room when it makes one, which must be one slug on `base`, since other clients
   /// show only those links as calls; a random slug when ToM makes none.
   private func slug(on base: URL, client: ClientProxy) async throws(MeetCallError) -> String {
-    guard let tom = await services(client)?.tom,
+    guard let tom = await capabilities.current().tom?.baseURL,
       let token = try? client.client.session().accessToken
     else { return MeetLink.randomSlug() }
     switch await meet.createRoom(tom: tom, accessToken: token) {
@@ -57,13 +64,5 @@ public actor MeetCallProxy: MeetCallRepository {
     case .failed:
       throw .failed
     }
-  }
-
-  private func services(_ client: ClientProxy) async -> TwakeMeet.Services? {
-    guard let userId = try? client.userId else { return nil }
-    if let services, services.userId == userId { return services.found }
-    guard let found = await meet.services(forUserId: userId) else { return nil }
-    services = (userId, found)
-    return found
   }
 }
