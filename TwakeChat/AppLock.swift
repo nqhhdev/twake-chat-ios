@@ -95,7 +95,7 @@ final class AppLock: AppLockSettings {
     }
     isUnlocking = true
     defer { isUnlocking = false }
-    if await check.authenticate(reason: "Unlock Twake Chat") {
+    if await check.authenticate(reason: String(localized: "Unlock Twake Chat")) {
       withAnimation(.easeOut(duration: 0.25)) { isLocked = false }
     }
   }
@@ -104,7 +104,9 @@ final class AppLock: AppLockSettings {
   func setEnabled(_ enabled: Bool) async -> Bool {
     guard enabled != isEnabled else { return true }
     guard check.method() != nil,
-      await check.authenticate(reason: enabled ? "Turn on App Lock" : "Turn off App Lock")
+      await check.authenticate(
+        reason: enabled
+          ? String(localized: "Turn on App Lock") : String(localized: "Turn off App Lock"))
     else { return false }
     store(enabled)
     return true
