@@ -115,8 +115,7 @@ public final class RoomViewModel {
 
   /// The other person of this direct chat, when it has one.
   @ObservationIgnored var directUserId: String?
-  /// Whether the user blocked someone, and unblocking them; given by the app from the account settings.
-  @ObservationIgnored private let blocking: Blocking?
+  @ObservationIgnored let blocking: Blocking?
 
   /// The account's block list, as the room needs it.
   public struct Blocking: Sendable {
@@ -138,8 +137,7 @@ public final class RoomViewModel {
   var focus: MessageFocus?
   /// A message to scroll to once the timeline first shows (the room was opened from a link to it).
   @ObservationIgnored public var pendingEventId: String?
-  /// What another app shared into this room, applied once the timeline shows.
-  @ObservationIgnored private var pendingShare: IncomingShare?
+  @ObservationIgnored var pendingShare: IncomingShare?
 
   @ObservationIgnored let repository: any TimelineRepository
   /// Loads the pictures and files of messages.
@@ -162,10 +160,9 @@ public final class RoomViewModel {
   @ObservationIgnored private let display: @MainActor () -> ChatDisplaySettings
   /// The banner's action: the app opens Privacy & Security, where the session is verified or the key entered.
   @ObservationIgnored public var onFixSession: (@MainActor () -> Void)?
-  /// The user left this chat: it shows read-only, with Rejoin in place of the composer.
-  public private(set) var isArchived: Bool
-  @ObservationIgnored private let rejoinRoom: (@MainActor () async -> Bool)?
-  public private(set) var isRejoining = false
+  public internal(set) var isArchived: Bool
+  @ObservationIgnored let rejoinRoom: (@MainActor () async -> Bool)?
+  public internal(set) var isRejoining = false
   @ObservationIgnored private var startCount = 0
 
   /// The quick reactions of the Flutter message menu.
@@ -256,43 +253,6 @@ public final class RoomViewModel {
         Task { await self?.gifsChanged(enabled: enabled) }
       }
       return details
-    }
-  }
-
-  /// Takes what another app shared: its text goes into the composer, to read and send; its files are sent, as if
-  /// picked with "+". Before the timeline shows, it waits for it.
-  public func receive(_ share: IncomingShare) {
-    if case .loaded = state {
-      Task { await apply(share) }
-    } else {
-      pendingShare = share
-    }
-  }
-
-  private func apply(_ share: IncomingShare) async {
-    if let text = share.text, !text.isEmpty {
-      draft = draft.isEmpty ? text : draft + "\n" + text
-    }
-    for file in share.files {
-      guard let loaded = AttachmentLoader.load(document: file) else { continue }
-      await send(
-        attachment: loaded.kind, fileURL: loaded.fileURL, mimeType: loaded.mimeType,
-        size: loaded.size)
-      AttachmentLoader.remove(loaded)
-    }
-    share.done()
-  }
-
-  /// Joins this left chat again; the composer comes back.
-  public func rejoin() async {
-    guard isArchived, let rejoinRoom, !isRejoining else { return }
-    isRejoining = true
-    defer { isRejoining = false }
-    errorMessage = nil
-    if await rejoinRoom() {
-      withAnimation { isArchived = false }
-    } else {
-      errorMessage = "Could not join this chat again. It may need an invitation."
     }
   }
 
@@ -503,112 +463,22 @@ public final class RoomViewModel {
     }
   }
 
-  /// The other person's presence in a direct chat, under the name in the header; `nil` elsewhere or when unknown.
-  public private(set) var presenceLine: String?
+  public internal(set) var presenceLine: String?
 
   /// The user may notify everyone in the room, so the mention list offers `@room`.
   public private(set) var canNotifyRoom = false
 
-  /// A direct chat and a Broadcast each have their own empty-chat card.
-  private var isDirect = false
-  private var isBroadcast = false
-
-  /// What the timeline shows while the room has no message.
-  public var emptyChatCard: EmptyChatCard {
-    .card(
-      roomName: roomName, isDirect: isDirect, isBroadcast: isBroadcast, isEncrypted: isEncrypted,
-      canPost: canSendMessages)
-  }
+  var isDirect = false
+  var isBroadcast = false
 
   /// The room is encrypted: the header shows a lock beside the name, as the Flutter app does.
   public private(set) var isEncrypted = false
 
   /// How many people are in a group; `nil` in a direct chat or before the room's details load.
   public private(set) var memberCount: Int?
-
-  /// The line under the name in the header: the other person's presence in a direct chat, the number of members in
-  /// a group, as the Flutter and web headers show.
-  public var headerSubtitle: String? {
-    if let presenceLine { return presenceLine }
-    guard let memberCount, memberCount > 0 else { return nil }
-    return memberCount == 1 ? "1 member" : "\(memberCount) members"
-  }
-
-  /// Asks the open timeline to decrypt events that were UTD, for example after keys arrive from the NSE or after
-  /// recovery. An empty session list retries every such event, as Element X does.
-  public func retryDecryption() async {
-    await repository.retryDecryption(sessionIds: [])
-  }
-
-  public func watchPresence(
-    every interval: Duration = .seconds(15), lowPower lowPowerInterval: Duration = .seconds(60),
-    isLowPower: @escaping @Sendable () -> Bool = { ProcessInfo.processInfo.isLowPowerModeEnabled }
-  ) async {
-    guard threadRootId == nil, let detailsRepository else { return }
-    var waits = 0
-    while !Task.isCancelled {
-      guard let userId = directUserId else {
-        waits += 1
-        guard waits <= 10 else { return }
-        try? await Task.sleep(for: .seconds(1))
-        continue
-      }
-      let line = await detailsRepository.presence(of: userId)?.line
-      if line != presenceLine {
-        withAnimation(.easeInOut(duration: 0.25)) { presenceLine = line }
-      }
-      try? await Task.sleep(for: isLowPower() ? lowPowerInterval : interval)
-    }
-  }
-
-  /// The link that opens the room that replaced this one.
-  public var successorLink: URL? {
-    successorRoomId.flatMap {
-      let via =
-        MatrixLink.server(of: $0).map { [$0] } ?? MatrixLink.server(of: roomId).map { [$0] } ?? []
-      return MatrixLink.room(idOrAlias: $0, eventId: nil, via: via).url
-    }
-  }
-
-  /// Unblocks the other person of this direct chat; the composer comes back.
-  public func unblock() async {
-    guard let userId = blockedUserId, let blocking else { return }
-    if await blocking.unblock(userId) {
-      withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { blockedUserId = nil }
-    } else {
-      errorMessage = "Could not unblock. Please try again."
-    }
-  }
-
-  /// The day divider's text, as the Flutter timeline writes it: "Today", "Yesterday", or the date.
-  public static func dayTitle(_ date: Date, now: Date = .now, calendar: Calendar = .current)
-    -> String
-  {
-    if calendar.isDate(date, inSameDayAs: now) { return "Today" }
-    if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),
-      calendar.isDate(date, inSameDayAs: yesterday)
-    {
-      return "Yesterday"
-    }
-    return date.formatted(.dateTime.weekday(.wide).day().month(.wide).year())
-  }
 }
 
 /// Runs a change to the typing names with the animation the indicator uses.
 @MainActor private func withTypingAnimation(_ change: () -> Void) {
   withAnimation(.spring(response: 0.3, dampingFraction: 0.8), change)
-}
-
-/// What another app shared into a room: text for the composer and files to send. `done` runs once they are sent, so
-/// the app can delete its copies.
-public struct IncomingShare {
-  public let text: String?
-  public let files: [URL]
-  public let done: @MainActor () -> Void
-
-  public init(text: String?, files: [URL], done: @escaping @MainActor () -> Void = {}) {
-    self.text = text
-    self.files = files
-    self.done = done
-  }
 }
