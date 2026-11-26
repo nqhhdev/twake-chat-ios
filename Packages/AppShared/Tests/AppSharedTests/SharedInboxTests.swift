@@ -53,4 +53,18 @@ struct SharedInboxTests {
     #expect(SharedItems(text: "").isEmpty)
     #expect(SharedItems(files: [.init(name: "a", kind: .image)]).isEmpty == false)
   }
+
+  @Test func aShareOfAnOlderBuildHasNoAccount() throws {
+    let json = Data(#"{"text":"Hi","files":[],"roomId":"!r:a"}"#.utf8)
+    let items = try JSONDecoder().decode(SharedItems.self, from: json)
+    #expect(items.accountUserId == nil)
+    #expect(items.roomId == "!r:a")
+  }
+
+  @Test func aShareKeepsItsAccount() throws {
+    let items = SharedItems(text: "Hi", roomId: "!r:a", accountUserId: "@me:a")
+    let decoded = try JSONDecoder().decode(
+      SharedItems.self, from: try JSONEncoder().encode(items))
+    #expect(decoded == items)
+  }
 }

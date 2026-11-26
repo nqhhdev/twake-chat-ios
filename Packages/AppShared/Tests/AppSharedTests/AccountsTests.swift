@@ -168,4 +168,82 @@ struct AccountsTests {
     #expect(registry.load() == nil)
     #expect(registry.migrate(legacyUserId: "@alice:a").active?.slot == .legacy)
   }
+
+  private func twoAccounts() -> AccountList {
+    var list = AccountList.migrated(nil, legacyUserId: "@alice:a")
+    _ = list.add(userId: "@bob:b", slot: AccountSlot(id: "b"))
+    list.activate(userId: "@alice:a")
+    return list
+  }
+
+  @Test func aPushBeforeAnyAccountIsListedUsesTheLegacySlot() {
+    #expect(AccountList().slot(forPush: "x", hash: { $0 }) == .legacy)
+    #expect(AccountList().slot(forPush: nil, hash: { $0 }) == .legacy)
+  }
+
+  @Test func aPushGoesToTheAccountItNames() {
+    let list = twoAccounts()
+    #expect(list.slot(forPush: "@bob:b", hash: { $0 }) == AccountSlot(id: "b"))
+    #expect(list.slot(forPush: "@alice:a", hash: { $0 }) == .legacy)
+  }
+
+  @Test func aPushWithoutIdentifierGoesToTheAccountOnScreen() {
+    #expect(twoAccounts().slot(forPush: nil, hash: { $0 }) == .legacy)
+    #expect(twoAccounts().slot(forPush: "", hash: { $0 }) == .legacy)
+  }
+
+  @Test func aPushForAnAccountNotListedShowsNothing() {
+    #expect(twoAccounts().slot(forPush: "@carol:c", hash: { $0 }) == nil)
+  }
+
+  @Test func notificationsNameTheirAccountOnlyWithSeveralAccounts() {
+    #expect(
+      AccountList.migrated(nil, legacyUserId: "@alice:a").notificationLabel(for: .legacy) == nil)
+    #expect(twoAccounts().notificationLabel(for: AccountSlot(id: "b")) == "@bob:b")
+    #expect(twoAccounts().notificationLabel(for: AccountSlot(id: "none")) == nil)
+  }
+
+  @Test func theAccountFollowsTheSubtitle() {
+    #expect(AccountLabel.subtitle("Alice", account: "@me:a") == "Alice · @me:a")
+    #expect(AccountLabel.subtitle("", account: "@me:a") == "@me:a")
+    #expect(AccountLabel.subtitle("Alice", account: nil) == "Alice")
+    #expect(AccountLabel.subtitle("Alice", account: "") == "Alice")
+  }
+
+  @Test func theShareAccountIsThePersonWhoIsTheUser() {
+    #expect(
+      AccountLabel.accountUserId(senderIsMe: true, senderId: "@me:a", meRecipientId: nil)
+        == "@me:a")
+    #expect(
+      AccountLabel.accountUserId(senderIsMe: false, senderId: "@alice:a", meRecipientId: "@me:a")
+        == "@me:a")
+    #expect(
+      AccountLabel.accountUserId(senderIsMe: false, senderId: "@alice:a", meRecipientId: nil)
+        == nil)
+    #expect(AccountLabel.accountUserId(senderIsMe: true, senderId: "", meRecipientId: nil) == nil)
+  }
+
+  @Test func theBadgeSumsEveryAccountsLastCount() throws {
+    let suite = "AccountsTests-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let badges = AccountBadges(defaults: defaults)
+    let list = twoAccounts()
+    badges.record(3, for: .legacy)
+    badges.record(4, for: AccountSlot(id: "b"))
+    #expect(badges.total(for: list, including: .legacy) == 7)
+    badges.record(-2, for: AccountSlot(id: "b"))
+    #expect(badges.count(for: AccountSlot(id: "b")) == 0)
+    badges.forget(.legacy)
+    #expect(badges.total(for: list, including: .legacy) == 0)
+  }
+
+  @Test func theBadgeCountsTheSlotOfAPushNotListedYet() throws {
+    let suite = "AccountsTests-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let badges = AccountBadges(defaults: defaults)
+    badges.record(5, for: .legacy)
+    #expect(badges.total(for: AccountList(), including: .legacy) == 5)
+  }
 }

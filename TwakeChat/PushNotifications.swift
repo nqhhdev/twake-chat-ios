@@ -124,6 +124,7 @@ struct NotificationAction: Sendable, Equatable {
   let eventId: String?
   let threadId: String?
   let title: String
+  let userId: String?
 
   init?(
     actionIdentifier: String, userText: String?, userInfo: [AnyHashable: Any], title: String
@@ -144,6 +145,7 @@ struct NotificationAction: Sendable, Equatable {
     self.roomId = roomId
     eventId = PushPayload.eventId(in: userInfo)
     threadId = PushPayload.threadId(in: userInfo)
+    userId = PushPayload.userId(in: userInfo)
     self.title = title
   }
 
@@ -179,6 +181,7 @@ struct NotificationAction: Sendable, Equatable {
 
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
   @MainActor static var push: PushCenter?
+  @MainActor static weak var accounts: AccountsCoordinator?
 
   func application(
     _ application: UIApplication,
@@ -218,8 +221,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         userText: (response as? UNTextInputNotificationResponse)?.userText,
         userInfo: content.userInfo, title: content.title)
     else { return }
-    let push = await Self.push
-    await push?.handle(action)
+    if let accounts = await Self.accounts {
+      await accounts.handle(action)
+    } else {
+      let push = await Self.push
+      await push?.handle(action)
+    }
   }
 }
 

@@ -104,6 +104,7 @@ struct ShareTargetSheet: View {
         ToolbarItem(placement: .cancellationAction) {
           Button("Cancel", action: onCancel)
         }
+        ToolbarItem(placement: .confirmationAction) { AccountSwitcherMenu() }
       }
     }
   }
