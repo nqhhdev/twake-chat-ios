@@ -179,9 +179,7 @@ struct NotificationAction: Sendable, Equatable {
   }
 }
 
-final class AppDelegate: NSObject, UIApplicationDelegate,
-  @preconcurrency UNUserNotificationCenterDelegate
-{
+final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
   @MainActor static var push: PushCenter?
   @MainActor static weak var accounts: AccountsCoordinator?
 
@@ -205,29 +203,48 @@ final class AppDelegate: NSObject, UIApplicationDelegate,
   ) {
   }
 
-  func userNotificationCenter(
-    _ center: UNUserNotificationCenter, willPresent notification: UNNotification
-  ) async -> UNNotificationPresentationOptions {
+  nonisolated func userNotificationCenter(
+    _ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
     let roomId = PushPayload.roomId(in: notification.request.content.userInfo)
-    NotificationCenter.default.post(name: .encryptionKeysImported, object: nil)
-    let shows = Self.push?.showsBanner(forRoom: roomId) ?? true
-    return shows ? [.banner, .list, .sound, .badge] : []
+    let completion = MainThreadCompletion(completionHandler)
+    Task { @MainActor in
+      NotificationCenter.default.post(name: .encryptionKeysImported, object: nil)
+      let shows = Self.push?.showsBanner(forRoom: roomId) ?? true
+      completion.call(shows ? [.banner, .list, .sound, .badge] : [])
+    }
   }
 
-  func userNotificationCenter(
-    _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
-  ) async {
+  nonisolated func userNotificationCenter(
+    _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
     let content = response.notification.request.content
-    guard
-      let action = NotificationAction(
-        actionIdentifier: response.actionIdentifier,
-        userText: (response as? UNTextInputNotificationResponse)?.userText,
-        userInfo: content.userInfo, title: content.title)
-    else { return }
-    if let accounts = Self.accounts {
+    let action = NotificationAction(
+      actionIdentifier: response.actionIdentifier,
+      userText: (response as? UNTextInputNotificationResponse)?.userText,
+      userInfo: content.userInfo, title: content.title)
+    let completion = MainThreadCompletion<Void> { _ in completionHandler() }
+    Self.deliver(action, to: { await Self.route($0) }, then: { completion.call(()) })
+  }
+
+  nonisolated static func deliver(
+    _ action: NotificationAction?,
+    to handle: @escaping @MainActor @Sendable (NotificationAction) async -> Void,
+    then complete: @escaping @MainActor @Sendable () -> Void
+  ) {
+    Task { @MainActor in
+      if let action { await handle(action) }
+      complete()
+    }
+  }
+
+  @MainActor static func route(_ action: NotificationAction) async {
+    if let accounts {
       await accounts.handle(action)
     } else {
-      await Self.push?.handle(action)
+      await push?.handle(action)
     }
   }
 }
@@ -259,4 +276,12 @@ enum ApnsEnvironment {
     else { return true }
     return text[open.upperBound..<close.lowerBound] != "development"
   }
+}
+
+final class MainThreadCompletion<Value>: @unchecked Sendable {
+  private let body: (Value) -> Void
+
+  init(_ body: @escaping (Value) -> Void) { self.body = body }
+
+  @MainActor func call(_ value: Value) { body(value) }
 }
