@@ -88,6 +88,7 @@ public struct ChatListScreen: View {
           if let onCompose {
             ToolbarItem(placement: .topBarTrailing) {
               Button("New chat", systemImage: "square.and.pencil", action: onCompose)
+                .accessibilityIdentifier(A11yIdentifiers.chatList.newChat)
             }
           }
           ToolbarItem(placement: .topBarTrailing) {
@@ -95,8 +96,10 @@ public struct ChatListScreen: View {
               MarkAllReadButton(viewModel: viewModel, rooms: viewModel.unreadRooms)
               if viewModel.hasSpaces {
                 Button("New Space", systemImage: "cube") { startNewSpace() }
+                  .accessibilityIdentifier(A11yIdentifiers.chatList.newSpace)
               }
             }
+            .accessibilityIdentifier(A11yIdentifiers.chatList.more)
           }
         }
       }
@@ -207,6 +210,7 @@ public struct ChatListScreen: View {
               viewModel.select(filter)
             }
           }
+          .accessibilityIdentifier(A11yIdentifiers.chatList.filter(filter.title))
         }
         ForEach(viewModel.userFolders) { folder in
           FilterChip(title: folder.title, isOn: viewModel.selectedFolderId == folder.id) {
@@ -214,6 +218,7 @@ public struct ChatListScreen: View {
               viewModel.selectFolder(folder)
             }
           }
+          .accessibilityIdentifier(A11yIdentifiers.chatList.folder(folder.name))
           .contextMenu { folderMenu(folder) }
         }
         if viewModel.hasFolders {
@@ -224,6 +229,7 @@ public struct ChatListScreen: View {
             .frame(width: 32, height: 32)
             .background(SysColors.surface, in: Circle())
             .buttonStyle(.borderless)
+            .accessibilityIdentifier(A11yIdentifiers.chatList.newFolder)
         }
       }
       .padding(.horizontal, 16)

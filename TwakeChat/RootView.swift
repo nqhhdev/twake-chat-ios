@@ -294,7 +294,7 @@ final class RootCoordinator {
   /// being unlocked needs nothing from the user, and asking then would show a prompt the unlock is about to make
   /// wrong. The prompt is what is left for a server without ToM, or a key that did not work.
   func sessionCheckAfterUnlock() -> (@Sendable () async -> SessionWarning?)? {
-    guard let check = sessionCheck() else { return nil }
+    guard !E2EHarness.skipsSessionPrompt, let check = sessionCheck() else { return nil }
     return { [weak self] in
       while await self?.isUnlockingDevice == true {
         try? await Task.sleep(for: .milliseconds(250))

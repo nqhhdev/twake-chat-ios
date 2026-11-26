@@ -229,6 +229,7 @@ struct SpaceScreen: View {
               } label: {
                 row(child)
               }
+              .accessibilityIdentifier(A11yIdentifiers.space.child(child.name))
             } else {
               Button {
                 Task { await viewModel.open(child) }
@@ -236,6 +237,7 @@ struct SpaceScreen: View {
                 row(child)
               }
               .foregroundStyle(SysColors.onSurface)
+              .accessibilityIdentifier(A11yIdentifiers.space.child(child.name))
             }
           }
         }
@@ -274,7 +276,9 @@ struct SpaceScreen: View {
             Button("New Sub-space", systemImage: "cube") {
               newSubspace = viewModel.makeNewSubspace { newSubspace = nil }
             }
+            .accessibilityIdentifier(A11yIdentifiers.space.newSubspace)
           }
+          .accessibilityIdentifier(A11yIdentifiers.space.add)
           .disabled(viewModel.isCreating)
         }
       }

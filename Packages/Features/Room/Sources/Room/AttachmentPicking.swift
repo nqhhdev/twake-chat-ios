@@ -161,6 +161,7 @@ struct AttachmentButton: View {
           let loaded = UIPasteboard.general.images?.compactMap(AttachmentLoader.load(image:)) ?? []
           if !loaded.isEmpty { preview = PickedBatch(items: loaded) }
         }
+        .accessibilityIdentifier(A11yIdentifiers.room.pastePicture)
       }
     } label: {
       Image(systemName: "plus")
@@ -170,6 +171,7 @@ struct AttachmentButton: View {
         .background(SysColors.surface, in: Circle())
     }
     .accessibilityLabel("Attach")
+    .accessibilityIdentifier(A11yIdentifiers.room.attach)
     .photosPicker(
       isPresented: $isGalleryShown, selection: $pickedPhotos, maxSelectionCount: 10,
       matching: .any(of: [.images, .videos])
@@ -407,6 +409,7 @@ struct SendPreviewSheet: View {
     HStack(alignment: .bottom, spacing: 10) {
       TextField("Add a caption…", text: $caption, axis: .vertical)
         .lineLimit(1...4)
+        .accessibilityIdentifier(A11yIdentifiers.room.attachmentCaption)
         .focused($isCaptionFocused)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -424,6 +427,7 @@ struct SendPreviewSheet: View {
           .background(SysColors.primary, in: Circle())
       }
       .accessibilityLabel("Send")
+      .accessibilityIdentifier(A11yIdentifiers.room.sendAttachments)
       .disabled(items.isEmpty)
     }
     .padding(.horizontal, 16)
