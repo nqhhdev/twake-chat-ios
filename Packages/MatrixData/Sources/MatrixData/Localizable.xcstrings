@@ -1,0 +1,662 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "%@ changed the chat avatar": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ a changé l’image de la discussion"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ đã đổi ảnh cuộc trò chuyện"
+          }
+        }
+      }
+    },
+    "%@ changed the chat description to: '%@'": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ a changé la description de la discussion : « %2$@ »"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ đã đổi mô tả cuộc trò chuyện thành: “%2$@”"
+          }
+        }
+      }
+    },
+    "%@ changed the chat name to: '%@'": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ a renommé la discussion : « %2$@ »"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ đã đổi tên cuộc trò chuyện thành: “%2$@”"
+          }
+        }
+      }
+    },
+    "%@ changed the chat permissions": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ a changé les permissions de la discussion"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ đã thay đổi quyền trong cuộc trò chuyện"
+          }
+        }
+      }
+    },
+    "%@ changed the guest access rules": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ a changé les règles d’accès à la discussion pour les invités"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ đã thay đổi quy tắc truy cập đối với khách"
+          }
+        }
+      }
+    },
+    "%@ changed the history visibility to: %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ a changé la visibilité de l’historique de la discussion en : %2$@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ đã thay đổi chế độ hiển thị lịch sử thành: %2$@"
+          }
+        }
+      }
+    },
+    "%@ changed the join rules": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ a changé les règles d’accès à la discussion"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ đã thay đổi quy tắc tham gia"
+          }
+        }
+      }
+    },
+    "%@ changed the join rules to: %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ a changé les règles d’accès à la discussion en : %2$@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ đã thay đổi quy tắc tham gia thành: %2$@"
+          }
+        }
+      }
+    },
+    "%@ rejected the invitation": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ a refusé l’invitation"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ đã từ chối lời mời"
+          }
+        }
+      }
+    },
+    "%@ removed the chat description": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ a supprimé la description de la discussion"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ đã xóa mô tả cuộc trò chuyện"
+          }
+        }
+      }
+    },
+    "%@ unbanned %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ a levé le bannissement de %2$@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ đã bỏ cấm %2$@"
+          }
+        }
+      }
+    },
+    "Anyone can ask to join": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tout le monde peut demander à rejoindre"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ai cũng có thể xin tham gia"
+          }
+        }
+      }
+    },
+    "Anyone can join": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tout le monde peut rejoindre"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mọi người đều có thể gia nhập"
+          }
+        }
+      }
+    },
+    "Chat stickers": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autocollants de la discussion"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nhãn dán của cuộc trò chuyện"
+          }
+        }
+      }
+    },
+    "From joining": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À partir de la date d'arrivée dans le salon"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Từ khi tham gia"
+          }
+        }
+      }
+    },
+    "From the invitation": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À partir de la date de l'invitation"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Từ lời mời"
+          }
+        }
+      }
+    },
+    "Invited users only": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uniquement les utilisateur/trices invité·es"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chỉ người dùng được mời"
+          }
+        }
+      }
+    },
+    "Invited you to chat": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vous a invité à discuter"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã mời bạn trò chuyện"
+          }
+        }
+      }
+    },
+    "My stickers": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mes autocollants"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nhãn dán của tôi"
+          }
+        }
+      }
+    },
+    "Sent a sticker": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A envoyé un autocollant"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã gửi một nhãn dán"
+          }
+        }
+      }
+    },
+    "This chat has been upgraded": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette discussion a été mise à niveau"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuộc trò chuyện này đã được nâng cấp"
+          }
+        }
+      }
+    },
+    "This message has been deleted": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce message a été supprimé"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tin nhắn này đã bị xóa"
+          }
+        }
+      }
+    },
+    "Unknown event": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Événement inconnu"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sự kiện không xác định"
+          }
+        }
+      }
+    },
+    "Unknown event '%@'": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Événement de type inconnu : « %@ »"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sự kiện không xác định “%@”"
+          }
+        }
+      }
+    },
+    "Visible for all participants": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visible par tous les membres"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiển thị với tất cả thành viên"
+          }
+        }
+      }
+    },
+    "Visible for everyone": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visible pour tout le monde"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiển thị cho mọi người"
+          }
+        }
+      }
+    },
+    "Waiting for this message": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En attente de ce message"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang chờ tin nhắn này"
+          }
+        }
+      }
+    },
+    "🎤 Audio": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🎤 Audio"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🎤 Âm thanh"
+          }
+        }
+      }
+    },
+    "🎥 Video": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🎥 Vidéo"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🎥 Video"
+          }
+        }
+      }
+    },
+    "👋 %@ joined the chat": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "👋 %@ a rejoint la discussion"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "👋 %@ đã tham gia cuộc trò chuyện"
+          }
+        }
+      }
+    },
+    "👍 %@ accepted the invitation": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "👍 %@ a accepté l’invitation"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "👍 %@ đã chấp nhận lời mời"
+          }
+        }
+      }
+    },
+    "👞 %@ kicked %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "👞 %1$@ a expulsé %2$@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "👞 %1$@ đã mời %2$@ ra khỏi cuộc trò chuyện"
+          }
+        }
+      }
+    },
+    "💬 %@ created the chat": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "💬 %@ a créé la discussion"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "💬 %@ đã tạo cuộc trò chuyện"
+          }
+        }
+      }
+    },
+    "📍 Location": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "📍 Position"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "📍 Vị trí"
+          }
+        }
+      }
+    },
+    "📩 %@ invited %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "📩 %1$@ a invité %2$@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "📩 %1$@ đã mời %2$@"
+          }
+        }
+      }
+    },
+    "📷 Photo": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "📷 Photo"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "📷 Ảnh"
+          }
+        }
+      }
+    },
+    "🔐 %@ activated end to end encryption": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🔐 %@ a activé le chiffrement de bout en bout"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🔐 %@ đã bật mã hóa đầu cuối"
+          }
+        }
+      }
+    },
+    "🖼️ Photos": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🖼️ Photos"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🖼️ Ảnh"
+          }
+        }
+      }
+    },
+    "🖼️ Picture": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🖼️ Image"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🖼️ Hình ảnh"
+          }
+        }
+      }
+    },
+    "🚪 %@ left the chat": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🚪 %@ a quitté la discussion"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🚪 %@ đã rời khỏi cuộc trò chuyện"
+          }
+        }
+      }
+    },
+    "🚫 %@ banned %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🚫 %1$@ a banni %2$@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🚫 %1$@ đã cấm %2$@"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

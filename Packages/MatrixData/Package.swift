@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
   name: "MatrixData",
+  defaultLocalization: "en",
   platforms: [.iOS(.v18)],
   products: [
     .library(name: "MatrixData", targets: ["MatrixData"])
@@ -20,6 +21,7 @@ let package = Package(
         .product(name: "AppShared", package: "AppShared"),
         .product(name: "MatrixRustSDK", package: "matrix-rust-components-swift"),
       ],
+      resources: [.process("Localizable.xcstrings")],
       swiftSettings: [.treatAllWarnings(as: .error)]
     )
   ]
