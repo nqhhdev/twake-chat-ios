@@ -60,7 +60,7 @@ struct AuthenticationCoordinatorTests {
   @Test func theCompanyServerPickerIsPrefilledAndGoesBackToWelcome() throws {
     let coordinator = coordinator(FakeAuthenticationRepository())
     try #require(welcome(coordinator)).useCompanyServer()
-    let picker = try #require(picker(coordinator))
+    let picker = try #require(self.picker(coordinator))
     #expect(picker.server == "matrix.example.org")
     picker.back()
     #expect(welcome(coordinator) != nil)
@@ -280,7 +280,7 @@ struct AuthenticationCoordinatorTests {
     repository.loginOptionsResult = .failure(.invalidHomeserverURL)
     let coordinator = coordinator(repository)
     try #require(welcome(coordinator)).useCompanyServer()
-    let picker = try #require(picker(coordinator))
+    let picker = try #require(self.picker(coordinator))
     await picker.continueTapped()
     #expect(picker.isWrongServerName)
     #expect(picker.errorMessage == nil)
