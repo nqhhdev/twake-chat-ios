@@ -61,7 +61,7 @@ struct AppComposition: Sendable {
       roomDetails: RoomDetailsProxy(authentication: repository),
       roomSearch: RoomSearchProxy(authentication: repository, index: messageIndex),
       savedMessages: SavedMessagesProxy(authentication: repository),
-      threadPrefs: ThreadPrefsProxy(authentication: repository),
+      threadPrefs: ThreadPrefsProxy(authentication: repository, capabilities: capabilities),
       activityReactions: ActivityReactionsProxy(authentication: repository),
       roomLinks: RoomLinkProxy(authentication: repository),
       accountSettings: accountSettings,
