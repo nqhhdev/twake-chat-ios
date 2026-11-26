@@ -17,11 +17,14 @@ public struct ServerCapabilities: Sendable, Equatable {
     public let invitationsEnabled: Bool
     public let sideService: URL?
     public let webURL: URL?
+    public let driveEnabled: Bool
 
     public init(
       supportContact: String? = nil, commonSettingsURL: String? = nil,
-      invitationsEnabled: Bool = false, sideService: URL? = nil, webURL: URL? = nil
+      invitationsEnabled: Bool = false, sideService: URL? = nil, webURL: URL? = nil,
+      driveEnabled: Bool = false
     ) {
+      self.driveEnabled = driveEnabled
       self.supportContact = supportContact
       self.commonSettingsURL = commonSettingsURL
       self.invitationsEnabled = invitationsEnabled
@@ -37,12 +40,14 @@ public struct ServerCapabilities: Sendable, Equatable {
   public let twakeChat: TwakeChat
   public let unstableFeatures: Set<String>
   public let build: BuildServices
+  public let authenticationIssuer: URL?
 
   public init(
     homeserver: URL? = nil, identityServer: URL? = nil, tom: Tom? = nil, callFoci: [URL] = [],
     twakeChat: TwakeChat = TwakeChat(), unstableFeatures: Set<String> = [],
-    build: BuildServices = BuildServices()
+    build: BuildServices = BuildServices(), authenticationIssuer: URL? = nil
   ) {
+    self.authenticationIssuer = authenticationIssuer
     self.homeserver = homeserver
     self.identityServer = identityServer
     self.tom = tom
@@ -63,6 +68,10 @@ public struct ServerCapabilities: Sendable, Equatable {
       let username = Self.localpart(of: userId)
     else { return nil }
     return URL(string: template.replacingOccurrences(of: "{username}", with: username))
+  }
+
+  public var driveSignInIssuer: URL? {
+    twakeChat.driveEnabled ? authenticationIssuer : nil
   }
 
   public var supportContact: String? {

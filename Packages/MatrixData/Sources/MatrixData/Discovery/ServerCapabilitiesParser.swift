@@ -17,9 +17,11 @@ enum ServerCapabilitiesParser {
         commonSettingsURL: commonSettings(chat["common_settings"]),
         invitationsEnabled: chat["enable_invitations"] as? Bool ?? false,
         sideService: baseURL(chat["side_service"]) ?? baseURL(chat["assistants"]),
-        webURL: nonEmpty(chat["web_url"]).flatMap(URL.init(string:))),
+        webURL: nonEmpty(chat["web_url"]).flatMap(URL.init(string:)),
+        driveEnabled: chat["enable_twake_drive"] as? Bool ?? false),
       unstableFeatures: unstableFeatures(versions),
-      build: build)
+      build: build,
+      authenticationIssuer: wellKnown.flatMap(HomeserverDiscovery.authenticationIssuer))
   }
 
   static func serverName(ofUserId userId: String) -> String? {
