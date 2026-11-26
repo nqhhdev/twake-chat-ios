@@ -11,6 +11,7 @@ struct AppComposition: Sendable {
   let accessGroup: String
   let appLock: AppLock
   let badges: AccountBadges?
+  let calls: AccountCallAvailability?
 
   func sessionStore(_ slot: AccountSlot) -> KeychainSessionStore {
     KeychainSessionStore(
@@ -84,9 +85,11 @@ struct AppComposition: Sendable {
       devices: devices, chatDisplay: ChatDisplayDefaults(),
       appLock: appLock, sync: repository, sessionExpiry: repository,
       meetCalls: MeetCallProxy(authentication: repository, capabilities: capabilities),
-      roomCalls: ElementCallProxy(
-        authentication: repository, fallbackURL: url("ElementCallURL"),
-        clientId: Bundle.main.bundleIdentifier ?? "app.twake.ios.chat"),
+      roomCalls: RecordedRoomCalls(
+        base: ElementCallProxy(
+          authentication: repository, fallbackURL: url("ElementCallURL"),
+          clientId: Bundle.main.bundleIdentifier ?? "app.twake.ios.chat"),
+        record: { [calls] in calls?.record($0, for: slot) }),
       identity: IdentityServerProxy(authentication: repository, capabilities: capabilities),
       addressBook: SystemAddressBook(),
       twakeContacts: TomContactsProxy(authentication: repository, capabilities: capabilities),
@@ -102,5 +105,30 @@ struct AppComposition: Sendable {
       return badges.total(for: registry.load() ?? AccountList(), including: slot)
     }
     return root
+  }
+}
+
+struct RecordedRoomCalls: RoomCallRepository {
+  let base: any RoomCallRepository
+  let record: @Sendable (Bool) -> Void
+
+  func isAvailable() async -> Bool {
+    let available = await base.isAvailable()
+    record(available)
+    return available
+  }
+
+  func decline(roomId: String, notificationEventId: String) async {
+    await base.decline(roomId: roomId, notificationEventId: notificationEventId)
+  }
+
+  func callStates(roomId: String) async -> AsyncStream<RoomCallState> {
+    await base.callStates(roomId: roomId)
+  }
+
+  func open(roomId: String, intent: CallIntent) async throws(RoomCallError)
+    -> any CallWidgetSession
+  {
+    try await base.open(roomId: roomId, intent: intent)
   }
 }

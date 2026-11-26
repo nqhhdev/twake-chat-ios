@@ -93,13 +93,18 @@ public final class RoomCallViewModel {
     isAvailable = await repository.isAvailable()
   }
 
+  public func joinIfAnswered(title: String) async {
+    guard isAvailable, center.takePendingJoin(roomId: roomId) else { return }
+    await open(title: title, joining: true)
+  }
+
   public func watch() async {
     for await next in await repository.callStates(roomId: roomId) {
       state = next
     }
   }
 
-  public func open(title: String) async {
+  public func open(title: String, joining: Bool = false) async {
     if activeCall != nil {
       center.restore()
       return
@@ -110,7 +115,7 @@ public final class RoomCallViewModel {
     errorMessage = nil
     do {
       let session = try await repository.open(
-        roomId: roomId, intent: state.isActive ? .join : .start)
+        roomId: roomId, intent: joining || state.isActive ? .join : .start)
       await center.start(
         ActiveCall(session: session, title: title), roomId: roomId, system: system)
     } catch RoomCallError.notAllowed {

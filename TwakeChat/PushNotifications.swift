@@ -1,6 +1,8 @@
 import AppShared
 import Domain
 import Observation
+import PushKit
+import Room
 import SwiftUI
 import UIKit
 import UserNotifications
@@ -125,6 +127,7 @@ struct NotificationAction: Sendable, Equatable {
   let threadId: String?
   let title: String
   let userId: String?
+  let ring: CallRing?
 
   init?(
     actionIdentifier: String, userText: String?, userInfo: [AnyHashable: Any], title: String
@@ -146,6 +149,8 @@ struct NotificationAction: Sendable, Equatable {
     eventId = PushPayload.eventId(in: userInfo)
     threadId = PushPayload.threadId(in: userInfo)
     userId = PushPayload.userId(in: userInfo)
+    ring = (userInfo[CallRingPayload.userInfoKey] as? [AnyHashable: Any]).flatMap(
+      CallRing.init(payload:))
     self.title = title
   }
 
@@ -181,9 +186,12 @@ struct NotificationAction: Sendable, Equatable {
   }
 }
 
-final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate,
+  PKPushRegistryDelegate
+{
   @MainActor static var push: PushCenter?
   @MainActor static weak var accounts: AccountsCoordinator?
+  private var voipRegistry: PKPushRegistry?
 
   func application(
     _ application: UIApplication,
@@ -191,6 +199,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
   ) -> Bool {
     UNUserNotificationCenter.current().delegate = self
     UNUserNotificationCenter.current().setNotificationCategories(NotificationAction.categories)
+    let registry = PKPushRegistry(queue: .main)
+    registry.delegate = self
+    registry.desiredPushTypes = [.voIP]
+    voipRegistry = registry
     return true
   }
 
@@ -209,10 +221,17 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     _ center: UNUserNotificationCenter, willPresent notification: UNNotification,
     withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
   ) {
-    let roomId = PushPayload.roomId(in: notification.request.content.userInfo)
+    let userInfo = notification.request.content.userInfo
+    let roomId = PushPayload.roomId(in: userInfo)
+    let ring = (userInfo[CallRingPayload.userInfoKey] as? [AnyHashable: Any]).flatMap(
+      CallRing.init(payload:))
     let completion = MainThreadCompletion(completionHandler)
     Task { @MainActor in
       NotificationCenter.default.post(name: .encryptionKeysImported, object: nil)
+      if let ring, ring.isRinging(), await CallKitReporter.shared.reportIncoming(ring) {
+        completion.call([])
+        return
+      }
       let shows = Self.push?.showsBanner(forRoom: roomId) ?? true
       completion.call(shows ? [.banner, .list, .sound, .badge] : [])
     }
@@ -229,6 +248,26 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
       userInfo: content.userInfo, title: content.title)
     let completion = MainThreadCompletion<Void> { _ in completionHandler() }
     Self.deliver(action, to: { await Self.route($0) }, then: { completion.call(()) })
+  }
+
+  nonisolated func pushRegistry(
+    _ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType
+  ) {}
+
+  nonisolated func pushRegistry(
+    _ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload,
+    for type: PKPushType, completion: @escaping () -> Void
+  ) {
+    let ring = CallRing(payload: payload.dictionaryPayload)
+    let done = MainThreadCompletion<Void> { _ in completion() }
+    Task { @MainActor in
+      if let ring, ring.isRinging(), await CallKitReporter.shared.reportIncoming(ring) {
+        done.call(())
+        return
+      }
+      await CallKitReporter.shared.reportUnusable()
+      done.call(())
+    }
   }
 
   nonisolated static func deliver(

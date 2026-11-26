@@ -1,4 +1,5 @@
 import Domain
+import Foundation
 import Testing
 
 @testable import MatrixData
@@ -88,5 +89,51 @@ struct NotificationFilteringTests {
     #expect(NotificationContentProxy.threadId(nil, rawEvent: reply) == nil)
     #expect(NotificationContentProxy.threadId(nil, rawEvent: edit) == nil)
     #expect(NotificationContentProxy.threadId(nil, rawEvent: "") == nil)
+  }
+
+  @Test func aRingingCallBecomesARingThatExpiresWhenTheEventSays() throws {
+    let ring = try #require(
+      NotificationContentProxy.ring(
+        of: .rtcNotification(
+          notificationType: .ring, expirationTs: 1_700_000_030_000, callIntent: .audio),
+        roomId: "!r:a", eventId: "$ring", roomName: "Team"))
+    #expect(ring.roomId == "!r:a")
+    #expect(ring.eventId == "$ring")
+    #expect(ring.roomName == "Team")
+    #expect(ring.isVoice)
+    #expect(ring.expiresAt == Date(timeIntervalSince1970: 1_700_000_030))
+  }
+
+  @Test func aCallNoticeOrAnotherEventIsNoRing() {
+    #expect(
+      NotificationContentProxy.ring(
+        of: .rtcNotification(notificationType: .notification, expirationTs: 1, callIntent: nil),
+        roomId: "!r:a", eventId: "$e", roomName: "Team") == nil)
+    #expect(
+      NotificationContentProxy.ring(
+        of: .sticker, roomId: "!r:a", eventId: "$e", roomName: "Team") == nil)
+    #expect(
+      NotificationContentProxy.ring(
+        of: .rtcNotification(notificationType: .ring, expirationTs: 1, callIntent: .video),
+        roomId: "", eventId: "$e", roomName: "Team") == nil)
+  }
+
+  @Test func aCallIsNamedByItsKind() {
+    #expect(
+      NotificationContentProxy.body(
+        of: .rtcNotification(notificationType: .ring, expirationTs: 1, callIntent: .video))
+        == "Incoming video call")
+    #expect(
+      NotificationContentProxy.body(
+        of: .rtcNotification(notificationType: .ring, expirationTs: 1, callIntent: .audio))
+        == "Incoming voice call")
+    #expect(
+      NotificationContentProxy.body(
+        of: .rtcNotification(notificationType: .notification, expirationTs: 1, callIntent: nil))
+        == "Started a call")
+    #expect(
+      NotificationContentProxy.isCall(
+        .rtcNotification(notificationType: .ring, expirationTs: 1, callIntent: nil)))
+    #expect(!NotificationContentProxy.isCall(.sticker))
   }
 }

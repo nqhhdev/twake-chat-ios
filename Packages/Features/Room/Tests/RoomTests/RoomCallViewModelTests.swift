@@ -229,4 +229,38 @@ struct RoomCallViewModelTests {
     center.minimize()
     #expect(!center.isMinimized)
   }
+
+  @Test func anAnsweredRingJoinsTheCallWhenItsRoomOpens() async {
+    let center = CallCenter()
+    center.pendingJoinRoomId = "!r"
+    let calls = FakeCalls()
+    let room = RoomCallViewModel(roomId: "!r", repository: calls, center: center)
+    await room.load()
+    await room.joinIfAnswered(title: "Room")
+    #expect(await calls.opened == [.join])
+    #expect(room.activeCall != nil)
+    #expect(center.pendingJoinRoomId == nil)
+  }
+
+  @Test func anotherRoomDoesNotTakeTheAnsweredRing() async {
+    let center = CallCenter()
+    center.pendingJoinRoomId = "!other"
+    let calls = FakeCalls()
+    let room = RoomCallViewModel(roomId: "!r", repository: calls, center: center)
+    await room.load()
+    await room.joinIfAnswered(title: "Room")
+    #expect(await calls.opened.isEmpty)
+    #expect(center.pendingJoinRoomId == "!other")
+  }
+
+  @Test func anAnsweredRingWaitsWhileCallsAreUnavailable() async {
+    let center = CallCenter()
+    center.pendingJoinRoomId = "!r"
+    let room = RoomCallViewModel(
+      roomId: "!r", repository: FakeCalls(available: false), center: center)
+    await room.load()
+    await room.joinIfAnswered(title: "Room")
+    #expect(room.activeCall == nil)
+    #expect(center.pendingJoinRoomId == "!r")
+  }
 }

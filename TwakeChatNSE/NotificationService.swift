@@ -1,4 +1,5 @@
 import AppShared
+import CallKit
 import Domain
 import Foundation
 import MatrixData
@@ -47,9 +48,20 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
     Task {
       switch await repository.content(roomId: roomId, eventId: eventId) {
       case .show(let found):
+        let ring = found.ring.map { $0.with(accountUserId: account.userId) }
+        let ringing =
+          ring.map { $0.isRinging() } == true
+          && AccountCallAvailability.inAppGroup()?.isAvailable(for: slot) == true
+        if let ring, ringing, await Self.reportRing(ring) {
+          lock.withLock { pending = UNMutableNotificationContent() }
+          break
+        }
         let shown = lock.withLock { () -> UNMutableNotificationContent? in
           guard let pending else { return nil }
           Self.apply(found, label: account.label, to: pending)
+          if let ring, ringing {
+            pending.userInfo[CallRingPayload.userInfoKey] = ring.payload
+          }
           return pending.mutableCopy() as? UNMutableNotificationContent
         }
         if let shown,
@@ -79,6 +91,15 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
     content.body = found.body
     content.categoryIdentifier = found.isMessage ? PushPayload.messageCategory : ""
     if let threadId = found.threadId { content.userInfo[PushPayload.threadIdKey] = threadId }
+  }
+
+  private static func reportRing(_ ring: CallRing) async -> Bool {
+    do {
+      try await CXProvider.reportNewIncomingVoIPPushPayload(ring.payload)
+      return true
+    } catch {
+      return false
+    }
   }
 
   override func serviceExtensionTimeWillExpire() {

@@ -244,4 +244,19 @@ struct AccountsTests {
     badges.record(5, for: .legacy)
     #expect(badges.total(for: AccountList(), including: .legacy) == 5)
   }
+
+  @Test func callsAreOffUntilTheAppFindsThemAvailable() throws {
+    let suite = "AccountsTests-\(UUID().uuidString)"
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let calls = try #require(AccountCallAvailability(suiteName: suite))
+    #expect(!calls.isAvailable(for: .legacy))
+    calls.record(true, for: .legacy)
+    #expect(calls.isAvailable(for: .legacy))
+    #expect(!calls.isAvailable(for: AccountSlot(id: "b")))
+    calls.record(false, for: .legacy)
+    #expect(!calls.isAvailable(for: .legacy))
+    calls.record(true, for: .legacy)
+    calls.forget(.legacy)
+    #expect(!calls.isAvailable(for: .legacy))
+  }
 }

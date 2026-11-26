@@ -18,7 +18,7 @@ struct TwakeChatApp: App {
     }
     let composition = AppComposition(
       registry: registry, accessGroup: accessGroup, appLock: AppLock(),
-      badges: AccountBadges.inAppGroup())
+      badges: AccountBadges.inAppGroup(), calls: AccountCallAvailability.inAppGroup())
     #if DEBUG
       E2EHarness.resetIfAsked(
         storeDirectory: registry.storeDirectory(for: .legacy),
@@ -28,7 +28,8 @@ struct TwakeChatApp: App {
       initialValue: AccountsCoordinator(
         registry: registry,
         legacyUserId: try? composition.sessionStore(.legacy).load()?.userId,
-        badges: composition.badges, makeRoot: composition.root(for:onSessionChange:)))
+        badges: composition.badges, calls: composition.calls,
+        makeRoot: composition.root(for:onSessionChange:)))
   }
 
   var body: some Scene {
