@@ -4,11 +4,16 @@ import Testing
 @testable import TwakeChat
 
 struct CommonSettingsLanguageTests {
+  private let suite = "CommonSettingsLanguageTests.\(UUID().uuidString)"
+
   private func makeLanguage() -> (CommonSettingsLanguage, UserDefaults) {
-    let name = "CommonSettingsLanguageTests.\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: name)!
-    defaults.removePersistentDomain(forName: name)
+    let defaults = UserDefaults(suiteName: suite)!
+    defaults.removePersistentDomain(forName: suite)
     return (CommonSettingsLanguage(defaults: defaults, available: ["en", "fr", "Base"]), defaults)
+  }
+
+  private func stored(_ defaults: UserDefaults, _ key: String) -> Any? {
+    defaults.persistentDomain(forName: suite)?[key]
   }
 
   @Test func theServerLanguageBecomesTheAppLanguage() {
@@ -22,8 +27,8 @@ struct CommonSettingsLanguageTests {
     let (language, defaults) = makeLanguage()
     language.apply("fr")
     language.apply(nil)
-    #expect(defaults.object(forKey: CommonSettingsLanguage.languagesKey) == nil)
-    #expect(defaults.string(forKey: CommonSettingsLanguage.appliedKey) == nil)
+    #expect(stored(defaults, CommonSettingsLanguage.languagesKey) == nil)
+    #expect(stored(defaults, CommonSettingsLanguage.appliedKey) == nil)
   }
 
   @Test func aLanguageTheUserChoseIsLeftAloneOnAPlainServer() {
