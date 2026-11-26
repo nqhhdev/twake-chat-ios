@@ -50,6 +50,7 @@ public final class RoomDetailsViewModel {
   @ObservationIgnored private let blockUser: (@MainActor (String) async -> Bool)?
   public private(set) var isSaving = false
   public private(set) var channel: ChannelSettings?
+  @ObservationIgnored public var onGifsChanged: (@MainActor (Bool) -> Void)?
   public private(set) var isChangingChannel = false
 
   public init(
@@ -261,6 +262,7 @@ public final class RoomDetailsViewModel {
     errorMessage = nil
     do {
       try await repository.setGifs(enabled, roomId: roomId)
+      onGifsChanged?(enabled)
       await loadChannel()
     } catch {
       channel = previous

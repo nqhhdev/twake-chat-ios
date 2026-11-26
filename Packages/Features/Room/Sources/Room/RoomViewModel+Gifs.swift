@@ -4,11 +4,27 @@ import Observation
 
 extension RoomViewModel {
   func loadGifsAvailability() async {
-    guard let gifs, await repository.gifsEnabled() else {
+    let enabled = await repository.gifsEnabled()
+    gifsOff = !enabled
+    guard let gifs, enabled else {
       gifsAvailable = false
       return
     }
     gifsAvailable = await gifs.searchPlaceholder() != nil
+  }
+
+  func gifsChanged(enabled: Bool) async {
+    gifsOff = !enabled
+    guard enabled, let gifs else {
+      gifsAvailable = false
+      return
+    }
+    gifsAvailable = await gifs.searchPlaceholder() != nil
+  }
+
+  static func isHiddenGif(_ message: TimelineMessage, gifsOff: Bool) -> Bool {
+    guard gifsOff, case .image = message.body else { return false }
+    return message.media?.mimeType?.lowercased() == "image/gif"
   }
 
   func makeGifPicker() -> GifPicker? {
