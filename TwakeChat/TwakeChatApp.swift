@@ -91,7 +91,7 @@ struct TwakeChatApp: App {
         roomCalls: ElementCallProxy(
           authentication: repository, fallbackURL: url("ElementCallURL"),
           clientId: Bundle.main.bundleIdentifier ?? "app.twake.ios.chat"),
-        identity: IdentityServerProxy(authentication: repository),
+        identity: IdentityServerProxy(authentication: repository, capabilities: capabilities),
         addressBook: SystemAddressBook(),
         twakeContacts: TomContactsProxy(authentication: repository, capabilities: capabilities),
         gifs: url("TwakeProxyURL").map { GifProxy(baseURL: $0, authentication: repository) },
