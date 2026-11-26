@@ -383,7 +383,9 @@ public actor TimelineProxy: TimelineRepository {
     }
     let packRooms = ImagePackMapper.eventContent(
       try? await client.accountData(eventType: ImagePackMapper.packRoomsType))
-    for (other, key) in packRooms.map(ImagePackMapper.packRooms) ?? [] where other != roomId {
+    for packRoom in packRooms.map(ImagePackMapper.packRooms) ?? [] where packRoom.roomId != roomId {
+      let other = packRoom.roomId
+      let key = packRoom.stateKey
       let path =
         "rooms/\(ClientServerRequest.encode(other))/state/\(ImagePackMapper.roomPackType)/"
         + ClientServerRequest.encode(key)

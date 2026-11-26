@@ -4,6 +4,7 @@ import Testing
 
 @testable import Room
 
+@MainActor
 struct TimelineRowsTests {
   private let start = Date(timeIntervalSince1970: 1_700_000_000)
 
