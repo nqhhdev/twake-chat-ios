@@ -34,6 +34,7 @@ public enum A11yIdentifiers {
   public struct Room: Sendable {
     public let composer = "room.composer"
     public let send = "room.send"
+    public let callButton = "room.call"
     /// A row of the message actions menu, by its English title ("Reply", "Edit", "Delete"…).
     public func action(_ title: String) -> String { "room.action.\(title)" }
     /// A reaction of the quick reaction bar, by its emoji.

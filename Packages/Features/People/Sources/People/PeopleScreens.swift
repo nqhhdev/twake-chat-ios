@@ -6,6 +6,7 @@ import SwiftUI
 struct PeopleSearchList: View {
   @Bindable var viewModel: PeopleSearchViewModel
   var phoneContacts: PhoneContactsViewModel?
+  var twakeContacts: TwakeContactsViewModel?
 
   var body: some View {
     list
@@ -144,8 +145,14 @@ struct PeopleSearchList: View {
         }
         .transition(.opacity)
       }
+      if let twakeContacts, viewModel.mode == .direct {
+        AddressBookSection(contacts: twakeContacts, search: viewModel)
+        if let message = twakeContacts.errorMessage {
+          Section { Text(message).foregroundStyle(SysColors.error) }
+        }
+      }
       if let phoneContacts, viewModel.mode == .direct {
-        PhoneContactsSections(contacts: phoneContacts, search: viewModel)
+        PhoneContactsSections(contacts: phoneContacts, search: viewModel, twake: twakeContacts)
       }
       if let message = viewModel.errorMessage {
         Section { Text(message).foregroundStyle(SysColors.error) }
@@ -234,18 +241,38 @@ public struct NewChatScreen: View {
 public struct ContactsScreen: View {
   let viewModel: PeopleSearchViewModel
   let phoneContacts: PhoneContactsViewModel?
+  let twakeContacts: TwakeContactsViewModel?
+  @State private var isAddingContact = false
 
-  public init(viewModel: PeopleSearchViewModel, phoneContacts: PhoneContactsViewModel? = nil) {
+  public init(
+    viewModel: PeopleSearchViewModel, phoneContacts: PhoneContactsViewModel? = nil,
+    twakeContacts: TwakeContactsViewModel? = nil
+  ) {
     self.viewModel = viewModel
     self.phoneContacts = phoneContacts
+    self.twakeContacts = twakeContacts
   }
 
   public var body: some View {
-    PeopleSearchList(viewModel: viewModel, phoneContacts: phoneContacts)
-      .scrollContentBackground(.hidden)
-      .background(SysColors.background)
-      .twakeTitle("Contacts")
-      .task { await phoneContacts?.load() }
+    PeopleSearchList(
+      viewModel: viewModel, phoneContacts: phoneContacts, twakeContacts: twakeContacts
+    )
+    .scrollContentBackground(.hidden)
+    .background(SysColors.background)
+    .twakeTitle("Contacts")
+    .toolbar {
+      if let twakeContacts {
+        TwakeContactsToolbar(contacts: twakeContacts, isAdding: $isAddingContact)
+      }
+    }
+    .sheet(isPresented: $isAddingContact) {
+      if let twakeContacts { AddressBookContactSheet(contacts: twakeContacts) }
+    }
+    .task {
+      async let phone: Void? = phoneContacts?.load()
+      async let twake: Void? = twakeContacts?.load()
+      _ = await (phone, twake)
+    }
   }
 }
 

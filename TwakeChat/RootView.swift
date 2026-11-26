@@ -44,6 +44,7 @@ final class RootCoordinator {
   @ObservationIgnored private let publicRooms: (any PublicRoomsRepository)?
   /// What spaces hold.
   @ObservationIgnored private let spaces: (any SpacesRepository)?
+  @ObservationIgnored private let folders: (any FoldersRepository)?
   /// Link previews from the homeserver.
   @ObservationIgnored private let linkPreviews: (any LinkPreviewRepository)?
   /// A room's timeline, or with a kind, only that kind of message, for a chat details tab.
@@ -60,8 +61,10 @@ final class RootCoordinator {
   @ObservationIgnored private let people: (any PeopleRepository)?
   @ObservationIgnored private let identity: (any IdentityRepository)?
   @ObservationIgnored private let addressBook: (any AddressBook)?
+  @ObservationIgnored private let twakeContactsRepository: (any TwakeContactsRepository)?
   /// Meet calls of the account (#92).
   @ObservationIgnored let meetCalls: (any MeetCallRepository)?
+  @ObservationIgnored let roomCalls: (any RoomCallRepository)?
   @ObservationIgnored private let gifs: (any GifRepository)?
   /// Push notifications of the signed-in account.
   @ObservationIgnored let push: PushCenter
@@ -97,6 +100,7 @@ final class RootCoordinator {
     archive: (any ArchivedRoomsRepository)? = nil,
     publicRooms: (any PublicRoomsRepository)? = nil,
     spaces: (any SpacesRepository)? = nil,
+    folders: (any FoldersRepository)? = nil,
     linkPreviews: (any LinkPreviewRepository)? = nil,
     makeTimeline: @escaping (String, RoomContentKind?) -> any TimelineRepository = { _, _ in
       UnavailableTimeline()
@@ -118,13 +122,15 @@ final class RootCoordinator {
     verification: (any VerificationRepository)? = nil, devices: (any DevicesRepository)? = nil,
     chatDisplay: (any ChatDisplaySettingsStore)? = nil, appLock: AppLock? = nil,
     sync: (any SyncLifecycle)? = nil, sessionExpiry: (any SessionExpiry)? = nil,
-    meetCalls: (any MeetCallRepository)? = nil,
+    meetCalls: (any MeetCallRepository)? = nil, roomCalls: (any RoomCallRepository)? = nil,
     identity: (any IdentityRepository)? = nil, addressBook: (any AddressBook)? = nil,
+    twakeContacts: (any TwakeContactsRepository)? = nil,
     gifs: (any GifRepository)? = nil,
     signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator
   ) {
     self.identity = identity
     self.addressBook = addressBook
+    self.twakeContactsRepository = twakeContacts
     self.gifs = gifs
     let pushCenter = PushCenter(repository: push, actions: notificationActions)
     self.sessionExpiry = sessionExpiry
@@ -139,6 +145,7 @@ final class RootCoordinator {
     self.archive = archive
     self.publicRooms = publicRooms
     self.spaces = spaces
+    self.folders = folders
     self.linkPreviews = linkPreviews
     self.makeTimeline = makeTimeline
     self.makeThreadTimeline = makeThreadTimeline
@@ -150,6 +157,7 @@ final class RootCoordinator {
     self.activityReactions = activityReactions
     self.accountSettings = accountSettings
     self.meetCalls = meetCalls
+    self.roomCalls = roomCalls
     self.deviceUnlock = deviceUnlock
     self.people = people
     self.signInConfiguration = signInConfiguration
@@ -175,6 +183,7 @@ final class RootCoordinator {
       openPerson: openDirectChat(),
       previewTimeline: { [makeTimeline] roomId in makeTimeline(roomId, nil) },
       presence: presenceLookup(),
+      folders: folders,
       logOut: { [weak signedIn, push, shareSuggestions] in
         guard let signedIn else { return false }
         await push.stop()
@@ -393,6 +402,10 @@ final class RootCoordinator {
       mode: mode, repository: people ?? UnavailablePeople(), onOpen: onOpen, identity: identity)
   }
 
+  func twakeContacts() -> TwakeContactsViewModel? {
+    twakeContactsRepository.map(TwakeContactsViewModel.init)
+  }
+
   func phoneContacts() -> PhoneContactsViewModel? {
     guard let identity, let addressBook else { return nil }
     return PhoneContactsViewModel(addressBook: addressBook, identity: identity)
@@ -517,8 +530,9 @@ struct RootView: View {
             makePeopleSearch: coordinator.peopleSearch(mode:onOpen:),
             makeRoom: coordinator.room(for:onLeft:),
             checkSession: coordinator.sessionCheckAfterUnlock(),
-            meetCalls: coordinator.meetCalls,
-            makePhoneContacts: coordinator.phoneContacts
+            meetCalls: coordinator.meetCalls, roomCalls: coordinator.roomCalls,
+            makePhoneContacts: coordinator.phoneContacts,
+            makeTwakeContacts: coordinator.twakeContacts
           )
           // Signed in: ask for notifications and register this device.
           .task { await coordinator.push.start() }
