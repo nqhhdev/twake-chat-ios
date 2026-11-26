@@ -25,6 +25,11 @@ done < <(find ./Packages \
   \( -name .build -o -name .swiftpm -o -name DerivedData -o -name Tests \) -prune \
   -o -path '*/Sources/*' -type f -name '*.swift' -print | LC_ALL=C sort)
 
+if [ ${#swift_files[@]} -eq 0 ]; then
+  echo "Localization check passed: 0 Swift file(s)."
+  exit 0
+fi
+
 findings="$(perl -ne '
   BEGIN {
     $views = qr/\b(?:Text|Button|Label|Toggle|Section|TextField|SecureField|Picker|LabeledContent|Link|Menu|NavigationLink|ContentUnavailableView|Stepper|DatePicker|GroupBox|DisclosureGroup)\(\s*/;
@@ -40,7 +45,7 @@ findings="$(perl -ne '
     }
   }
   if (eof) { close ARGV; $preview = 0 }
-' ${swift_files[@]+"${swift_files[@]}"})"
+' "${swift_files[@]}" < /dev/null)"
 
 if [ -n "$findings" ]; then
   printf '%s\n' "$findings"
