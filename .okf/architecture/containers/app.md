@@ -11,7 +11,7 @@ status: draft
 > `MatrixData` packages exist (TWAK-34). The app target has the App Group `group.app.twake.ios.chat` and the Keychain
 > access group `$(AppIdentifierPrefix)app.twake.ios.chat` in `TwakeChat/TwakeChat.entitlements` (TWAK-63). The
 > Notification Service Extension and the `.xcconfig` files are still planned. TWAK-65 adds the first feature package,
-> `Features/Authentication`, the composition root in `TwakeChatApp.swift` and the root coordinator in `RootView.swift`
+> `Features/Authentication`, the composition root in `TwakeChatApp.swift` and the root coordinator in `RootCoordinator.swift`
 > (see [Features Layer](../components/ui.md)).
 
 | | |

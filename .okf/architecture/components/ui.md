@@ -45,7 +45,7 @@ Reasoning: [ADR 0004](../../../docs/adr/0004-swiftui-observable-coordinators.md)
   acceptance locks hold Domain to one product and one test target; the owner decides whether to move it when a
   second feature needs it (a feature may not depend on another feature).
 
-The app target's root coordinator, `RootCoordinator` in `TwakeChat/RootView.swift`, restores the saved session once
+The app target's root coordinator, `RootCoordinator` in `TwakeChat/RootCoordinator.swift`, restores the saved session once
 at launch, then shows `AuthenticationCoordinatorView`. It marks the restore as started before it awaits, since every
 window of the app shares it. A restore error of any kind keeps the saved session and its SDK store: the root shows the
 feature's `RestoreFailedScreen` with Try again, which restores once more, and Log out, the way out when the error
