@@ -46,8 +46,9 @@ runs on every pull request and push to `main`, on `macos-26` with Xcode 26.6:
 It does not call `scripts/test.sh`: the `architecture` job already runs the architecture checks, and the script
 takes no DerivedData path to cache. The staging integration suites (`AuthenticationIntegrationTests`,
 `RoomListIntegrationTests`, `NotificationContentIntegrationTests`) run in the plan and skip, because CI has neither
-the variables nor the env file. Snapshot tests, the iOS 18.0 deployment-target build and the E2E suite do not run in
-CI.
+the variables nor the env file. Snapshot tests and the iOS 18.0 deployment-target build do not run in CI. The E2E
+suite (XCUITest against a local Synapse, `scripts/e2e.sh`, [docs/e2e.md](../../docs/e2e.md)) runs in its own
+workflow, `.github/workflows/e2e.yml`, on dispatch and every Monday; it is not a required check of `main`.
 
 ## Test targets
 | Target | Lives in | Runs with |

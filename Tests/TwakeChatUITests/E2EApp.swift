@@ -9,6 +9,11 @@ enum E2EConfig {
   static var user: String { environment["E2E_USER"] ?? "ios-alice" }
   static var password: String { environment["E2E_PASSWORD"] ?? "password" }
   static var peer: String { environment["E2E_PEER"] ?? "ios-bob" }
+  static var peerId: String { peer.hasPrefix("@") ? peer : "@\(peer):localhost" }
+  static var peerDisplayName: String { environment["E2E_PEER_DISPLAY_NAME"] ?? "bob E2E" }
+  static var peerLocalpart: String {
+    String(peerId.dropFirst().prefix { $0 != ":" })
+  }
   static var displayName: String { environment["E2E_DISPLAY_NAME"] ?? "Alice E2E" }
 }
 
@@ -18,6 +23,7 @@ enum E2EApp {
     let app = XCUIApplication()
     app.launchEnvironment["IS_RUNNING_E2E_TESTS"] = "1"
     app.launchEnvironment["E2E_RESET_SESSION"] = "1"
+    app.launchEnvironment["E2E_SKIP_SESSION_PROMPT"] = "1"
     app.launchEnvironment["E2E_HOMESERVER"] = E2EConfig.homeserver
     app.launch()
     return app
@@ -31,13 +37,29 @@ extension XCTestCase {
   /// Dismisses the notification permission alert, which iOS shows from SpringBoard after sign-in.
   @MainActor func dismissSystemAlerts() {
     let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-    for title in ["Allow", "Don’t Allow", "Don't Allow", "OK"] {
+    for title in ["Allow", "Allow Paste", "Don’t Allow", "Don't Allow", "OK"] {
       let button = springboard.alerts.buttons[title]
       if button.exists {
         button.tap()
         return
       }
     }
+  }
+
+  @MainActor func dismissInterruptions(_ app: XCUIApplication, waiting: TimeInterval = 0) {
+    let deadline = Date().addingTimeInterval(waiting)
+    let later = app.alerts.buttons["Later"]
+    let notNow = app.buttons["Not Now"]
+    repeat {
+      dismissSystemAlerts()
+      if notNow.exists, notNow.isHittable { notNow.tap() }
+      if later.exists, later.isHittable {
+        later.tap()
+        dismissSystemAlerts()
+        return
+      }
+      if Date() < deadline { _ = later.waitForExistence(timeout: 1) }
+    } while Date() < deadline
   }
 
   /// Welcome → "Use your company server" → homeserver → password form → chat list.
@@ -72,11 +94,11 @@ extension XCTestCase {
       : app.buttons.matching(identifier: "Chats").firstMatch
     XCTAssertTrue(
       chats.waitForExistence(timeout: Self.timeout), "Signed in", file: file, line: line)
-    dismissSystemAlerts()
+    dismissInterruptions(app, waiting: 5)
   }
 
   @MainActor func openSettings(_ app: XCUIApplication) {
-    dismissSystemAlerts()
+    dismissInterruptions(app)
     let tab =
       app.tabBars.buttons["Settings"].exists
       ? app.tabBars.buttons["Settings"]
@@ -105,10 +127,20 @@ extension XCTestCase {
       "Back on the welcome screen", file: file, line: line)
   }
 
-  @MainActor func openRoom(_ app: XCUIApplication, named name: String) {
+  @MainActor func chatRow(_ app: XCUIApplication, named name: String) -> XCUIElement {
+    dismissInterruptions(app)
     let row = app.buttons[A11yIdentifiers.chatList.room(name)]
+    if !row.waitForExistence(timeout: 3) {
+      let search = app.searchFields.firstMatch
+      search.tap()
+      search.typeText(name + "\n")
+    }
     XCTAssertTrue(row.waitForExistence(timeout: Self.timeout), "Room \(name) in the chat list")
-    row.tap()
+    return row
+  }
+
+  @MainActor func openRoom(_ app: XCUIApplication, named name: String) {
+    chatRow(app, named: name).tap()
     XCTAssertTrue(
       app.textViews[A11yIdentifiers.room.composer].waitForExistence(timeout: Self.timeout)
         || app.textFields[A11yIdentifiers.room.composer].waitForExistence(timeout: 1),
@@ -155,4 +187,40 @@ extension XCTestCase {
     XCTAssertTrue(bubble.waitForExistence(timeout: Self.timeout), "Message \(text)")
     bubble.press(forDuration: 0.8)
   }
+
+  @MainActor func element(_ app: XCUIApplication, _ identifier: String) -> XCUIElement {
+    app.descendants(matching: .any)[identifier].firstMatch
+  }
+
+  @MainActor func tapWhenReady(
+    _ element: XCUIElement, _ what: String, file: StaticString = #filePath, line: UInt = #line
+  ) {
+    XCTAssertTrue(element.waitForExistence(timeout: Self.timeout), what, file: file, line: line)
+    element.tap()
+  }
+
+  @MainActor func typeInto(
+    _ element: XCUIElement, _ text: String, _ what: String, file: StaticString = #filePath,
+    line: UInt = #line
+  ) {
+    tapWhenReady(element, what, file: file, line: line)
+    element.typeText(text)
+  }
+
+  @MainActor func waitUntilGone(
+    _ element: XCUIElement, _ what: String, file: StaticString = #filePath, line: UInt = #line
+  ) {
+    let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: element)
+    XCTAssertEqual(
+      XCTWaiter.wait(for: [gone], timeout: Self.timeout), .completed, what, file: file, line: line)
+  }
+
+  @MainActor func goBackToChatList(_ app: XCUIApplication) {
+    let back = app.navigationBars.buttons.element(boundBy: 0)
+    for _ in 0..<3 where !app.buttons[A11yIdentifiers.chatList.newChat].isHittable {
+      if back.exists { back.tap() }
+    }
+  }
+
+  static func marker() -> String { String(UUID().uuidString.prefix(6)) }
 }

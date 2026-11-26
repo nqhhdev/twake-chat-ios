@@ -37,6 +37,10 @@ public struct NewSpace: Sendable, Equatable {
     return servers
   }
 
+  public static func childContent(childId: String, ownServer: String?) -> [String: Any] {
+    ["via": via(childId, ownServer: ownServer)]
+  }
+
   public func createRoomBody(ownServer: String?, avatarURL: String? = nil) -> [String: Any] {
     var events: [String: Any] = Dictionary(
       uniqueKeysWithValues: Self.memberEvents.map { ($0, 0 as Any) })
