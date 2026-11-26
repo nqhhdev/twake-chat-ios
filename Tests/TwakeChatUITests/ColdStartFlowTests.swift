@@ -80,18 +80,7 @@ extension ColdStartFlowTests {
 
   @MainActor func dismissPromptsAfterSignIn(_ app: XCUIApplication) {
     let notNow = app.buttons["Not Now"]
-    let later = app.alerts["Unlock your encrypted messages"].buttons["Later"]
-    let deadline = Date().addingTimeInterval(10)
-    while Date() < deadline {
-      if notNow.exists, notNow.isHittable {
-        notNow.tap()
-      } else if later.exists, later.isHittable {
-        later.tap()
-        return
-      } else {
-        Thread.sleep(forTimeInterval: 0.25)
-      }
-    }
+    if notNow.waitForExistence(timeout: 3) { notNow.tap() }
   }
 
   @MainActor func allowNotifications() {

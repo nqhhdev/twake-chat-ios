@@ -27,6 +27,7 @@ public enum A11yIdentifiers {
 
   public struct ChatList: Sendable {
     public let list = "chatList.list"
+    public let sessionPrompt = "chatList.sessionPrompt"
     /// A room row, by the room's display name.
     public func room(_ name: String) -> String { "chatList.room.\(name)" }
   }
