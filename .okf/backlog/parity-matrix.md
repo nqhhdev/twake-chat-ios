@@ -70,7 +70,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Search in a chat: unencrypted on the server, encrypted on device | `chat_search` | Phase 4 (D21) | Built: `Room/RoomSearch.swift`, `RoomSearchProxy.swift`, on-device index of decrypted messages (ADR 0040) | Matrix | #94 |
 | Threads: list, reply, thread screen | — | Phase 2 | Built: `Room/Threads.swift`, `ThreadPrefsProxy.swift` | Matrix | #93 (notifications) |
 | Polls (MSC3381) | — | Phase 10 | Built: `Room/Polls.swift`, `Domain/Models/Poll.swift` | Matrix | — |
-| Checklists next to polls | — | THR-11 | Off: no event format defined ([ADR 0028](../../docs/adr/0028-gifs-stickers-checklists.md)) | Matrix | #105 |
+| Checklists next to polls | — | THR-11 | Off: no event format defined ([ADR 0028](../../docs/adr/0028-gifs-stickers-checklists.md)) | Matrix | #224 |
 | Voice messages (MSC3245), playback speed | `chat_audio_player_widget` | Phase 10 | Built: `Room/VoiceRecorder.swift`, `Players.swift`; interop to verify | Matrix | #108 |
 | Transcribe a voice message | — | MSG-13 | Built: on-device `SFSpeechRecognizer` (`SpeechTranscriber.swift`) | Device | #182 |
 | Translate a message | — | MSG-15 | Built: Apple Translation on the device (`MessageTranslationViews.swift`) | Device (ADR 0026) | #181 |
@@ -137,7 +137,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Feature | Flutter | Web | iOS | Server | Issue |
 |---|---|---|---|---|---|
 | Meet link button and call events in the timeline | `chat_video_call_button`, `domain/video_call` | D30, D105 | Built: `Room/MeetCalls.swift`, `MatrixData/Discovery/TwakeMeet.swift`, `Mappers/CallEvents.swift` (#161) | ToM + Twake (Meet) | — |
-| Calls in the app (MatrixRTC, LiveKit, ringing) | `dialer` | Phase 7, 7 bis | Built ([ADR 0038](../../docs/adr/0038-in-app-calls-with-element-call-widget.md)): Element Call in a web view driven by the SDK widget driver (`MatrixData/Proxies/ElementCallProxy.swift`, `Room/RoomCalls.swift`), start or join from the header, active-call banner, CallKit (`Room/CallKitReporter.swift`); shown only with a `livekit_service_url` focus. Incoming ring in the background not built | Matrix + LiveKit token service | #191 |
+| Calls in the app (MatrixRTC, LiveKit, ringing) | `dialer` | Phase 7, 7 bis | Built ([ADR 0038](../../docs/adr/0038-in-app-calls-with-element-call-widget.md)): Element Call in a web view driven by the SDK widget driver (`MatrixData/Proxies/ElementCallProxy.swift`, `Room/RoomCalls.swift`), start or join from the header, active-call banner, CallKit (`Room/CallKitReporter.swift`); shown only with a `livekit_service_url` focus. Incoming ring not built (#222), no picture in picture (#223), no screen sharing (out of scope, ADR 0038) | Matrix + LiveKit token service | #222, #223 |
 
 ## Settings
 
