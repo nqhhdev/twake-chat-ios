@@ -3,6 +3,7 @@ import XCTest
 final class ColdStartFlowTests: XCTestCase {
   static let alias = "ios-cold-start"
   static let pushedBody = "cold start ping"
+  static let earlierBody = "before the app was killed"
 
   @MainActor func testTappingANotificationAfterTheAppWasKilledOpensItsNewRoom() async throws {
     try XCTSkipUnless(
@@ -19,6 +20,45 @@ final class ColdStartFlowTests: XCTestCase {
     let roomId = try await otherDevice.createRoom(name: roomName, alias: Self.alias)
     try await otherDevice.send(Self.pushedBody, in: roomId)
 
+    tapTheNotificationAndCheckTheRoom(app, named: roomName)
+
+    try? await otherDevice.removeAlias(Self.alias)
+    try? await otherDevice.logout()
+  }
+
+  @MainActor func testTappingANotificationForAChatOpenedBeforeTheAppWasKilledShowsTheNewMessage()
+    async throws
+  {
+    try XCTSkipUnless(
+      ProcessInfo.processInfo.environment["E2E_PUSHES_COLD_START"] == "1",
+      "Needs the push from the host: scripts/e2e.sh cold-start")
+    let otherDevice = try await E2ERest.login(user: E2EConfig.user, password: E2EConfig.password)
+    let roomName = "Known chat \(UUID().uuidString.prefix(6))"
+    try await otherDevice.removeAlias(Self.alias)
+    let roomId = try await otherDevice.createRoom(name: roomName, alias: Self.alias)
+    try await otherDevice.send(Self.earlierBody, in: roomId)
+
+    let app = E2EApp.launch()
+    signIn(app)
+    dismissPromptsAfterSignIn(app)
+    openRoom(app, named: roomName)
+    XCTAssertTrue(
+      app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", Self.earlierBody))
+        .firstMatch.waitForExistence(timeout: Self.timeout),
+      "The chat loaded before the app was killed")
+    app.terminate()
+    try await otherDevice.send(Self.pushedBody, in: roomId)
+
+    tapTheNotificationAndCheckTheRoom(app, named: roomName)
+
+    try? await otherDevice.removeAlias(Self.alias)
+    try? await otherDevice.logout()
+  }
+}
+
+extension ColdStartFlowTests {
+  @MainActor func tapTheNotificationAndCheckTheRoom(_ app: XCUIApplication, named roomName: String)
+  {
     guard let notification = notification(containing: Self.pushedBody) else {
       print(XCUIApplication(bundleIdentifier: "com.apple.springboard").debugDescription)
       XCTFail("No notification within 120 s")
@@ -34,13 +74,24 @@ final class ColdStartFlowTests: XCTestCase {
       message.waitForExistence(timeout: Self.timeout), "The notified message in its room")
     XCTAssertTrue(app.staticTexts[roomName].exists, "The room's real name in the header")
     XCTAssertFalse(app.staticTexts["Could not open this chat."].exists)
-
-    try? await otherDevice.removeAlias(Self.alias)
-    try? await otherDevice.logout()
   }
-}
 
-extension ColdStartFlowTests {
+  @MainActor func dismissPromptsAfterSignIn(_ app: XCUIApplication) {
+    let notNow = app.buttons["Not Now"]
+    let later = app.alerts["Unlock your encrypted messages"].buttons["Later"]
+    let deadline = Date().addingTimeInterval(10)
+    while Date() < deadline {
+      if notNow.exists, notNow.isHittable {
+        notNow.tap()
+      } else if later.exists, later.isHittable {
+        later.tap()
+        return
+      } else {
+        Thread.sleep(forTimeInterval: 0.25)
+      }
+    }
+  }
+
   @MainActor func allowNotifications() {
     let allow = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.buttons["Allow"]
     if allow.waitForExistence(timeout: 15) { allow.tap() }
