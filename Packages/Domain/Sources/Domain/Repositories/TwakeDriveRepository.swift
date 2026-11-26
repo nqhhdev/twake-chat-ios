@@ -26,7 +26,7 @@ public struct DrivePickerOptions: Sendable, Equatable {
   }
 }
 
-public struct DrivePicker: Sendable, Equatable {
+public struct DrivePicker: Sendable, Equatable, Identifiable {
   public let intentId: String
   public let url: URL
   public let client: String
@@ -39,9 +39,19 @@ public struct DrivePicker: Sendable, Equatable {
     self.acknowledgement = acknowledgement
   }
 
+  public var id: String { intentId }
+
   public var origin: String? {
-    guard let scheme = url.scheme, let host = url.host() else { return nil }
-    return url.port.map { "\(scheme)://\(host):\($0)" } ?? "\(scheme)://\(host)"
+    Self.origin(scheme: url.scheme, host: url.host(), port: url.port)
+  }
+
+  public static func origin(scheme: String?, host: String?, port: Int?) -> String? {
+    guard let scheme = scheme?.lowercased(), let host = host?.lowercased(), !host.isEmpty else {
+      return nil
+    }
+    let defaultPort = ["https": 443, "http": 80][scheme]
+    guard let port, port != 0, port != defaultPort else { return "\(scheme)://\(host)" }
+    return "\(scheme)://\(host):\(port)"
   }
 }
 
@@ -116,6 +126,7 @@ public enum DriveError: Error, Sendable, Equatable {
   case cancelled
   case signInFailed
   case workplaceUnknown
+  case chatAppMissing
   case exchangeRejected
   case intentFailed
   case tooLarge

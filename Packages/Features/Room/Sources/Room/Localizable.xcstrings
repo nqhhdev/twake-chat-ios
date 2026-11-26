@@ -801,6 +801,54 @@
         }
       }
     },
+    "Add as attachment": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajouter comme pièce jointe"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thêm dưới dạng tệp đính kèm"
+          }
+        }
+      }
+    },
+    "Add as link": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajouter comme lien"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thêm dưới dạng liên kết"
+          }
+        }
+      }
+    },
+    "Add from Drive": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajouter depuis Drive"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thêm từ Drive"
+          }
+        }
+      }
+    },
     "Add people": {
       "localizations": {
         "fr": {
@@ -2321,6 +2369,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Không thể tải tệp lên. Vui lòng thử lại."
+          }
+        }
+      }
+    },
+    "Couldn't open Twake Drive": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible d’ouvrir Twake Drive"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể mở Twake Drive"
+          }
+        }
+      }
+    },
+    "Couldn't sign in to Twake Drive": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de se connecter à Twake Drive"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể đăng nhập vào Twake Drive"
           }
         }
       }
@@ -5649,6 +5729,22 @@
         }
       }
     },
+    "Shortcuts can't be attached, send a link instead": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les raccourcis ne peuvent pas être joints, envoyez plutôt un lien"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể đính kèm lối tắt, hãy gửi liên kết"
+          }
+        }
+      }
+    },
     "Show Original": {
       "localizations": {
         "fr": {
@@ -5773,6 +5869,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mặt cười"
+          }
+        }
+      }
+    },
+    "Some files couldn't be added from Twake Drive": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Certains fichiers n’ont pas pu être ajoutés depuis Twake Drive"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể thêm một số tệp từ Twake Drive"
           }
         }
       }
@@ -6561,6 +6673,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bật mã hóa?"
+          }
+        }
+      }
+    },
+    "Twake Chat isn't installed on your Twake Drive yet. Ask your administrator to install it.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Twake Chat n’est pas encore installé sur votre Twake Drive. Demandez à votre administrateur de l’installer."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Twake Chat chưa được cài đặt trên Twake Drive của bạn. Hãy yêu cầu quản trị viên cài đặt."
+          }
+        }
+      }
+    },
+    "Twake Drive": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Twake Drive"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Twake Drive"
           }
         }
       }

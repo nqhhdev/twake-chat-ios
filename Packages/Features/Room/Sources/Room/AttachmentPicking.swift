@@ -141,6 +141,8 @@ struct AttachmentButton: View {
   @State private var isCameraShown = false
   @State private var gifPicker: GifPicker?
   @State private var isStickerPickerShown = false
+  @State private var drivePicker: DrivePicker?
+  @Environment(\.colorScheme) private var colorScheme
 
   var body: some View {
     Menu {
@@ -149,6 +151,13 @@ struct AttachmentButton: View {
       }
       Button(localized("Gallery"), systemImage: "photo.on.rectangle") { isGalleryShown = true }
       Button(localized("Documents"), systemImage: "paperclip") { isDocumentPickerShown = true }
+      if viewModel.driveAvailable {
+        Button(localized("Add from Drive"), systemImage: "externaldrive") {
+          Task { drivePicker = await viewModel.openDrive(isDark: colorScheme == .dark) }
+        }
+        .disabled(viewModel.isOpeningDrive)
+        .accessibilityIdentifier(A11yIdentifiers.room.addFromDrive)
+      }
       Button(localized("Poll"), systemImage: "chart.bar.xaxis") { isPollShown = true }
       if viewModel.gifsAvailable {
         Button(localized("GIF"), systemImage: "photo.stack") {
@@ -212,6 +221,13 @@ struct AttachmentButton: View {
     .sheet(item: $gifPicker) { picker in
       GifPickerSheet(picker: picker) { gif in
         Task { await viewModel.send(gif: gif) }
+      }
+    }
+    .fullScreenCover(item: $drivePicker) { picker in
+      DrivePickerScreen(picker: picker) { outcome in
+        guard drivePicker?.id == picker.id else { return }
+        drivePicker = nil
+        Task { await viewModel.finishDrivePick(outcome) }
       }
     }
     .fullScreenCover(isPresented: $isCameraShown) {
