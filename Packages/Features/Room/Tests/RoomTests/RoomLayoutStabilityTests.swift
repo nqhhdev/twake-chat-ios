@@ -26,6 +26,32 @@ struct RoomLayoutStabilityTests {
     #expect(RoomMetrics.capsuleInset == 12)
   }
 
+  @Test func theColumnAndTheBubbleFitTheScreenLessTheGutters() {
+    #expect(RoomMetrics.columnWidth(screenWidth: 393) == 369)
+    #expect(RoomMetrics.columnWidth(screenWidth: 0) == 0)
+    #expect(abs(RoomMetrics.bubbleWidth(screenWidth: 393) - 393 * 0.88) < 0.001)
+    #expect(RoomMetrics.bubbleWidth(screenWidth: 393) <= RoomMetrics.columnWidth(screenWidth: 393))
+    #expect(RoomMetrics.bubbleWidth(screenWidth: 100) == 76)
+    #expect(RoomMetrics.bubbleWidth(screenWidth: 1200) == 520)
+    for width in stride(from: CGFloat(320), through: 1366, by: 1) {
+      let column = RoomMetrics.columnWidth(screenWidth: width)
+      let bubble = RoomMetrics.bubbleWidth(screenWidth: width)
+      let incomingRow =
+        RoomMetrics.avatarColumn
+        + RoomMetrics.contentWidth(bubbleWidth: bubble, isOwn: false) + 2 * RoomMetrics.bubbleInset
+      #expect(incomingRow <= column + 0.001)
+      #expect(bubble <= column)
+    }
+  }
+
+  @Test func theTimelineNeverScrollsSideways() {
+    #expect(RoomMetrics.bottomAnchor.x == 0)
+    #expect(RoomMetrics.topAnchor.x == 0)
+    #expect(RoomMetrics.middleAnchor.x == 0)
+    #expect(RoomMetrics.bottomAnchor.y == 1)
+    #expect(RoomMetrics.topAnchor.y == 0)
+  }
+
   @Test func theTextWidthLeavesTheBubbleInsetsAndTheAvatarColumn() {
     #expect(RoomMetrics.contentWidth(bubbleWidth: 343, isOwn: true) == 319)
     #expect(RoomMetrics.contentWidth(bubbleWidth: 343, isOwn: false) == 279)

@@ -15,6 +15,7 @@ private struct TimelineScrollGeometry: Equatable {
 struct TimelineScroll: View {
   let viewModel: RoomViewModel
   let bubbleWidth: CGFloat
+  let columnWidth: CGFloat
 
   @State private var position = ScrollPosition(idType: String.self, edge: .bottom)
   @State private var isAtBottom = true
@@ -58,6 +59,7 @@ struct TimelineScroll: View {
         }
         ForEach(rows) { row in
           ChatRowView(row: row, bubbleWidth: bubbleWidth, viewModel: viewModel)
+            .frame(width: columnWidth, alignment: .leading)
             .transition(animatesAppend ? Self.insertion(for: row) : .identity)
         }
       }
@@ -68,17 +70,14 @@ struct TimelineScroll: View {
         value: rows.last?.id
       )
       .scrollTargetLayout()
-      // The content is exactly as wide as the screen. A row that asked for more made it wider, and then each jump
-      // or page (`scrollTo` centres its row across too) slid the whole chat sideways: the avatars touched the left
-      // edge and the right side had twice the margin.
-      .containerRelativeFrame(.horizontal)
+      .frame(width: columnWidth + 2 * RoomMetrics.gutter, alignment: .leading)
     }
-    .scrollPosition($position, anchor: .top)
+    .scrollPosition($position, anchor: RoomMetrics.topAnchor)
     .onChange(of: rows.last?.id, initial: true) { _, lastId in shownLastRowId = lastId }
     .onChange(of: viewModel.scrollTarget) { _, target in
       guard let target else { return }
       withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-        position.scrollTo(id: target, anchor: .center)
+        position.scrollTo(id: target, anchor: RoomMetrics.middleAnchor)
       }
       viewModel.scrollTarget = nil
     }
@@ -88,7 +87,9 @@ struct TimelineScroll: View {
       guard let target else { return }
       var transaction = Transaction()
       transaction.disablesAnimations = true
-      withTransaction(transaction) { position.scrollTo(id: target, anchor: .top) }
+      withTransaction(transaction) {
+        position.scrollTo(id: target, anchor: RoomMetrics.topAnchor)
+      }
       viewModel.restoreTarget = nil
     }
     .onDisappear {
@@ -96,10 +97,10 @@ struct TimelineScroll: View {
         isAtBottom: isAtBottom, topRowId: position.viewID(type: String.self))
     }
     // Open on the newest message, and stay on it as messages arrive or pictures load.
-    .defaultScrollAnchor(.bottom)
+    .defaultScrollAnchor(RoomMetrics.bottomAnchor)
     // Pinning size changes to the bottom while scrolled up would drag the reader with new
     // messages or with a prepend; only the bottom of a chat they are already following stays put.
-    .defaultScrollAnchor(isAtBottom ? .bottom : nil, for: .sizeChanges)
+    .defaultScrollAnchor(isAtBottom ? RoomMetrics.bottomAnchor : nil, for: .sizeChanges)
     .scrollDismissesKeyboard(.interactively)
     .onScrollGeometryChange(for: TimelineScrollGeometry.self) { geometry in
       // The visible rect accounts for the insets (the composer, the safe area), unlike the bare content offset.
@@ -198,7 +199,7 @@ struct TimelineScroll: View {
     else { return }
     var transaction = Transaction()
     transaction.disablesAnimations = true
-    withTransaction(transaction) { position.scrollTo(id: id, anchor: .top) }
+    withTransaction(transaction) { position.scrollTo(id: id, anchor: RoomMetrics.topAnchor) }
   }
 
   private static func isMessage(_ row: ChatRow) -> Bool {
@@ -312,6 +313,7 @@ struct OtherRow: View {
         .padding(.vertical, 4)
         .background(SysColors.surface, in: Capsule())
         .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
     case .stateNotice(let text):
       Text(text)
         .textStyle(TextStyles.bodySmall)

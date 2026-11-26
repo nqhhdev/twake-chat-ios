@@ -1,3 +1,4 @@
+import DesignSystem
 import SwiftUI
 
 enum RoomMetrics {
@@ -12,6 +13,17 @@ enum RoomMetrics {
   static let highlightBleed: CGFloat = 6
   static let skeletonDelay: Duration = .milliseconds(400)
   static let appendLimit = 3
+  static let bottomAnchor = UnitPoint.bottomLeading
+  static let topAnchor = UnitPoint.topLeading
+  static let middleAnchor = UnitPoint.leading
+
+  static func columnWidth(screenWidth: CGFloat) -> CGFloat {
+    max(0, screenWidth - 2 * gutter)
+  }
+
+  static func bubbleWidth(screenWidth: CGFloat) -> CGFloat {
+    min(TwakeLayout.bubbleWidth(in: screenWidth), columnWidth(screenWidth: screenWidth))
+  }
 
   static func contentWidth(bubbleWidth: CGFloat, isOwn: Bool) -> CGFloat {
     max(0, bubbleWidth - 2 * bubbleInset - (isOwn ? 0 : avatarColumn))
