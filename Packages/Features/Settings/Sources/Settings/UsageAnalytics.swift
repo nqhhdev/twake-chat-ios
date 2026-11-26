@@ -33,7 +33,7 @@ public final class UsageAnalyticsViewModel {
       try await analytics.setConsent(granted)
       isPrompting = false
     } catch {
-      errorMessage = "Could not save your choice. Please try again."
+      errorMessage = localized("Could not save your choice. Please try again.")
     }
     state = await analytics.state()
   }
@@ -50,7 +50,7 @@ struct UsageAnalyticsSection: View {
             get: { viewModel.isGranted },
             set: { granted in Task { await viewModel.choose(granted) } })
         ) {
-          SettingsRow(title: "Share Usage Data", icon: "chart.bar", detail: nil)
+          SettingsRow(title: localized("Share Usage Data"), icon: "chart.bar", detail: nil)
         }
         .accessibilityIdentifier("settings.usageAnalytics")
         if let message = viewModel.errorMessage {
@@ -65,7 +65,9 @@ struct UsageAnalyticsSection: View {
 
 enum UsageAnalyticsText {
   static let explanation =
-    "Twake Chat counts which screens and actions you use, to improve the app. It never sends your messages, names, contacts or files."
+    localized(
+      "Twake Chat counts which screens and actions you use, to improve the app. It never sends your messages, names, contacts or files."
+    )
 }
 
 public struct UsageAnalyticsConsentSheet: View {
@@ -81,7 +83,7 @@ public struct UsageAnalyticsConsentSheet: View {
         .font(.system(size: 40))
         .foregroundStyle(SysColors.primary)
         .accessibilityHidden(true)
-      Text("Help improve Twake Chat")
+      Text(localized("Help improve Twake Chat"))
         .textStyle(TextStyles.titleLarge)
         .foregroundStyle(SysColors.onSurface)
       Text(UsageAnalyticsText.explanation)
@@ -94,7 +96,7 @@ public struct UsageAnalyticsConsentSheet: View {
       Button {
         Task { await viewModel.choose(true) }
       } label: {
-        Text("Share Usage Data").frame(maxWidth: .infinity)
+        Text(localized("Share Usage Data")).frame(maxWidth: .infinity)
       }
       .buttonStyle(.borderedProminent)
       .controlSize(.large)
@@ -102,7 +104,7 @@ public struct UsageAnalyticsConsentSheet: View {
       Button {
         Task { await viewModel.choose(false) }
       } label: {
-        Text("Don't Share").frame(maxWidth: .infinity)
+        Text(localized("Don't Share")).frame(maxWidth: .infinity)
       }
       .buttonStyle(.bordered)
       .controlSize(.large)

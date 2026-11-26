@@ -11,8 +11,8 @@ struct BlockedUsersScreen: View {
       if let users = viewModel.blockedUsers {
         if users.isEmpty {
           ContentUnavailableView(
-            "No one blocked", systemImage: "hand.raised",
-            description: Text("People you block from a chat show here."))
+            localized("No one blocked"), systemImage: "hand.raised",
+            description: Text(localized("People you block from a chat show here.")))
         } else {
           List {
             ForEach(users) { user in
@@ -26,11 +26,11 @@ struct BlockedUsersScreen: View {
                   }
                 }
                 Spacer()
-                Button("Unblock") { confirming = user }
+                Button(localized("Unblock")) { confirming = user }
                   .buttonStyle(.bordered)
               }
               .swipeActions {
-                Button("Unblock") { confirming = user }.tint(SysColors.primary)
+                Button(localized("Unblock")) { confirming = user }.tint(SysColors.primary)
               }
             }
             if let message = viewModel.errorMessage {
@@ -43,18 +43,18 @@ struct BlockedUsersScreen: View {
         ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
-    .navigationTitle("Blocked people")
+    .navigationTitle(localized("Blocked people"))
     .task { await viewModel.loadBlockedUsers() }
     .confirmationDialog(
-      confirming.map { "Unblock \($0.name)?" } ?? "",
+      confirming.map { localized("Unblock \($0.name)?") } ?? "",
       isPresented: Binding(get: { confirming != nil }, set: { if !$0 { confirming = nil } }),
       titleVisibility: .visible
     ) {
-      Button("Unblock") {
+      Button(localized("Unblock")) {
         if let user = confirming { Task { await viewModel.unblock(user) } }
       }
     } message: {
-      Text("Their messages and invitations will show again.")
+      Text(localized("Their messages and invitations will show again."))
     }
   }
 }
