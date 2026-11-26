@@ -247,6 +247,7 @@ private final class WeakMessageHandler: NSObject, WKScriptMessageHandler {
 struct RoomCallPresentation: ViewModifier {
   let calls: RoomCallViewModel?
   let roomId: String
+  let title: String
 
   func body(content: Content) -> some View {
     content
@@ -254,6 +255,7 @@ struct RoomCallPresentation: ViewModifier {
         guard let calls else { return }
         await calls.load()
         guard calls.isAvailable else { return }
+        await calls.joinIfAnswered(title: title)
         await calls.watch()
       }
       .alert(
@@ -268,7 +270,7 @@ struct RoomCallPresentation: ViewModifier {
 }
 
 extension View {
-  func roomCalls(_ calls: RoomCallViewModel?, roomId: String) -> some View {
-    modifier(RoomCallPresentation(calls: calls, roomId: roomId))
+  func roomCalls(_ calls: RoomCallViewModel?, roomId: String, title: String) -> some View {
+    modifier(RoomCallPresentation(calls: calls, roomId: roomId, title: title))
   }
 }

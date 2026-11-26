@@ -36,7 +36,12 @@ public protocol CallWidgetSession: Sendable {
 
 public protocol RoomCallRepository: Sendable {
   func isAvailable() async -> Bool
+  func decline(roomId: String, notificationEventId: String) async
   func callStates(roomId: String) async -> AsyncStream<RoomCallState>
   func open(roomId: String, intent: CallIntent) async throws(RoomCallError)
     -> any CallWidgetSession
+}
+
+extension RoomCallRepository {
+  public func decline(roomId: String, notificationEventId: String) async {}
 }

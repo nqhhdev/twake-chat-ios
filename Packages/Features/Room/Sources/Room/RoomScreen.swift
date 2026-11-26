@@ -209,7 +209,7 @@ public struct RoomScreen: View {
     .sensoryFeedback(.success, trigger: viewModel.toast) { _, new in new != nil }
     .environment(calls)
     .task(id: viewModel.roomId) { await calls?.load() }
-    .roomCalls(roomCall, roomId: viewModel.roomId)
+    .roomCalls(roomCall, roomId: viewModel.roomId, title: viewModel.roomName)
     .alert(
       calls?.errorMessage ?? "",
       isPresented: Binding(

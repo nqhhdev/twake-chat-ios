@@ -230,3 +230,34 @@ public enum AccountLabel {
     return id
   }
 }
+
+public struct AccountCallAvailability: Sendable {
+  private let suiteName: String
+
+  public init?(suiteName: String) {
+    guard UserDefaults(suiteName: suiteName) != nil else { return nil }
+    self.suiteName = suiteName
+  }
+
+  public static func inAppGroup() -> AccountCallAvailability? {
+    AccountCallAvailability(suiteName: AppGroupContainer.defaultGroupIdentifier)
+  }
+
+  private var defaults: UserDefaults {
+    UserDefaults(suiteName: suiteName) ?? .standard
+  }
+
+  static func key(_ slot: AccountSlot) -> String { "calls.\(slot.id)" }
+
+  public func record(_ available: Bool, for slot: AccountSlot) {
+    defaults.set(available, forKey: Self.key(slot))
+  }
+
+  public func isAvailable(for slot: AccountSlot) -> Bool {
+    defaults.bool(forKey: Self.key(slot))
+  }
+
+  public func forget(_ slot: AccountSlot) {
+    defaults.removeObject(forKey: Self.key(slot))
+  }
+}

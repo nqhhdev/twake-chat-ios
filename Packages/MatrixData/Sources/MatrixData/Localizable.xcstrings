@@ -257,6 +257,38 @@
         }
       }
     },
+    "Incoming video call": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appel vidéo entrant"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuộc gọi video đến"
+          }
+        }
+      }
+    },
+    "Incoming voice call": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appel vocal entrant"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuộc gọi thoại đến"
+          }
+        }
+      }
+    },
     "Invited users only": {
       "localizations": {
         "fr": {
@@ -317,6 +349,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Đã gửi một nhãn dán"
+          }
+        }
+      }
+    },
+    "Started a call": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A lancé un appel"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã bắt đầu một cuộc gọi"
           }
         }
       }

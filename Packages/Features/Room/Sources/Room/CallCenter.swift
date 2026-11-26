@@ -8,6 +8,7 @@ public final class CallCenter {
   public private(set) var call: ActiveCall?
   public private(set) var roomId: String?
   public private(set) var isMinimized = false
+  public var pendingJoinRoomId: String?
 
   @ObservationIgnored private var system: (any CallSystemReporting)?
 
@@ -28,6 +29,12 @@ public final class CallCenter {
       Task { await self.end() }
     }
     await system?.reportStarted(call.id, title: call.title)
+  }
+
+  public func takePendingJoin(roomId: String) -> Bool {
+    guard pendingJoinRoomId == roomId else { return false }
+    pendingJoinRoomId = nil
+    return true
   }
 
   public func minimize() {

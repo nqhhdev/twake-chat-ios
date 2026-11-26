@@ -1,4 +1,5 @@
 import AppShared
+import Domain
 import Foundation
 import MatrixData
 import Observation
@@ -34,11 +35,13 @@ final class AccountsCoordinator {
   @ObservationIgnored private let makeRoot: MakeRoot
   @ObservationIgnored private let relay: SessionRelay
   @ObservationIgnored private let badges: AccountBadges?
+  @ObservationIgnored private let calls: AccountCallAvailability?
   @ObservationIgnored private let inbox: SharedInbox?
 
   init(
     registry: AccountRegistry, legacyUserId: String?, badges: AccountBadges? = nil,
-    inbox: SharedInbox? = SharedInbox.inAppGroup(), makeRoot: @escaping MakeRoot
+    calls: AccountCallAvailability? = nil, inbox: SharedInbox? = SharedInbox.inAppGroup(),
+    makeRoot: @escaping MakeRoot
   ) {
     let list = registry.migrate(legacyUserId: legacyUserId)
     let slot = list.active?.slot ?? list.slotForSignIn()
@@ -47,6 +50,7 @@ final class AccountsCoordinator {
     self.makeRoot = makeRoot
     self.relay = relay
     self.badges = badges
+    self.calls = calls
     self.inbox = inbox
     self.list = list
     rootSlot = slot
@@ -54,6 +58,10 @@ final class AccountsCoordinator {
     relay.target = self
     AppDelegate.push = root.push
     AppDelegate.accounts = self
+    CallKitReporter.shared.onAnswer = { [weak self] ring in self?.answer(ring) }
+    CallKitReporter.shared.onDecline = { [weak self] ring in
+      Task { await self?.decline(ring) }
+    }
     root.shareSuggestions.accountUserId = activeUserId
   }
 
@@ -69,10 +77,37 @@ final class AccountsCoordinator {
   }
 
   func handle(_ action: NotificationAction) async {
+    if action.kind == .open, let ring = action.ring, ring.isRinging() {
+      answer(ring)
+      return
+    }
     if let userId = action.userId, userId != activeUserId, list.account(userId: userId) != nil {
       switchTo(userId: userId)
     }
     await root.push.handle(action)
+  }
+
+  func answer(_ ring: CallRing, center: CallCenter = .shared) {
+    if let userId = ring.accountUserId, userId != activeUserId, list.account(userId: userId) != nil
+    {
+      switchTo(userId: userId)
+    }
+    center.pendingJoinRoomId = ring.roomId
+    if !ring.roomName.isEmpty { root.push.pendingRoomName = ring.roomName }
+    root.push.pendingRoomId = ring.roomId
+    Task {
+      try? await Task.sleep(for: Self.answerTimeout)
+      guard center.call == nil, center.pendingJoinRoomId == ring.roomId else { return }
+      center.pendingJoinRoomId = nil
+      CallKitReporter.shared.endPendingAnswer()
+    }
+  }
+
+  static let answerTimeout: Duration = .seconds(30)
+
+  func decline(_ ring: CallRing) async {
+    if let userId = ring.accountUserId, userId != activeUserId { return }
+    await root.roomCalls?.decline(roomId: ring.roomId, notificationEventId: ring.eventId)
   }
 
   func openShare() {
@@ -121,6 +156,7 @@ final class AccountsCoordinator {
     case .signedOut:
       registry.update { _ = $0.remove(slot: slot) }
       badges?.forget(slot)
+      calls?.forget(slot)
       reloadList()
       guard slot == rootSlot, let next = list.active, next.slot != slot else { return }
       install(makeRoot(next.slot, relay.forward(next.slot)), slot: next.slot)

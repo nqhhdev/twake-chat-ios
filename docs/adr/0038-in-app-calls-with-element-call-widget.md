@@ -61,6 +61,31 @@ and `twake.app` list only `livekit_base_url` (Meet), which is not a token servic
   120 × 180 pt floating window at the bottom trailing corner, with the same web view, so the call goes on while the
   user browses other chats; a tap on the window, or "Return to call" on the room's banner, brings it back full screen.
   Starting a call in another room ends the first one; switching accounts ends it.
+- **Ringing an incoming call (#222).** A ring is the MSC4075 event `org.matrix.msc4075.rtc.notification` with
+  `notification_type: ring` (`MessageLikeEventContent.rtcNotification` in the SDK). The push gateway, the pusher and
+  the payload do not change (ADR 0009, ADR 0017): the ring arrives as the usual alert push, and the Notification
+  Service Extension decrypts it like any message. No VoIP push is sent by any server.
+  - The extension turns it into a `CallRing` (room, event, room name, voice or video, expiry, account) when the ring
+    has not expired (and expires within 90 s) and the account's server offers calls: the app records, per account,
+    whether its well-known has a token service (`AccountCallAvailability`, the App Group's `UserDefaults`). A server
+    without one never rings; the push shows as "Incoming video call".
+  - The extension hands the ring to the app with `CXProvider.reportNewIncomingVoIPPushPayload` (iOS 14.5, Apple's
+    "Sending end-to-end encrypted VoIP calls", the path Element X takes) and shows nothing. The app, started or woken
+    in the background, receives it in `PKPushRegistry`'s `didReceiveIncomingPushWith` (PushKit registered for
+    `.voIP`, the `voip` background mode; the VoIP token is never sent anywhere) and reports it to CallKit at once;
+    a payload it cannot read is reported and ended, as PushKit requires.
+  - That call needs the `com.apple.developer.usernotifications.filtering` entitlement on the extension, which Apple
+    grants on request (the "Notification Service Extension Filtering Entitlement Request" form). Until the owner has
+    it, the call fails and the extension shows the push with the ring attached: the app rings through CallKit when it
+    is in the foreground (`willPresent`), and a tap on the notification while it still rings answers it. The
+    entitlement is not in `TwakeChatNSE.entitlements` yet: a key the provisioning profile lacks breaks every signed
+    build. Owner's direction of 2026-11-25: « Pls auto and auto no need human review, I will review it after 100% func
+    works well »; applying to Apple is the owner's step.
+  - Answer: the app switches to the ring's account, opens the room and joins the call (`CallCenter.pendingJoinRoomId`,
+    joined with `CallIntent.join`), and the CallKit call it answered becomes the call's (`CallIdentities`), so the
+    system shows one call. A call not joined within 30 s is ended. Decline: `Room.declineCall` with the ring's event
+    (MSC4310), on the account on screen; a ring of another account is only dismissed. An unanswered ring stops at its
+    expiry (`.unanswered`).
 - **Leaving.** Hanging up in Element Call (`im.vector.hangup` or `io.element.close`), the red Leave button, or ending
   from CallKit closes the call and stops the driver. Element Call leaves the call itself through a delayed event,
   so a closed app is removed from the call by the server.
@@ -77,11 +102,8 @@ Element Call's embedded build inside the app: Element Call is AGPL-3.0, which [A
 has not settled. Keeping the Meet link only: no interoperable call with the web.
 
 ## Left for later
-1. **Ringing an incoming call** when the app is in the background or closed: the NSE reads
-   `org.matrix.msc4075.rtc.notification` (`MessageLikeEventContent.rtcNotification` in the SDK) and hands it to the
-   app through `CXProvider.reportNewIncomingVoIPPushPayload`, which needs a PushKit registration, the `voip`
-   background mode and a decline through `Room.declineCall`. It touches the push extension and the pusher (ADR 0009,
-   ADR 0017), so it is its own change: #222.
+1. **Ringing a locked or closed device** waits for the filtering entitlement (above): the code is built, the
+   entitlement key is added once Apple grants it. The rest of #222 is built.
 2. **Picture in picture** outside the app (#223). Keeping the call while browsing other chats is built (above); system
    picture in picture is not. It needs `AVPictureInPictureController` with an
    `AVPictureInPictureVideoCallViewController` content source and the call's web view moved into it while picture in

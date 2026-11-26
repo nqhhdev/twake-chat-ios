@@ -87,6 +87,7 @@ struct ChatShell: View {
       .tabViewStyle(.sidebarAdaptable)
       // A request from another of the user's devices opens the verification sheet wherever the user is.
       .task { await settings.verification?.follow() }
+      .task { _ = await roomCalls?.isAvailable() }
       .sheet(
         isPresented: Binding(
           get: { settings.verification?.isPresentingRequest == true },

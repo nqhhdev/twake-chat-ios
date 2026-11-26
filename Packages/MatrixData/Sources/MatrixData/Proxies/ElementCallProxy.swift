@@ -21,6 +21,16 @@ public actor ElementCallProxy: RoomCallRepository {
     return await callURL(client) != nil
   }
 
+  public func decline(roomId: String, notificationEventId: String) async {
+    guard let client = await clientProxy(), let room = try? client.client.getRoom(roomId: roomId)
+    else { return }
+    do {
+      try await room.declineCall(rtcNotificationEventId: notificationEventId)
+    } catch {
+      DebugLog.failure("declineCall", error)
+    }
+  }
+
   public func callStates(roomId: String) async -> AsyncStream<RoomCallState> {
     guard let client = await clientProxy(), let room = try? client.client.getRoom(roomId: roomId)
     else { return AsyncStream { $0.finish() } }

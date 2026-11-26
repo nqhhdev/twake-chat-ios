@@ -21,7 +21,7 @@ public actor NotificationContentProxy: NotificationContentRepository {
     while true {
       let status = try? await notifications.getNotification(roomId: roomId, eventId: eventId)
       guard Self.isWorthRetrying(status), let pause = pauses.popFirst(), !Task.isCancelled else {
-        let outcome = Self.outcome(of: status, ownUserId: ownUserId)
+        let outcome = Self.outcome(of: status, ownUserId: ownUserId, roomId: roomId)
         return await Self.withAvatars(outcome, of: status, client: client)
       }
       try? await Task.sleep(for: pause)
@@ -66,9 +66,9 @@ public actor NotificationContentProxy: NotificationContentRepository {
     }
   }
 
-  static func outcome(of status: NotificationStatus?, ownUserId: String? = nil)
-    -> NotificationOutcome
-  {
+  static func outcome(
+    of status: NotificationStatus?, ownUserId: String? = nil, roomId: String = ""
+  ) -> NotificationOutcome {
     guard let status else { return .generic }
     guard case .event(let item) = status else {
       return Self.outcome(withoutEvent: status) ?? .generic
@@ -86,11 +86,14 @@ public actor NotificationContentProxy: NotificationContentRepository {
       guard case .messageLike(let content)? = try? event.content() else { return .generic }
       if Self.isSilent(content, rawEvent: item.rawEvent) { return .hide }
       guard let body = Self.body(of: content) else { return .generic }
+      let ring = Self.ring(
+        of: content, roomId: roomId, eventId: event.eventId(), roomName: item.roomInfo.displayName)
       return .show(
         Self.content(
           senderId: senderId, sender: sender ?? senderId, room: item.roomInfo.displayName,
           isDirect: item.roomInfo.isDirect, body: body,
-          threadId: Self.threadId(item.threadId, rawEvent: item.rawEvent), isMessage: true))
+          threadId: Self.threadId(item.threadId, rawEvent: item.rawEvent),
+          isMessage: !Self.isCall(content), ring: ring))
     }
   }
 
@@ -138,12 +141,28 @@ public actor NotificationContentProxy: NotificationContentRepository {
 
   static func content(
     senderId: String = "", sender: String, room: String, isDirect: Bool, body: String,
-    threadId: String? = nil, isMessage: Bool = false
+    threadId: String? = nil, isMessage: Bool = false, ring: CallRing? = nil
   ) -> NotificationContent {
     NotificationContent(
       title: isDirect ? sender : room, subtitle: isDirect ? "" : sender, body: body,
       senderId: senderId, senderName: sender, roomName: room, isDirect: isDirect,
-      threadId: threadId, isMessage: isMessage)
+      threadId: threadId, isMessage: isMessage, ring: ring)
+  }
+
+  static func isCall(_ content: MessageLikeEventContent) -> Bool {
+    if case .rtcNotification = content { return true }
+    return false
+  }
+
+  static func ring(
+    of content: MessageLikeEventContent, roomId: String, eventId: String?, roomName: String
+  ) -> CallRing? {
+    guard case .rtcNotification(let type, let expirationTs, let intent) = content,
+      type == .ring, let eventId, !eventId.isEmpty, !roomId.isEmpty
+    else { return nil }
+    return CallRing(
+      roomId: roomId, eventId: eventId, roomName: roomName, isVoice: intent == .audio,
+      expiresAt: Date(timeIntervalSince1970: TimeInterval(expirationTs) / 1000))
   }
 
   static func body(of content: MessageLikeEventContent) -> String? {
@@ -151,6 +170,10 @@ public actor NotificationContentProxy: NotificationContentRepository {
     case .roomMessage(let type, _): body(of: type)
     case .poll(let question): "📊 \(question)"
     case .sticker: localized("Sent a sticker")
+    case .rtcNotification(let type, _, let intent):
+      type == .notification
+        ? localized("Started a call")
+        : intent == .audio ? localized("Incoming voice call") : localized("Incoming video call")
     default: nil
     }
   }

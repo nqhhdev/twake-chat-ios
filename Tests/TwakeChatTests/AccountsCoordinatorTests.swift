@@ -1,8 +1,10 @@
 import AppShared
 import Authentication
 import AuthenticationTestSupport
+import Domain
 import Foundation
 import MatrixData
+import Room
 import Testing
 import UserNotifications
 
@@ -270,5 +272,45 @@ struct AccountsCoordinatorTests {
     #expect(accounts.root.shareSuggestions.accountUserId == "@bob:b")
     accounts.switchTo(userId: "@alice:a")
     #expect(accounts.root.shareSuggestions.accountUserId == "@alice:a")
+  }
+
+  private func ring(account: String?) -> CallRing {
+    CallRing(
+      roomId: "!call:a", eventId: "$ring", roomName: "Team", isVoice: false,
+      expiresAt: Date().addingTimeInterval(30), accountUserId: account)
+  }
+
+  @Test func answeringARingOfAnotherAccountSwitchesAndOpensItsRoomToJoin() async throws {
+    defer { cleanUp() }
+    let (accounts, _) = try await twoAccounts(Roots(inbox: inbox))
+    let center = CallCenter()
+    accounts.answer(ring(account: "@alice:a"), center: center)
+    #expect(accounts.activeUserId == "@alice:a")
+    #expect(accounts.root.push.pendingRoomId == "!call:a")
+    #expect(accounts.root.push.pendingRoomName == "Team")
+    #expect(center.pendingJoinRoomId == "!call:a")
+  }
+
+  @Test func answeringARingOfTheAccountOnScreenStays() async throws {
+    defer { cleanUp() }
+    let (accounts, slot) = try await twoAccounts(Roots(inbox: inbox))
+    let center = CallCenter()
+    accounts.answer(ring(account: "@bob:b"), center: center)
+    #expect(accounts.rootSlot == slot)
+    #expect(center.pendingJoinRoomId == "!call:a")
+  }
+
+  @Test func tappingARingingNotificationAnswersIt() async throws {
+    defer { cleanUp() }
+    let (accounts, _) = try await twoAccounts(Roots(inbox: inbox))
+    let action = try #require(
+      NotificationAction(
+        actionIdentifier: UNNotificationDefaultActionIdentifier, userText: nil,
+        userInfo: ["room_id": "!call:a", "call_ring": ring(account: "@alice:a").payload],
+        title: "Team"))
+    await accounts.handle(action)
+    #expect(accounts.activeUserId == "@alice:a")
+    #expect(CallCenter.shared.pendingJoinRoomId == "!call:a")
+    CallCenter.shared.pendingJoinRoomId = nil
   }
 }

@@ -193,4 +193,23 @@ struct NotificationActionTests {
         userInfo: userInfo, title: ""))
     #expect(without.userId == nil)
   }
+
+  @Test func aRingingNotificationCarriesItsRing() throws {
+    let ring = CallRing(
+      roomId: "!r:b", eventId: "$ring", roomName: "Team", isVoice: false,
+      expiresAt: Date().addingTimeInterval(30), accountUserId: "@me:b")
+    var info = userInfo
+    info["call_ring"] = ring.payload
+    let action = try #require(
+      NotificationAction(
+        actionIdentifier: UNNotificationDefaultActionIdentifier, userText: nil, userInfo: info,
+        title: "Team"))
+    #expect(action.ring?.eventId == "$ring")
+    #expect(action.ring?.accountUserId == "@me:b")
+    let plain = try #require(
+      NotificationAction(
+        actionIdentifier: UNNotificationDefaultActionIdentifier, userText: nil,
+        userInfo: userInfo, title: ""))
+    #expect(plain.ring == nil)
+  }
 }

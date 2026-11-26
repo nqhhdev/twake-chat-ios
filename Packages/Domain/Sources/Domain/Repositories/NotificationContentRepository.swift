@@ -12,11 +12,12 @@ public struct NotificationContent: Sendable, Equatable {
   public let isMessage: Bool
   public var senderAvatar: Data?
   public var roomAvatar: Data?
+  public let ring: CallRing?
 
   public init(
     title: String, subtitle: String, body: String, senderId: String = "", senderName: String = "",
     roomName: String = "", isDirect: Bool = false, threadId: String? = nil, isMessage: Bool = false,
-    senderAvatar: Data? = nil, roomAvatar: Data? = nil
+    senderAvatar: Data? = nil, roomAvatar: Data? = nil, ring: CallRing? = nil
   ) {
     self.title = title
     self.subtitle = subtitle
@@ -29,6 +30,7 @@ public struct NotificationContent: Sendable, Equatable {
     self.isMessage = isMessage
     self.senderAvatar = senderAvatar
     self.roomAvatar = roomAvatar
+    self.ring = ring
   }
 }
 
