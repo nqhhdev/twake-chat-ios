@@ -125,7 +125,7 @@ public final class RoomContentViewModel {
     do {
       return try await media.file(reference, filename: RoomViewModel.fileName(of: entry.message))
     } catch {
-      errorMessage = "Could not download the file."
+      errorMessage = localized("Could not download the file.")
       return nil
     }
   }
@@ -161,10 +161,10 @@ public final class RoomContentViewModel {
 extension RoomContentKind {
   var title: String {
     switch self {
-    case .media: "Media"
-    case .files: "Files"
-    case .links: "Links"
-    case .text: "Messages"
+    case .media: localized("Media")
+    case .files: localized("Files")
+    case .links: localized("Links")
+    case .text: localized("Messages")
     }
   }
 
@@ -179,10 +179,10 @@ extension RoomContentKind {
 
   var emptyText: String {
     switch self {
-    case .media: "No pictures or videos"
-    case .files: "No files"
-    case .links: "No links"
-    case .text: "No messages"
+    case .media: localized("No pictures or videos")
+    case .files: localized("No files")
+    case .links: localized("No links")
+    case .text: localized("No messages")
     }
   }
 }
@@ -220,7 +220,7 @@ struct RoomContentScreen: View {
   @ViewBuilder private var content: some View {
     if viewModel.failed {
       ContentUnavailableView(
-        "Could not load this chat", systemImage: "exclamationmark.triangle")
+        localized("Could not load this chat"), systemImage: "exclamationmark.triangle")
     } else if viewModel.entries.isEmpty, viewModel.reachedStart {
       ContentUnavailableView(viewModel.kind.emptyText, systemImage: viewModel.kind.systemImage)
     } else if viewModel.kind == .media {
@@ -291,7 +291,7 @@ struct RoomContentScreen: View {
         .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .accessibilityLabel(isVideo(entry) ? "Video" : "Picture")
+    .accessibilityLabel(isVideo(entry) ? localized("Video") : localized("Picture"))
     .accessibilityValue(entry.message.date.formatted(date: .abbreviated, time: .shortened))
   }
 
@@ -364,7 +364,9 @@ struct RoomContentScreen: View {
     .foregroundStyle(SysColors.onSurface)
     .contextMenu {
       if let link = entry.link {
-        Button("Copy link", systemImage: "doc.on.doc") { UIPasteboard.general.url = link }
+        Button(localized("Copy link"), systemImage: "doc.on.doc") {
+          UIPasteboard.general.url = link
+        }
         ShareLink(item: link)
       }
     }

@@ -12,7 +12,7 @@ extension RoomViewModel {
   public var headerSubtitle: String? {
     if let presenceLine { return presenceLine }
     guard let memberCount, memberCount > 0 else { return nil }
-    return memberCount == 1 ? "1 member" : "\(memberCount) members"
+    return localized("\(memberCount) members")
   }
 
   public func retryDecryption() async {
@@ -53,18 +53,18 @@ extension RoomViewModel {
     if await blocking.unblock(userId) {
       withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { blockedUserId = nil }
     } else {
-      errorMessage = "Could not unblock. Please try again."
+      errorMessage = localized("Could not unblock. Please try again.")
     }
   }
 
   public static func dayTitle(_ date: Date, now: Date = .now, calendar: Calendar = .current)
     -> String
   {
-    if calendar.isDate(date, inSameDayAs: now) { return "Today" }
+    if calendar.isDate(date, inSameDayAs: now) { return localized("Today") }
     if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),
       calendar.isDate(date, inSameDayAs: yesterday)
     {
-      return "Yesterday"
+      return localized("Yesterday")
     }
     return date.formatted(.dateTime.weekday(.wide).day().month(.wide).year())
   }

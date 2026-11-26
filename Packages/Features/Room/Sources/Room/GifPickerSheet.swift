@@ -19,15 +19,15 @@ struct GifPickerSheet: View {
         content
           .padding(.horizontal, 8)
       }
-      .navigationTitle("GIFs")
+      .navigationTitle(localized("GIFs"))
       .navigationBarTitleDisplayMode(.inline)
       .searchable(
         text: $picker.query, placement: .navigationBarDrawer(displayMode: .always),
-        prompt: picker.placeholder.isEmpty ? "Search GIFs" : picker.placeholder
+        prompt: picker.placeholder.isEmpty ? localized("Search GIFs") : picker.placeholder
       )
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
+          Button(localized("Cancel")) { dismiss() }
         }
       }
       .task { await picker.start() }
@@ -42,8 +42,8 @@ struct GifPickerSheet: View {
         .frame(maxWidth: .infinity, minHeight: 200)
     case .failed:
       ContentUnavailableView(
-        "GIFs are not available right now", systemImage: "wifi.exclamationmark",
-        description: Text("Try again later."))
+        localized("GIFs are not available right now"), systemImage: "wifi.exclamationmark",
+        description: Text(localized("Try again later.")))
     case .loaded where picker.gifs.isEmpty:
       ContentUnavailableView.search(text: picker.query)
     case .loaded:
@@ -60,7 +60,7 @@ struct GifPickerSheet: View {
               .contentShape(.rect(cornerRadius: 8))
           }
           .buttonStyle(PressScaleButtonStyle())
-          .accessibilityLabel(gif.title.isEmpty ? "GIF" : gif.title)
+          .accessibilityLabel(gif.title.isEmpty ? localized("GIF") : gif.title)
         }
       }
       if picker.next != nil {

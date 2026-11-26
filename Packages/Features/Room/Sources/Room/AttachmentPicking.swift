@@ -145,19 +145,21 @@ struct AttachmentButton: View {
   var body: some View {
     Menu {
       if CameraPicker.isAvailable {
-        Button("Camera", systemImage: "camera") { isCameraShown = true }
+        Button(localized("Camera"), systemImage: "camera") { isCameraShown = true }
       }
-      Button("Gallery", systemImage: "photo.on.rectangle") { isGalleryShown = true }
-      Button("Documents", systemImage: "paperclip") { isDocumentPickerShown = true }
-      Button("Poll", systemImage: "chart.bar.xaxis") { isPollShown = true }
+      Button(localized("Gallery"), systemImage: "photo.on.rectangle") { isGalleryShown = true }
+      Button(localized("Documents"), systemImage: "paperclip") { isDocumentPickerShown = true }
+      Button(localized("Poll"), systemImage: "chart.bar.xaxis") { isPollShown = true }
       if viewModel.gifsAvailable {
-        Button("GIF", systemImage: "photo.stack") { gifPicker = viewModel.makeGifPicker() }
+        Button(localized("GIF"), systemImage: "photo.stack") {
+          gifPicker = viewModel.makeGifPicker()
+        }
       }
       if !viewModel.stickerPacks.isEmpty {
-        Button("Sticker", systemImage: "face.smiling") { isStickerPickerShown = true }
+        Button(localized("Sticker"), systemImage: "face.smiling") { isStickerPickerShown = true }
       }
       if UIPasteboard.general.hasImages {
-        Button("Paste Picture", systemImage: "doc.on.clipboard") {
+        Button(localized("Paste Picture"), systemImage: "doc.on.clipboard") {
           let loaded = UIPasteboard.general.images?.compactMap(AttachmentLoader.load(image:)) ?? []
           if !loaded.isEmpty { preview = PickedBatch(items: loaded) }
         }
@@ -170,7 +172,7 @@ struct AttachmentButton: View {
         .frame(width: 40, height: 40)
         .background(SysColors.surface, in: Circle())
     }
-    .accessibilityLabel("Attach")
+    .accessibilityLabel(localized("Attach"))
     .accessibilityIdentifier(A11yIdentifiers.room.attach)
     .photosPicker(
       isPresented: $isGalleryShown, selection: $pickedPhotos, maxSelectionCount: 10,
@@ -299,7 +301,7 @@ struct SendPreviewSheet: View {
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") {
+          Button(localized("Cancel")) {
             items.forEach(AttachmentLoader.remove)
             dismiss()
           }
@@ -309,16 +311,17 @@ struct SendPreviewSheet: View {
     .presentationDetents(items.allSatisfy(\.isVisual) ? [.large] : [.medium, .large])
     .interactiveDismissDisabled()
     .alert(
-      "Describe this picture",
+      localized("Describe this picture"),
       isPresented: Binding(get: { describing != nil }, set: { if !$0 { describing = nil } })
     ) {
-      TextField("Description", text: $descriptionText, axis: .vertical)
-      Button("Cancel", role: .cancel) {}
-      Button("Save") {
+      TextField(localized("Description"), text: $descriptionText, axis: .vertical)
+      Button(localized("Cancel"), role: .cancel) {}
+      Button(localized("Save")) {
         if let id = describing { descriptions[id] = descriptionText }
       }
     } message: {
-      Text("People who use a screen reader hear it. It is sent as the picture's caption.")
+      Text(
+        localized("People who use a screen reader hear it. It is sent as the picture's caption."))
     }
   }
 
@@ -328,23 +331,25 @@ struct SendPreviewSheet: View {
       descriptionText = descriptions[item.id] ?? ""
       describing = item.id
     } label: {
-      Label("ALT", systemImage: isDescribed ? "checkmark" : "text.below.photo")
+      Label(localized("ALT"), systemImage: isDescribed ? "checkmark" : "text.below.photo")
         .font(.caption.weight(.bold))
         .foregroundStyle(.white)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(.black.opacity(0.6), in: Capsule())
     }
-    .accessibilityLabel(isDescribed ? "Edit the description" : "Add a description")
+    .accessibilityLabel(
+      isDescribed ? localized("Edit the description") : localized("Add a description")
+    )
     .padding(12)
   }
 
   private var title: String {
     let count = items.count
     if items.allSatisfy(\.isVisual) {
-      return count == 1 ? "1 item" : "\(count) items"
+      return localized("\(count) items")
     }
-    return count == 1 ? "1 file" : "\(count) files"
+    return localized("\(count) files")
   }
 
   /// Pictures and videos, one per page, with the others as a strip of thumbnails to jump to or remove.
@@ -412,7 +417,7 @@ struct SendPreviewSheet: View {
           }
         }
         .swipeActions {
-          Button("Remove", systemImage: "trash", role: .destructive) { remove(item) }
+          Button(localized("Remove"), systemImage: "trash", role: .destructive) { remove(item) }
         }
       }
     }
@@ -427,7 +432,7 @@ struct SendPreviewSheet: View {
         .foregroundStyle(.white, .black.opacity(0.6))
         .font(.system(size: 18))
     }
-    .accessibilityLabel("Remove")
+    .accessibilityLabel(localized("Remove"))
   }
 
   private func remove(_ item: AttachmentLoader.Loaded) {
@@ -442,7 +447,7 @@ struct SendPreviewSheet: View {
 
   private var captionBar: some View {
     HStack(alignment: .bottom, spacing: 10) {
-      TextField("Add a caption…", text: $caption, axis: .vertical)
+      TextField(localized("Add a caption…"), text: $caption, axis: .vertical)
         .lineLimit(1...4)
         .accessibilityIdentifier(A11yIdentifiers.room.attachmentCaption)
         .focused($isCaptionFocused)
@@ -462,7 +467,7 @@ struct SendPreviewSheet: View {
           .frame(width: 40, height: 40)
           .background(SysColors.primary, in: Circle())
       }
-      .accessibilityLabel("Send")
+      .accessibilityLabel(localized("Send"))
       .accessibilityIdentifier(A11yIdentifiers.room.sendAttachments)
       .disabled(items.isEmpty)
     }

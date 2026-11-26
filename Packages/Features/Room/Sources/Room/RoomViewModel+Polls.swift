@@ -14,7 +14,7 @@ extension RoomViewModel {
       sendCount += 1
       return true
     } catch {
-      errorMessage = "Could not send the poll."
+      errorMessage = localized("Could not send the poll.")
       return false
     }
   }
@@ -25,7 +25,7 @@ extension RoomViewModel {
     do {
       try await repository.vote(poll.selection(tapping: answerId), in: eventId)
     } catch {
-      errorMessage = "Could not send your vote."
+      errorMessage = localized("Could not send your vote.")
     }
   }
 
@@ -39,7 +39,7 @@ extension RoomViewModel {
     do {
       try await repository.endPoll(eventId)
     } catch {
-      errorMessage = "Could not end the poll."
+      errorMessage = localized("Could not end the poll.")
     }
   }
 }
