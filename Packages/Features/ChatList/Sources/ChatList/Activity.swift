@@ -25,7 +25,10 @@ extension ChatListViewModel {
   /// taking part are not listed: the SDK gives no list of them across rooms.
   public func loadFollowedThreads() async {
     guard let threadPrefs else { return }
-    followedThreads = await threadPrefs.followedThreads()
+    let roomIds = joinedRooms.filter { !$0.isSpace }.prefix(Self.reactionRoomLimit).map(\.id)
+    async let followed = threadPrefs.followedThreads()
+    async let active = threadPrefs.activeThreads(inRooms: Array(roomIds))
+    followedThreads = FollowedThread.merged(followed: await followed, active: await active)
   }
 
   /// How many of the most recent chats the Activity reads reactions from: each one opens a timeline from the cache.
@@ -53,6 +56,10 @@ extension ChatListViewModel {
 
   /// "Sender: text" of a followed thread's root, or "Thread" when it could not be loaded.
   public static func preview(of thread: FollowedThread) -> String {
+    if let latest = thread.latestText, !latest.isEmpty {
+      let line = thread.latestSenderName.map { "\($0): \(latest)" } ?? latest
+      return thread.replyCount > 1 ? "\(thread.replyCount) replies · \(line)" : line
+    }
     guard let text = thread.rootText, !text.isEmpty else { return "Thread" }
     guard let sender = thread.rootSenderName, !sender.isEmpty else { return text }
     return "\(sender): \(text)"
@@ -83,7 +90,7 @@ struct ActivityScreen: View {
       }
       let followed = viewModel.followedThreads
       if !followed.isEmpty {
-        Section("Followed threads") {
+        Section("Threads") {
           ForEach(followed) { thread in threadRow(thread) }
         }
       }

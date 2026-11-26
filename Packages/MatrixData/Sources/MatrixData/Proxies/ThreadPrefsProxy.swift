@@ -6,9 +6,16 @@ import MatrixRustSDK
 /// mute push rule. Nothing here logs message content (ADR 0009).
 public actor ThreadPrefsProxy: ThreadPrefsRepository {
   private let clientProxy: @Sendable () async -> ClientProxy?
+  private let capabilities: (any ServerCapabilitiesRepository)?
 
-  public init(authentication: MatrixAuthenticationRepository) {
+  static let activeRoomLimit = 10
+
+  public init(
+    authentication: MatrixAuthenticationRepository,
+    capabilities: (any ServerCapabilitiesRepository)? = nil
+  ) {
     clientProxy = { await authentication.clientProxy }
+    self.capabilities = capabilities
   }
 
   public func threadPrefs() async -> [ThreadPrefEntry] {
@@ -37,6 +44,7 @@ public actor ThreadPrefsProxy: ThreadPrefsRepository {
           conditions: Self.muteConditions(roomId: roomId, threadId: threadId))
       }
       try await client.setAccountData(eventType: ThreadPrefs.accountDataType, content: content)
+      await subscribe(pref, roomId: roomId, threadId: threadId, client: client)
     } catch {
       DebugLog.failure("setThreadPref", error)
       throw .requestFailed
@@ -99,5 +107,76 @@ public actor ThreadPrefsProxy: ThreadPrefsRepository {
     return FollowedThread(
       entry: entry, roomName: roomName, rootSenderName: name, rootText: text,
       date: Date(timeIntervalSince1970: TimeInterval(event.timestamp()) / 1000))
+  }
+
+  private func subscribe(_ pref: ThreadPref, roomId: String, threadId: String, client: Client)
+    async
+  {
+    guard let capabilities,
+      ThreadPrefs.usesSubscriptions(await capabilities.current().unstableFeatures),
+      let room = try? client.getRoom(roomId: roomId)
+    else { return }
+    do {
+      try await room.setThreadSubscription(
+        threadRootEventId: threadId, subscribed: ThreadPrefs.isSubscribed(pref))
+    } catch {
+      DebugLog.failure("setThreadSubscription", error)
+    }
+  }
+
+  public func activeThreads(inRooms roomIds: [String]) async -> [FollowedThread] {
+    guard let client = await clientProxy()?.client else { return [] }
+    let entries = await threadPrefs()
+    let rooms = roomIds.prefix(Self.activeRoomLimit).compactMap {
+      try? client.getRoom(roomId: $0)
+    }
+    return await withTaskGroup(of: [FollowedThread].self) { group in
+      for room in rooms where room.membership() == .joined {
+        group.addTask { await Self.activeThreads(in: room, entries: entries) }
+      }
+      var all: [FollowedThread] = []
+      for await threads in group { all += threads }
+      return all
+    }
+  }
+
+  private static func activeThreads(in room: Room, entries: [ThreadPrefEntry]) async
+    -> [FollowedThread]
+  {
+    let service = room.threadListService()
+    do {
+      try await service.paginate()
+    } catch {
+      DebugLog.failure("threadList.paginate", error)
+      return []
+    }
+    let roomId = room.id()
+    let roomName = room.displayName() ?? roomId
+    return service.items().compactMap { item in
+      let candidate = ThreadActivityCandidate(
+        roomId: roomId, threadId: item.rootEvent.eventId, rootIsOwn: item.rootEvent.isOwn,
+        latestIsOwn: item.latestEvent?.isOwn)
+      guard ThreadPrefs.isActive(candidate, entries: entries), let latest = item.latestEvent
+      else { return nil }
+      return FollowedThread(
+        entry: ThreadPrefEntry(
+          roomId: roomId, threadId: item.rootEvent.eventId,
+          pref: ThreadPrefs.pref(of: candidate, in: entries) ?? .follow),
+        roomName: roomName, rootSenderName: name(of: item.rootEvent),
+        rootText: item.rootEvent.content.flatMap(TimelineItemMapper.line(of:)),
+        date: Date(timeIntervalSince1970: TimeInterval(latest.timestamp) / 1000),
+        latestSenderName: name(of: latest),
+        latestText: latest.content.flatMap(TimelineItemMapper.line(of:)),
+        replyCount: Int(item.numReplies))
+    }
+  }
+
+  private static func name(of event: ThreadListItemEvent) -> String {
+    if case .ready(let displayName, _, _) = event.senderProfile, let displayName,
+      !displayName.isEmpty
+    {
+      return displayName
+    }
+    return event.sender
   }
 }
