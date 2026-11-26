@@ -30,7 +30,7 @@ public final class ConnectViewModel {
   /// The providers to show; a server with SSO and no listed provider gets one plain SSO button.
   public var providers: [HomeserverLoginOptions.IdentityProvider] {
     options.identityProviders.isEmpty && options.supportsSSO
-      ? [.init(id: "", name: "Sign in with one click")] : options.identityProviders
+      ? [.init(id: "", name: localized("Sign in with one click"))] : options.identityProviders
   }
 
   public func back() {

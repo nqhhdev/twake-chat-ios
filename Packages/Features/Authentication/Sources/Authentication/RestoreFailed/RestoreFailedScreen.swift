@@ -16,13 +16,13 @@ public struct RestoreFailedScreen: View {
 
   public var body: some View {
     VStack(spacing: 16) {
-      Text("Can't open your session")
+      Text(localized("Can't open your session"))
         .font(.headline)
-      Text("You are still signed in. Check the connection and try again.")
+      Text(localized("You are still signed in. Check the connection and try again."))
         .font(.subheadline)
         .multilineTextAlignment(.center)
-      Button("Try again", action: retry)
-      Button("Log out", role: .destructive, action: logOut)
+      Button(localized("Try again"), action: retry)
+      Button(localized("Log out"), role: .destructive, action: logOut)
       if let errorMessage {
         Text(errorMessage).foregroundStyle(.red)
       }

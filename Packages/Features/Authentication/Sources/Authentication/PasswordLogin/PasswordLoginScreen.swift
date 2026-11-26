@@ -22,7 +22,7 @@ public struct PasswordLoginScreen: View {
               } label: {
                 Image(systemName: "chevron.backward")
               }
-              .accessibilityLabel("Back")
+              .accessibilityLabel(localized("Back"))
             }
           }
         }
@@ -32,7 +32,7 @@ public struct PasswordLoginScreen: View {
   private var form: some View {
     Form {
       Section {
-        TextField("Homeserver", text: $viewModel.homeserver)
+        TextField(localized("Homeserver"), text: $viewModel.homeserver)
           .textContentType(.URL)
           .keyboardType(.URL)
           .textInputAutocapitalization(.never)
@@ -40,7 +40,7 @@ public struct PasswordLoginScreen: View {
           .accessibilityIdentifier(A11yIdentifiers.passwordLogin.homeserver)
       }
       Section {
-        TextField("Username", text: $viewModel.username)
+        TextField(localized("Username"), text: $viewModel.username)
           .textContentType(.username)
           .accessibilityIdentifier(A11yIdentifiers.passwordLogin.username)
           .textInputAutocapitalization(.never)
@@ -48,7 +48,7 @@ public struct PasswordLoginScreen: View {
         if let usernameError = viewModel.usernameError {
           Text(usernameError).foregroundStyle(.red)
         }
-        SecureField("Password", text: $viewModel.password)
+        SecureField(localized("Password"), text: $viewModel.password)
           .textContentType(.password)
           .accessibilityIdentifier(A11yIdentifiers.passwordLogin.password)
         if let passwordError = viewModel.passwordError {
@@ -67,7 +67,7 @@ public struct PasswordLoginScreen: View {
           if viewModel.isLoading {
             ProgressView()
           } else {
-            Text("Sign in")
+            Text(localized("Sign in"))
           }
         }
         .disabled(viewModel.isLoading)
