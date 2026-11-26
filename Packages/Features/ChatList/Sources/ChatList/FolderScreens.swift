@@ -36,6 +36,7 @@ struct FolderEditorScreen: View {
               .accessibilityLabel("Emoji")
             TextField("Folder name", text: $viewModel.name)
               .textInputAutocapitalization(.words)
+              .accessibilityIdentifier(A11yIdentifiers.folderEditor.name)
           }
         } footer: {
           if let error = viewModel.nameError {
@@ -84,6 +85,7 @@ struct FolderEditorScreen: View {
           } else {
             Button("Save") { Task { await viewModel.save() } }
               .disabled(!viewModel.canSave)
+              .accessibilityIdentifier(A11yIdentifiers.folderEditor.save)
           }
         }
       }
