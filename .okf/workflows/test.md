@@ -113,3 +113,27 @@ client on the same store, then logs out. It checks that the store directory and 
 1. Create fakes of the Domain protocols the view model needs.
 2. Build the view model with them.
 3. Call an action; assert on the view model's state.
+
+## Accessibility audits and the performance budget (#96)
+Both run in the E2E test plan (`TwakeChatUITests`, [docs/e2e.md](../../docs/e2e.md)) against the local homeserver of
+`scripts/e2e.sh up`, never in the pull-request CI.
+
+- **Accessibility audits** (`AccessibilityAuditFlowTests`). `performAccessibilityAudit` on Welcome, the homeserver
+  picker, the password form, the chat list, a room and Settings. They fail on the types that pass today: element
+  descriptions, traits and element detection (`.action` and `.parentChild` exist on macOS only). The run of
+  2026-11-26 also reported, and these are not enforced yet: contrast on Welcome, Settings, the room and the chat
+  list; hit areas under 44 pt (Privacy Policy, a Settings row, a message's sender and time); Dynamic Type only partly
+  supported in the room timeline and the chat list's footer rows; and clipped text, which the audit often reports
+  for truncated single lines. A type joins the enforced set once its screens pass. VoiceOver on a device is a manual
+  check.
+- **Performance budget** (`PerformanceBudgetTests`, five iterations each):
+
+| Metric | Test | Budget | Simulator reference (iPhone 16e, iOS 26.3, Debug, 2026-11-26) |
+|---|---|---|---|
+| Cold launch | `testColdLaunchTime` (`XCTApplicationLaunchMetric`) | Under 400 ms to the first frame on a device, Release; under 2 s on the simulator, Debug | 0.73 s, then 1.55 s with the E2E stack starting beside it |
+| Timeline scroll | `testTimelineScrollHitches` (`XCTOSSignpostMetric.scrollDecelerationMetric`, "E2E History", 300 messages) | Hitch time ratio under 5 ms/s on a device | The simulator reports only the fling's duration: 2.42 s |
+| Chat list scroll | `testChatListScrollHitches` | Hitch time ratio under 5 ms/s on a device | Duration only: 0.70 s |
+| Memory with a large account | Instruments, Allocations on a device | The notification extension under its system limit (about 24 MB); the app measured once, then budgeted | Device check |
+
+  XCTest metrics fail only against a recorded baseline. None is committed: baselines are per device, and the first
+  run on the reference device records them. Until then the numbers are read from the result bundle.
