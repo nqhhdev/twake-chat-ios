@@ -121,3 +121,4 @@
 * **Decision**: ADR 0035 (Proposed) sets the formats of spoilers (`data-mx-spoiler`, plain body `[Spoiler]`), picture descriptions (the caption), emotes (MSC2545, `data-mx-emoticon`) and scheduled messages (MSC4140, announced, never encrypted), and keeps link preview removal off until the web defines it.
 * **Change**: spoiler in the format bar (#178), picture descriptions (#179), presence dot on timeline avatars (#180), custom emotes (#186).
 * **Change**: translate a message with Apple's Translation framework (#181), transcribe a voice message on the device (#182), and schedule a message through MSC4140 delayed events where the server announces them, never in an encrypted room (#184). The MSC4140 check reads `ServerCapabilities.supports(_:)` (ADR 0034).
+* **Change**: The owner of a channel turns its GIFs off or on in the channel info (`app.twake.chat.gifs`, web D146; ADR 0028 decision 4). Received GIFs are not hidden yet (#140).

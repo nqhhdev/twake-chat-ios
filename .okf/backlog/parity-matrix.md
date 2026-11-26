@@ -62,7 +62,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Emoji shortcodes, bot commands (MSC4332) | `command_hints` | README | Built: `Room/EmojiSuggestions.swift`, `Domain/Models/BotCommand.swift` | Matrix | — |
 | Custom emotes and packs (MSC2545) | `settings_emotes` | — | Built: shown, picked and sent (`RoomViewModel+Emotes.swift`); packs not editable, [ADR 0035](../../docs/adr/0035-timeline-extras-formats.md) | Matrix | #186 |
 | Stickers: shown / sent | `sticker_picker_dialog` | — | Built: `StickerViews.swift` (shown without a bubble), sent from MSC2545 packs, [ADR 0028](../../docs/adr/0028-gifs-stickers-checklists.md) | Matrix | #105 |
-| GIF picker | — | D63, D146 | Built: `GifPickerSheet.swift`; received GIFs not hidden when off, no owner switch yet | Twake (common proxy), ADR 0028 | #140 |
+| GIF picker | — | D63, D146 | Built: `GifPickerSheet.swift`; the owner's GIFs switch in the channel info (`ChannelSettingsSection.swift`); received GIFs not hidden when off yet | Twake (common proxy), ADR 0028 | #140 |
 | Typing line, receipts, Seen by, unread marker, mark unread | `seen_by_row` | Phase 2, 2b | Built: `Room/RoomScreen.swift`, `TimelineRows.swift` | Matrix | — |
 | Draft per chat and per thread, reopen where left | `chat_draft` | Phase 2b | Built: `TimelineRepository.saveDraft`, `Room/TimelineScrollMemory.swift` | Matrix | — |
 | Forward, pin, edit history (encrypted too), report, ignore | `forward`, `chat_pinned_events` | Phase 2b | Built: `Room/PinnedAndForward.swift`, `MatrixData/Proxies/EncryptedEditHistory.swift` | Matrix | — |

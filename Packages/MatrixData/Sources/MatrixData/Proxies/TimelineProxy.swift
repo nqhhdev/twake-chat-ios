@@ -543,7 +543,7 @@ public actor TimelineProxy: TimelineRepository {
     return await ClientServerRequest.succeeds(request)
   }
 
-  static let gifsStateType = "app.twake.chat.gifs"
+  static let gifsStateType = ChannelSettings.gifsStateType
 
   static func gifsEnabled(_ content: [String: Any]) -> Bool {
     (content["enabled"] as? Bool) != false
