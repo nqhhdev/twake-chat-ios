@@ -128,3 +128,5 @@
 * **Change**: #191 closes on the Element Call widget of ADR 0038; incoming ringing (#222) and keeping a call across chats (#223) are split out, screen sharing is out of scope (ADR 0038). #105 and #106 close: each item is built or has its own issue (checklists #224).
 * **Decision**: ADR 0041 (Proposed): an album (two or more pictures or videos) is sent as raw events carrying `app.twake.chat.batch`, with the files encrypted in the app in an encrypted room (#210).
 * **Change**: The owner of a channel turns its GIFs off or on in the channel info (`app.twake.chat.gifs`, web D146; ADR 0028 decision 4). Received GIFs are not hidden yet (#140).
+* **Change**: The store lock wait is explicit (#88): MatrixData `StoreLock` retries a lock that timed out every 250 ms for at most 20 s, then reports it (it waited forever before); other errors and cancellation end the wait. A hosted test opens one store as `app` and `nse` at once. The share extension takes no lock: it never opens the SDK.
+
