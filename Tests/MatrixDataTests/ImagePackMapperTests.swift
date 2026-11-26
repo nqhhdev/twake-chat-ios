@@ -21,12 +21,12 @@ struct ImagePackMapperTests {
   ]
 
   @Test func aPackKeepsItsStickersWithTheirSizeAndName() throws {
-    let pack = try #require(
+    let mapped = try #require(
       ImagePackMapper.pack(id: "user", content: content, fallbackName: "Mine", source: source))
-    #expect(pack.name == "Cats")
-    #expect(pack.avatar?.source == "source:mxc://example.org/avatar")
-    #expect(pack.stickers.map(\.id) == ["user/both", "user/happy"])
-    let happy = pack.stickers[1]
+    #expect(mapped.name == "Cats")
+    #expect(mapped.avatar?.source == "source:mxc://example.org/avatar")
+    #expect(mapped.stickers.map(\.id) == ["user/both", "user/happy"])
+    let happy = mapped.stickers[1]
     #expect(happy.body == "Happy cat")
     #expect(happy.url == "mxc://example.org/happy")
     #expect(
@@ -34,7 +34,7 @@ struct ImagePackMapperTests {
         == MediaReference(
           source: "source:mxc://example.org/happy", mimeType: "image/png", size: 1234, width: 256,
           height: 128))
-    #expect(pack.stickers[0].body == "both")
+    #expect(mapped.stickers[0].body == "both")
   }
 
   @Test func aPackForEmoticonsOnlyOffersNoSticker() {
@@ -83,5 +83,31 @@ struct ImagePackMapperTests {
     #expect(relation["rel_type"] as? String == "m.thread")
     #expect(relation["event_id"] as? String == "$root")
     #expect(relation["is_falling_back"] as? Bool == true)
+  }
+}
+
+struct ImagePackEmoteTests {
+  private let source: (String) -> String? = { "source:" + $0 }
+
+  @Test func emoticonsAreTheImagesForEmotesWithAValidShortcode() {
+    let content: [String: Any] = [
+      "images": [
+        "cat": ["url": "mxc://example.org/cat", "info": ["w": 64, "h": 64]],
+        "sticker_only": ["url": "mxc://example.org/s", "usage": ["sticker"]],
+        "bad code": ["url": "mxc://example.org/b"],
+        "web": ["url": "https://example.org/w.png"],
+      ]
+    ]
+    let emotes = ImagePackMapper.emotes(content: content, source: source)
+    #expect(emotes.map(\.shortcode) == ["cat"])
+    #expect(emotes.first?.url == "mxc://example.org/cat")
+    #expect(emotes.first?.media.width == 64)
+  }
+
+  @Test func aStickerPackGivesNoEmote() {
+    let content: [String: Any] = [
+      "pack": ["usage": ["sticker"]], "images": ["a": ["url": "mxc://example.org/a"]],
+    ]
+    #expect(ImagePackMapper.emotes(content: content, source: source).isEmpty)
   }
 }

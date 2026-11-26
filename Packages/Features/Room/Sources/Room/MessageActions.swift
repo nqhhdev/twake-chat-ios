@@ -156,6 +156,25 @@ struct MessageActionsOverlay: View {
           Task { await viewModel.togglePin(message) }
         })
     }
+    if viewModel.canTranscribe(message) {
+      list.append(
+        .init(title: "Transcribe", icon: "text.quote") {
+          Task { await viewModel.transcribe(message) }
+        })
+    } else if case .transcribed = viewModel.transcription(of: message) {
+      list.append(
+        .init(title: "Hide Transcription", icon: "text.badge.minus") {
+          viewModel.hideTranscription(of: message)
+        })
+    }
+    if viewModel.canTranslate(message) {
+      list.append(.init(title: "Translate", icon: "translate") { viewModel.translate(message) })
+    } else if case .translated = viewModel.translation(of: message) {
+      list.append(
+        .init(title: "Show Original", icon: "arrow.uturn.backward") {
+          viewModel.showOriginal(message)
+        })
+    }
     if message.isOwn, case .text = message.body {
       list.append(.init(title: "Edit", icon: "pencil") { viewModel.edit(message) })
     }

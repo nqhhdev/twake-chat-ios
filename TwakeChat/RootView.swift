@@ -76,7 +76,7 @@ final class RootCoordinator {
   /// Opens Matrix links in the app; the shell shows what it finds.
   @ObservationIgnored private(set) var links: LinkRouter!
   /// What other apps share into the app, waiting for a chat.
-  @ObservationIgnored let shares = ShareCenter()
+  @ObservationIgnored let shares: ShareCenter
   @ObservationIgnored let shareSuggestions = ShareSuggestions()
   @ObservationIgnored private let verificationRepository: (any VerificationRepository)?
   /// Unlocks this device with the recovery key kept on ToM (ADR 0024); `nil` (tests) never runs.
@@ -132,8 +132,10 @@ final class RootCoordinator {
     signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator,
     capabilities: (any ServerCapabilitiesRepository)? = nil,
     accountDeletion: (any AccountDeletionRepository)? = nil,
-    analytics: (any AnalyticsRepository)? = nil
+    analytics: (any AnalyticsRepository)? = nil,
+    shares: ShareCenter = ShareCenter()
   ) {
+    self.shares = shares
     self.analyticsRepository = analytics
     self.capabilities = capabilities
     self.accountDeletion = accountDeletion
@@ -311,7 +313,12 @@ final class RootCoordinator {
     unlockedSignIn = signedIn
     isUnlockingDevice = true
     defer { isUnlockingDevice = false }
-    if case .setUpNotSaved(let key) = await deviceUnlock.run() { unsavedRecoveryKey = key }
+    switch await deviceUnlock.run() {
+    case .setUpNotSaved(let key): unsavedRecoveryKey = key
+    case .verifiedFromVault:
+      NotificationCenter.default.post(name: .encryptionKeysImported, object: nil)
+    case .alreadyVerified, .setUp, .needsKey: break
+    }
   }
 
   /// Rejoins a left chat from its read-only screen (the archive belongs to the room list proxy).
@@ -510,6 +517,14 @@ final class RootCoordinator {
   /// even when the server cannot be told) and shows the sign-in form. While it runs, `start()` does nothing. When the
   /// repository reports an error the session may still be saved, so the screen stays with an error and the user can
   /// try again, as on the signed-in screen: the user is never shown as signed out while a session is still saved.
+  func retire() async {
+    await lifecycle.stop()
+  }
+
+  func discardSession() async {
+    try? await repository.logout()
+  }
+
   func logOutAfterFailedRestore() async {
     guard state == .restoreFailed, !started else { return }
     started = true

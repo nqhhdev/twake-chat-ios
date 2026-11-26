@@ -426,6 +426,12 @@ public final class ChatListViewModel {
       && !isSearchingMessages
   }
 
+  public func retryUndecryptedPreviews() async {
+    let undecrypted = loadedRooms.filter { $0.lastMessageKind == .encrypted }.map(\.id)
+    guard !undecrypted.isEmpty else { return }
+    await repository.retryDecryption(roomIds: undecrypted)
+  }
+
   public var visibleRooms: [RoomSummary] {
     guard case .loaded(let rooms) = state else { return [] }
     let text = query.trimmingCharacters(in: .whitespaces)

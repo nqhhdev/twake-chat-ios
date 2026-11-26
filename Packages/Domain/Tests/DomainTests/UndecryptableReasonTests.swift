@@ -17,4 +17,13 @@ import Testing
         .contains("before you joined"))
     #expect(UndecryptableReason.withheld.help(isDeviceVerified: true).contains("did not share"))
   }
+
+  @Test func aKeyWithheldFromAnUnverifiedDeviceAsksToVerifyUntilTheDeviceIsVerified() {
+    #expect(
+      UndecryptableReason.withheldFromUnverifiedDevice.help(isDeviceVerified: false)
+        == "Verify this device with your recovery key to read it.")
+    #expect(
+      UndecryptableReason.withheldFromUnverifiedDevice.help(isDeviceVerified: true)
+        .contains("did not share"))
+  }
 }

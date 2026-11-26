@@ -66,6 +66,7 @@ struct ChatShell: View {
   /// What the prompt after sign-in asks the user to do, as the Flutter app asks for recovery right after login.
   @State private var sessionPrompt: SessionWarning?
   @State private var quickSwitcher: QuickSwitcherViewModel?
+  @Environment(\.scenePhase) private var scenePhase
 
   var body: some View {
     GeometryReader { geometry in
@@ -105,6 +106,15 @@ struct ChatShell: View {
         push.pendingThreadId = nil
         destination = .chats
         Task { await openWhenKnown(roomId, name: fallbackName, thread: threadId) }
+      }
+      .onChange(of: scenePhase) { _, phase in
+        if phase == .active { Task { await chatList.retryUndecryptedPreviews() } }
+      }
+      .onReceive(NotificationCenter.default.publisher(for: .encryptionKeysImported)) { _ in
+        Task { await chatList.retryUndecryptedPreviews() }
+      }
+      .task(id: chatList.loadedRooms.isEmpty) {
+        if !chatList.loadedRooms.isEmpty { await chatList.retryUndecryptedPreviews() }
       }
       .onChange(of: push.pendingDraftUserId, initial: true) { _, userId in
         guard let userId else { return }
@@ -236,9 +246,12 @@ struct ChatShell: View {
   @ViewBuilder private func settingsContent(isTwoColumn: Bool) -> some View {
     if isTwoColumn {
       HStack(spacing: 0) {
-        NavigationStack { SettingsScreen(viewModel: settings, selection: $settingsPage) }
-          .ignoresSafeArea(.container, edges: .trailing)
-          .frame(width: TwakeLayout.listColumnWidth)
+        NavigationStack {
+          SettingsScreen(viewModel: settings, selection: $settingsPage)
+            .toolbar { ToolbarItem(placement: .topBarLeading) { AccountSwitcherMenu() } }
+        }
+        .ignoresSafeArea(.container, edges: .trailing)
+        .frame(width: TwakeLayout.listColumnWidth)
         Rectangle().fill(SysColors.surface).frame(width: 1)
         NavigationStack {
           SettingsPageView(page: settingsPage ?? .security, viewModel: settings)
@@ -247,7 +260,10 @@ struct ChatShell: View {
       }
       .background(SysColors.background)
     } else {
-      NavigationStack { SettingsScreen(viewModel: settings) }
+      NavigationStack {
+        SettingsScreen(viewModel: settings)
+          .toolbar { ToolbarItem(placement: .topBarLeading) { AccountSwitcherMenu() } }
+      }
     }
   }
 
@@ -322,6 +338,7 @@ struct ChatShell: View {
       onSelect: { open($0) },
       onCompose: startNewChat, isBesideChat: isBesideChat
     )
+    .toolbar { ToolbarItem(placement: .topBarLeading) { AccountSwitcherMenu() } }
     // Beside the chat the list does not reach the trailing edge, yet it is handed the inset of the side strip and the
     // system tab bar there, which left an empty band on the unfolded Duo; the chat column keeps that inset.
     .ignoresSafeArea(.container, edges: isBesideChat ? .trailing : [])

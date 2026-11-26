@@ -61,17 +61,17 @@ struct GifProxyTests {
     """
 
   @Test func aPageKeepsOnlyTheProxysMediaAndPrefersTheSmallGif() throws {
-    let page = try #require(GifPageMapper.page(Data(Self.page.utf8), baseURL: base))
-    #expect(page.next == "cursor-2")
-    #expect(page.results.map(\.id) == ["a", "c"])
-    let cat = page.results[0]
+    let parsed = try #require(GifPageMapper.page(Data(Self.page.utf8), baseURL: base))
+    #expect(parsed.next == "cursor-2")
+    #expect(parsed.results.map(\.id) == ["a", "c"])
+    let cat = parsed.results[0]
     #expect(cat.title == "Cat")
     #expect(cat.url.absoluteString == "https://proxy.example/m/a-sm.gif")
     #expect(cat.width == 220)
     #expect(cat.height == 165)
     #expect(cat.previewURL.absoluteString == "https://proxy.example/m/a-sm.webp")
-    #expect(page.results[1].url.absoluteString == "https://proxy.example/m/c.webp")
-    #expect(page.results[1].previewURL.absoluteString == "https://proxy.example/m/c.webp")
+    #expect(parsed.results[1].url.absoluteString == "https://proxy.example/m/c.webp")
+    #expect(parsed.results[1].previewURL.absoluteString == "https://proxy.example/m/c.webp")
   }
 
   @Test func thePlaceholderComesFromTheGifModule() {

@@ -15,7 +15,8 @@ enum ClientServerRequest {
     let root =
       base.absoluteString.hasSuffix("/")
       ? String(base.absoluteString.dropLast()) : base.absoluteString
-    guard let url = URL(string: root + "/_matrix/client/\(version)/" + path) else { return nil }
+    let suffix = path.isEmpty ? "" : "/" + path
+    guard let url = URL(string: root + "/_matrix/client/\(version)" + suffix) else { return nil }
     var request = URLRequest(url: url)
     request.httpMethod = method
     request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")

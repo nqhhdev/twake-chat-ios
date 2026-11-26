@@ -3,7 +3,7 @@ import Foundation
 /// A format of the composer's bar. The Markdown stays in the text, as on the web: a format writes its syntax around
 /// the selection and takes it off when it is already there; sending turns it into `formatted_body`.
 enum TextFormat: CaseIterable, Sendable {
-  case bold, italic, strike, code, codeBlock, link
+  case bold, italic, strike, spoiler, code, codeBlock, link
 
   /// What VoiceOver reads for the button.
   var label: String {
@@ -11,6 +11,7 @@ enum TextFormat: CaseIterable, Sendable {
     case .bold: "Bold"
     case .italic: "Italic"
     case .strike: "Strikethrough"
+    case .spoiler: "Spoiler"
     case .code: "Code"
     case .codeBlock: "Code block"
     case .link: "Link"
@@ -22,6 +23,7 @@ enum TextFormat: CaseIterable, Sendable {
     case .bold: "bold"
     case .italic: "italic"
     case .strike: "strikethrough"
+    case .spoiler: "eye.slash"
     case .code: "chevron.left.forwardslash.chevron.right"
     case .codeBlock: "curlybraces.square"
     case .link: "link"
@@ -52,6 +54,7 @@ enum TextFormatting {
     case .bold: return wrap(characters, selection, "**", "**")
     case .italic: return wrap(characters, selection, "_", "_")
     case .strike: return wrap(characters, selection, "~~", "~~")
+    case .spoiler: return wrap(characters, selection, "||", "||")
     case .code: return wrap(characters, selection, "`", "`")
     case .codeBlock: return codeBlock(characters, selection)
     case .link: return FormattedText(text: text, selection: selection)

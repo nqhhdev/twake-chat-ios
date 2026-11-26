@@ -18,15 +18,26 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
       return
     }
     let userInfo = request.content.userInfo
-    let unreadCount = PushPayload.unreadCount(in: userInfo)
-    if let unreadCount { content.badge = NSNumber(value: unreadCount) }
+    let registry = AccountRegistry.inAppGroup()
+    let accounts = registry?.load() ?? AccountList()
+    guard
+      let slot = accounts.slot(
+        forPush: PushPayload.clientIdentifier(in: userInfo), hash: PusherProxy.clientIdentifier)
+    else {
+      contentHandler(UNMutableNotificationContent())
+      return
+    }
+    let badge = Self.badge(PushPayload.unreadCount(in: userInfo), slot: slot, accounts: accounts)
+    if let badge { content.badge = NSNumber(value: badge) }
+    let account = Self.account(accounts, slot: slot)
+    if let userId = account.userId { content.userInfo[PushPayload.userIdKey] = userId }
     lock.withLock {
       deliver = contentHandler
       pending = content
     }
     guard let roomId = PushPayload.roomId(in: userInfo),
       let eventId = PushPayload.eventId(in: userInfo),
-      let repository = Self.makeRepository()
+      let registry, let repository = Self.makeRepository(registry: registry, slot: slot)
     else {
       finish()
       return
@@ -38,18 +49,20 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
       case .show(let found):
         let shown = lock.withLock { () -> UNMutableNotificationContent? in
           guard let pending else { return nil }
-          Self.apply(found, to: pending)
+          Self.apply(found, label: account.label, to: pending)
           return pending.mutableCopy() as? UNMutableNotificationContent
         }
         if let shown,
           let updated = await CommunicationNotification.content(
-            shown, intent: CommunicationNotification.intent(for: found, roomId: roomId))
+            shown,
+            intent: CommunicationNotification.intent(
+              for: found, roomId: roomId, accountUserId: account.userId))
         {
           lock.withLock { if pending != nil { pending = updated } }
         }
       case .hide:
         let empty = UNMutableNotificationContent()
-        if let unreadCount { empty.badge = NSNumber(value: unreadCount) }
+        if let badge { empty.badge = NSNumber(value: badge) }
         lock.withLock { pending = empty }
       case .generic:
         break
@@ -58,10 +71,11 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
     }
   }
 
-  private static func apply(_ found: NotificationContent, to content: UNMutableNotificationContent)
-  {
+  private static func apply(
+    _ found: NotificationContent, label: String?, to content: UNMutableNotificationContent
+  ) {
     content.title = found.title
-    content.subtitle = found.subtitle
+    content.subtitle = AccountLabel.subtitle(found.subtitle, account: label)
     content.body = found.body
     content.categoryIdentifier = found.isMessage ? PushPayload.messageCategory : ""
     if let threadId = found.threadId { content.userInfo[PushPayload.threadIdKey] = threadId }
@@ -82,14 +96,30 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
     if let deliver, let content { deliver(content) }
   }
 
-  private static func makeRepository() -> NotificationContentProxy? {
+  private static func account(_ accounts: AccountList, slot: AccountSlot) -> (
+    userId: String?, label: String?
+  ) {
+    (accounts.account(slot: slot)?.userId, accounts.notificationLabel(for: slot))
+  }
+
+  private static func badge(_ unreadCount: Int?, slot: AccountSlot, accounts: AccountList) -> Int? {
+    guard let unreadCount else { return nil }
+    guard let badges = AccountBadges.inAppGroup() else { return unreadCount }
+    badges.record(unreadCount, for: slot)
+    return badges.total(for: accounts, including: slot)
+  }
+
+  private static func makeRepository(registry: AccountRegistry, slot: AccountSlot)
+    -> NotificationContentProxy?
+  {
     MatrixPlatform.setUp()
-    guard let storeDirectory = AppGroupContainer().sdkStoreDirectory(),
+    guard
       let accessGroup = Bundle.main.object(forInfoDictionaryKey: "KeychainAccessGroup") as? String
     else { return nil }
     let authentication = MatrixAuthenticationRepository(
-      storeDirectory: storeDirectory,
-      sessionStore: KeychainSessionStore(service: "app.twake.ios.chat", accessGroup: accessGroup),
+      storeDirectory: registry.storeDirectory(for: slot),
+      sessionStore: KeychainSessionStore(
+        service: "app.twake.ios.chat", accessGroup: accessGroup, account: slot.keychainAccount),
       lockHolderName: "nse")
     return NotificationContentProxy(authentication: authentication)
   }

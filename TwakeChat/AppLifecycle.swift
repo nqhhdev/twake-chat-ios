@@ -15,6 +15,7 @@ final class AppLifecycle {
   private let push: PushCenter
   /// The unread messages of all chats, for the badge.
   var unreadCount: () -> Int = { 0 }
+  var badgeTotal: (Int) -> Int = { $0 }
   private var pausing: Task<Void, Never>?
   private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
   private var isPaused = false
@@ -45,7 +46,7 @@ final class AppLifecycle {
   }
 
   private func enterBackground() {
-    Task { try? await UNUserNotificationCenter.current().setBadgeCount(unreadCount()) }
+    Task { try? await UNUserNotificationCenter.current().setBadgeCount(badgeTotal(unreadCount())) }
     guard sync != nil, pausing == nil else { return }
     backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Sync") { [weak self] in
       MainActor.assumeIsolated { self?.pauseNow() }
@@ -55,6 +56,14 @@ final class AppLifecycle {
       guard !Task.isCancelled else { return }
       self?.pauseNow()
     }
+  }
+
+  func stop() async {
+    pausing?.cancel()
+    pausing = nil
+    endBackgroundTask()
+    isPaused = true
+    await sync?.pauseSync()
   }
 
   private func pauseNow() {

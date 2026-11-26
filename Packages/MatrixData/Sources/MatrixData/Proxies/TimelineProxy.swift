@@ -18,7 +18,11 @@ public actor TimelineProxy: TimelineRepository {
   /// Typing subscriptions, cancelled when the timeline closes.
   private var typingHandles: [TaskHandle] = []
   private let clientProxy: @Sendable () async -> ClientProxy?
+  private let index: MessageIndex?
   private var opened: Opened?
+  private var knownEmotes: [String: String] = [:]
+  private var delayedEventsSupported: Bool?
+  private let capabilities: (any ServerCapabilitiesRepository)?
 
   /// - Parameters:
   ///   - roomId: The room this timeline shows.
@@ -27,11 +31,14 @@ public actor TimelineProxy: TimelineRepository {
   ///   - threadRoot: Shows this thread (its root and replies); what is sent goes into it.
   public init(
     roomId: String, authentication: MatrixAuthenticationRepository,
-    only content: RoomContentKind? = nil, threadRoot: String? = nil
+    only content: RoomContentKind? = nil, threadRoot: String? = nil, index: MessageIndex? = nil,
+    capabilities: (any ServerCapabilitiesRepository)? = nil
   ) {
+    self.capabilities = capabilities
     self.roomId = roomId
     self.content = content
     self.threadRoot = threadRoot
+    self.index = index
     clientProxy = { await authentication.clientProxy }
   }
 
@@ -54,7 +61,7 @@ public actor TimelineProxy: TimelineRepository {
           if let content { Self.configuration(only: content) } else {
             Self.configuration(threadRoot: threadRoot)
           }
-        let timeline = try await found.timelineWithConfiguration(configuration: configuration)
+        let timeline = try await Self.timeline(in: found, configuration: configuration)
         return (found, timeline)
       }
     } catch is WaitTimeout {
@@ -76,7 +83,8 @@ public actor TimelineProxy: TimelineRepository {
     // The listener is called on an SDK thread; diffs are applied in order by one task, which keeps the client alive
     // until it ends.
     let sendHandles = SendHandles()
-    let applying = Task { [client] in
+    let recorder = await room.isEncrypted() ? index.map { IndexRecorder(index: $0) } : nil
+    let applying = Task { [client, roomId] in
       var mapped: [Domain.TimelineItem?] = []
       for await batch in diffs {
         guard !Task.isCancelled else { continue }
@@ -86,7 +94,9 @@ public actor TimelineProxy: TimelineRepository {
             return TimelineItemMapper.item(item, ownUserId: ownUserId)
           }.apply(to: &mapped)
         }
-        itemsContinuation.yield(mapped.compactMap { $0 })
+        let items = mapped.compactMap { $0 }
+        itemsContinuation.yield(items)
+        await recorder?.record(roomId: roomId, items: items)
       }
       itemsContinuation.finish()
       withExtendedLifetime(client) {}
@@ -108,6 +118,24 @@ public actor TimelineProxy: TimelineRepository {
       applying: applying, sendHandles: sendHandles)
     itemsContinuation.onTermination = { _ in diffsContinuation.finish() }
     return items
+  }
+
+  static let storeLockRetryPause: Duration = .milliseconds(250)
+
+  static func isStoreLockTimeout(_ error: ClientError) -> Bool {
+    guard case .Generic(_, let details?) = error else { return false }
+    return details.contains("Unobtained(TimedOut)")
+  }
+
+  static func timeline(in room: Room, configuration: TimelineConfiguration) async throws -> Timeline
+  {
+    while true {
+      do {
+        return try await room.timelineWithConfiguration(configuration: configuration)
+      } catch let error as ClientError where isStoreLockTimeout(error) {
+        try await Task.sleep(for: storeLockRetryPause)
+      }
+    }
   }
 
   /// A timeline of one kind of message, as the Flutter chat details tabs list them (`isVideoOrImage`, `isAFile`, and
@@ -147,7 +175,7 @@ public actor TimelineProxy: TimelineRepository {
   public func send(text: String) async throws(TimelineError) {
     let timeline = try openedTimeline()
     do {
-      _ = try await timeline.send(msg: Self.content(text))
+      _ = try await timeline.send(msg: Self.content(text, emotes: knownEmotes))
     } catch {
       throw Self.failure("send", error)
     }
@@ -156,7 +184,7 @@ public actor TimelineProxy: TimelineRepository {
   public func send(emote text: String) async throws(TimelineError) {
     let timeline = try openedTimeline()
     do {
-      _ = try await timeline.send(msg: Self.content(text, isEmote: true))
+      _ = try await timeline.send(msg: Self.content(text, isEmote: true, emotes: knownEmotes))
     } catch {
       throw Self.failure("sendEmote", error)
     }
@@ -354,17 +382,43 @@ public actor TimelineProxy: TimelineRepository {
   }
 
   public func stickerPacks() async -> [StickerPack] {
+    var seen = Set<String>()
+    return await imagePacks().compactMap { pack in
+      ImagePackMapper.pack(
+        id: pack.id, content: pack.content, fallbackName: pack.fallbackName,
+        source: Self.mediaSourceJSON)
+    }
+    .filter { seen.insert($0.id).inserted }
+  }
+
+  public func emotes() async -> [Emote] {
+    var seen = Set<String>()
+    let emotes = await imagePacks().flatMap { pack in
+      ImagePackMapper.emotes(content: pack.content, source: Self.mediaSourceJSON)
+    }
+    .filter { seen.insert($0.shortcode).inserted }
+    knownEmotes = Dictionary(emotes.map { ($0.shortcode, $0.url) }, uniquingKeysWith: { a, _ in a })
+    return emotes
+  }
+
+  static func mediaSourceJSON(_ url: String) -> String? {
+    try? MediaSource.fromUrl(url: url).toJson()
+  }
+
+  private struct PackContent: @unchecked Sendable {
+    let id: String
+    let content: [String: Any]
+    let fallbackName: String
+  }
+
+  private func imagePacks() async -> [PackContent] {
     guard let opened else { return [] }
     let client = opened.client.client
-    let source: (String) -> String? = { try? MediaSource.fromUrl(url: $0).toJson() }
-    var packs: [StickerPack] = []
-    let user = ImagePackMapper.eventContent(
+    var packs: [PackContent] = []
+    if let user = ImagePackMapper.eventContent(
       try? await client.accountData(eventType: ImagePackMapper.userPackType))
-    if let user,
-      let pack = ImagePackMapper.pack(
-        id: "user", content: user, fallbackName: "My stickers", source: source)
     {
-      packs.append(pack)
+      packs.append(PackContent(id: "user", content: user, fallbackName: "My stickers"))
     }
     let room = ClientServerRequest.encode(roomId)
     if let request = ClientServerRequest.make(client: client, path: "rooms/\(room)/state"),
@@ -373,12 +427,12 @@ public actor TimelineProxy: TimelineRepository {
     {
       for event in events where event["type"] as? String == ImagePackMapper.roomPackType {
         guard let key = event["state_key"] as? String,
-          let content = event["content"] as? [String: Any],
-          let pack = ImagePackMapper.pack(
-            id: "room:\(roomId):\(key)", content: content,
-            fallbackName: key.isEmpty ? "Chat stickers" : key, source: source)
+          let content = event["content"] as? [String: Any]
         else { continue }
-        packs.append(pack)
+        packs.append(
+          PackContent(
+            id: "room:\(roomId):\(key)", content: content,
+            fallbackName: key.isEmpty ? "Chat stickers" : key))
       }
     }
     let packRooms = ImagePackMapper.eventContent(
@@ -390,15 +444,14 @@ public actor TimelineProxy: TimelineRepository {
         "rooms/\(ClientServerRequest.encode(other))/state/\(ImagePackMapper.roomPackType)/"
         + ClientServerRequest.encode(key)
       guard let request = ClientServerRequest.make(client: client, path: path),
-        let content = await ClientServerRequest.object(request),
-        let pack = ImagePackMapper.pack(
-          id: "room:\(other):\(key)", content: content,
-          fallbackName: key.isEmpty ? "Stickers" : key, source: source)
+        let content = await ClientServerRequest.object(request)
       else { continue }
-      packs.append(pack)
+      packs.append(
+        PackContent(
+          id: "room:\(other):\(key)", content: content,
+          fallbackName: key.isEmpty ? "Stickers" : key))
     }
-    var seen = Set<String>()
-    return packs.filter { seen.insert($0.id).inserted }
+    return packs
   }
 
   public func send(sticker: Sticker) async throws(TimelineError) {
@@ -412,6 +465,82 @@ public actor TimelineProxy: TimelineRepository {
     } catch {
       throw Self.failure("sendSticker", error)
     }
+  }
+
+  public func canSchedule() async -> Bool {
+    guard let opened, threadRoot == nil,
+      (try? await opened.room.latestEncryptionState()) == .notEncrypted
+    else { return false }
+    if let delayedEventsSupported { return delayedEventsSupported }
+    if let capabilities {
+      let supported = await capabilities.current().supports(DelayedEvents.feature)
+      delayedEventsSupported = supported
+      return supported
+    }
+    guard
+      let request = ClientServerRequest.make(
+        client: opened.client.client, path: "", version: "versions"),
+      let versions = await ClientServerRequest.object(request)
+    else { return false }
+    let supported = DelayedEvents.supports(versions)
+    delayedEventsSupported = supported
+    return supported
+  }
+
+  public func schedule(text: String, at date: Date, replyTo: String?) async throws(ScheduleError) {
+    guard let opened else { throw .failed }
+    guard (try? await opened.room.latestEncryptionState()) == .notEncrypted else {
+      throw .encryptedRoom
+    }
+    guard await canSchedule() else { throw .unsupported }
+    let room = ClientServerRequest.encode(roomId)
+    let path =
+      "rooms/\(room)/send/m.room.message/\(UUID().uuidString)?\(DelayedEvents.delayParameter)="
+      + String(DelayedEvents.delay(until: date))
+    guard
+      let request = ClientServerRequest.make(
+        client: opened.client.client, path: path, method: "PUT",
+        json: DelayedEvents.content(text: text, replyTo: replyTo, emotes: knownEmotes)),
+      let (status, body) = await ClientServerRequest.answer(request)
+    else { throw .failed }
+    guard status == 200 else { throw DelayedEvents.error(status: status, body: body) }
+  }
+
+  public func scheduledMessages() async -> [ScheduledMessage] {
+    guard let opened,
+      let request = ClientServerRequest.make(
+        client: opened.client.client, path: "delayed_events?status=scheduled",
+        version: DelayedEvents.version),
+      let object = await ClientServerRequest.object(request)
+    else { return [] }
+    return DelayedEvents.scheduled(object, roomId: roomId)
+  }
+
+  public func cancelScheduled(id: String) async -> Bool {
+    await updateDelayedEvent(id: id, action: "cancel")
+  }
+
+  public func sendScheduledNow(id: String) async -> Bool {
+    await updateDelayedEvent(id: id, action: "send")
+  }
+
+  private func updateDelayedEvent(id: String, action: String) async -> Bool {
+    guard let client = opened?.client.client else { return false }
+    let delay = ClientServerRequest.encode(id)
+    if let request = ClientServerRequest.make(
+      client: client, path: "delayed_events/\(delay)/\(action)", method: "POST", json: [:],
+      version: DelayedEvents.version),
+      let (status, _) = await ClientServerRequest.answer(request)
+    {
+      if status == 200 { return true }
+      guard status == 404 || status == 400 || status == 405 else { return false }
+    }
+    guard
+      let request = ClientServerRequest.make(
+        client: client, path: "delayed_events/\(delay)", method: "POST",
+        json: ["action": action], version: DelayedEvents.version)
+    else { return false }
+    return await ClientServerRequest.succeeds(request)
   }
 
   static let gifsStateType = "app.twake.chat.gifs"
@@ -510,7 +639,7 @@ public actor TimelineProxy: TimelineRepository {
   public func reply(text: String, to eventId: String) async throws(TimelineError) {
     let timeline = try openedTimeline()
     do {
-      try await timeline.sendReply(msg: Self.content(text), eventId: eventId)
+      try await timeline.sendReply(msg: Self.content(text, emotes: knownEmotes), eventId: eventId)
     } catch {
       throw Self.failure("reply", error)
     }
@@ -521,7 +650,7 @@ public actor TimelineProxy: TimelineRepository {
     do {
       try await timeline.edit(
         eventOrTransactionId: .eventId(eventId: eventId),
-        newContent: .roomMessage(content: Self.content(text)))
+        newContent: .roomMessage(content: Self.content(text, emotes: knownEmotes)))
     } catch {
       throw Self.failure("edit", error)
     }
@@ -664,12 +793,21 @@ public actor TimelineProxy: TimelineRepository {
 
   /// The message content of a Markdown text. A link to a user (`[Name](https://matrix.to/#/@user:server)`, as the
   /// composer writes a mention) also lists that user in the intentional mentions, so they are notified.
-  static func content(_ text: String, isEmote: Bool = false)
+  static func content(_ text: String, isEmote: Bool = false, emotes: [String: String] = [:])
     -> RoomMessageEventContentWithoutRelation
   {
-    let content =
-      isEmote
-      ? messageEventContentFromMarkdownAsEmote(md: text) : messageEventContentFromMarkdown(md: text)
+    let content: RoomMessageEventContentWithoutRelation
+    if let spoiler = RichMarkdown.content(text, emotes: emotes) {
+      content =
+        isEmote
+        ? messageEventContentFromHtmlAsEmote(body: spoiler.body, htmlBody: spoiler.html)
+        : messageEventContentFromHtml(body: spoiler.body, htmlBody: spoiler.html)
+    } else {
+      content =
+        isEmote
+        ? messageEventContentFromMarkdownAsEmote(md: text)
+        : messageEventContentFromMarkdown(md: text)
+    }
     let userIds = mentionedUserIds(in: text)
     let room = mentionsRoom(text)
     return userIds.isEmpty && !room
@@ -742,7 +880,28 @@ public actor TimelineProxy: TimelineRepository {
 
 /// The SDK send handles of the messages that failed to send, by transaction id, so one of them can be sent again
 /// (`SendHandle.tryResend`). The timeline's applying task fills it; the proxy reads it.
-private final class SendHandles: @unchecked Sendable {
+private
+
+  actor IndexRecorder
+{
+  private let index: MessageIndex
+  private var recorded: [String: String] = [:]
+
+  init(index: MessageIndex) {
+    self.index = index
+  }
+
+  func record(roomId: String, items: [Domain.TimelineItem]) async {
+    let (entries, redacted) = MessageIndex.entries(roomId: roomId, items: items)
+    let changed = entries.filter { recorded[$0.eventId] != $0.text }
+    let removed = redacted.filter { recorded[$0] != "" }
+    for entry in changed { recorded[entry.eventId] = entry.text }
+    for eventId in removed { recorded[eventId] = "" }
+    await index.record(changed)
+    await index.remove(eventIds: removed)
+  }
+}
+final class SendHandles: @unchecked Sendable {
   private let lock = NSLock()
   private var handles: [String: SendHandle] = [:]
 

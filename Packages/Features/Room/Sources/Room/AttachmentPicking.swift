@@ -272,6 +272,9 @@ struct SendPreviewSheet: View {
   @State private var items: [AttachmentLoader.Loaded]
   @State private var caption: String
   @State private var page: UUID?
+  @State private var descriptions: [UUID: String] = [:]
+  @State private var describing: UUID?
+  @State private var descriptionText = ""
   @Environment(\.dismiss) private var dismiss
   @FocusState private var isCaptionFocused: Bool
 
@@ -305,6 +308,35 @@ struct SendPreviewSheet: View {
     }
     .presentationDetents(items.allSatisfy(\.isVisual) ? [.large] : [.medium, .large])
     .interactiveDismissDisabled()
+    .alert(
+      "Describe this picture",
+      isPresented: Binding(get: { describing != nil }, set: { if !$0 { describing = nil } })
+    ) {
+      TextField("Description", text: $descriptionText, axis: .vertical)
+      Button("Cancel", role: .cancel) {}
+      Button("Save") {
+        if let id = describing { descriptions[id] = descriptionText }
+      }
+    } message: {
+      Text("People who use a screen reader hear it. It is sent as the picture's caption.")
+    }
+  }
+
+  private func describeButton(_ item: AttachmentLoader.Loaded) -> some View {
+    let isDescribed = !(descriptions[item.id] ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+    return Button {
+      descriptionText = descriptions[item.id] ?? ""
+      describing = item.id
+    } label: {
+      Label("ALT", systemImage: isDescribed ? "checkmark" : "text.below.photo")
+        .font(.caption.weight(.bold))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.black.opacity(0.6), in: Capsule())
+    }
+    .accessibilityLabel(isDescribed ? "Edit the description" : "Add a description")
+    .padding(12)
   }
 
   private var title: String {
@@ -322,6 +354,9 @@ struct SendPreviewSheet: View {
         LazyHStack(spacing: 0) {
           ForEach(items) { item in
             LocalPreview(item: item)
+              .overlay(alignment: .bottomLeading) {
+                if case .image = item.kind { describeButton(item) }
+              }
               .containerRelativeFrame([.horizontal, .vertical])
               .id(item.id)
           }
@@ -417,8 +452,9 @@ struct SendPreviewSheet: View {
       Button {
         let batch = items
         let text = caption
+        let described = descriptions
         dismiss()
-        Task { await viewModel.send(batch: batch, caption: text) }
+        Task { await viewModel.send(batch: batch, caption: text, descriptions: described) }
       } label: {
         Image(systemName: "arrow.up")
           .font(.system(size: 18, weight: .bold))

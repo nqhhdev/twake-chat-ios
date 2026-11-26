@@ -18,6 +18,7 @@ scripts/e2e.sh all          # up + test + down; down runs even when a test fails
 scripts/e2e.sh up           # Docker stack, sliding-sync check, users and rooms
 scripts/e2e.sh test         # xcodebuild test -testPlan E2E on "iPhone 16e"
 scripts/e2e.sh down         # docker compose down -v
+scripts/e2e.sh cold-start   # after up: kill the app, simctl push, tap the banner; a new room and a chat opened before (#84, #119)
 ```
 
 Needs Docker (Docker Desktop locally, or Colima on GitHub Actions). When

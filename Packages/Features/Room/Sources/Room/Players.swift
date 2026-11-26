@@ -89,6 +89,23 @@ struct AudioMessageRow: View {
           .textStyle(TextStyles.labelSmall)
           .foregroundStyle(SysColors.textSecondary)
           .monospacedDigit()
+        switch viewModel.transcription(of: message) {
+        case .transcribing:
+          HStack(spacing: 6) {
+            ProgressView().controlSize(.mini)
+            Text("Transcribing…")
+          }
+          .textStyle(TextStyles.labelSmall)
+          .foregroundStyle(SysColors.textSecondary)
+        case .transcribed(let text):
+          Text(text)
+            .textStyle(TextStyles.bodySmall)
+            .foregroundStyle(SysColors.onSurface)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityLabel("Transcription: \(text)")
+        case nil:
+          EmptyView()
+        }
       }
       Button(action: turnSpeed) {
         Text(speedSetting.speed.label)

@@ -8,6 +8,8 @@
 #   scripts/e2e.sh all      up, test, down (down runs even when a test fails)
 #   scripts/e2e.sh staging  run the E2E plan against staging (ADR 0020), credentials from
 #                           ~/.factos/secrets/twake-chat-ios-staging.env (never printed)
+#   scripts/e2e.sh cold-start  run ColdStartFlowTests and push its notification with `simctl push` while the app is
+#                           killed (issue #84); needs `up` first
 #
 # Environment: WEB_E2E (path of twake-space-chat/e2e), SIMULATOR_NAME, E2E_HOMESERVER (skip `up`, use this server).
 set -euo pipefail
@@ -216,12 +218,56 @@ down() {
   "${COMPOSE[@]}" down -v
 }
 
+cold_start() {
+  local udid token room event payload pid pushed status=0 alias="%23ios-cold-start:localhost"
+  pick_simulator || die "no iPhone simulator available"
+  udid=$(simulator_udid "$SIMULATOR_NAME") || die "no simulator named '$SIMULATOR_NAME'"
+  mkdir -p "$(dirname "$RESULTS")"
+  rm -rf "$RESULTS-cold-start.xcresult"
+  log "cold start on $SIMULATOR_NAME ($udid)"
+  TEST_RUNNER_E2E_HOMESERVER="$HS" TEST_RUNNER_E2E_USER=ios-alice TEST_RUNNER_E2E_PASSWORD="$PASSWORD" \
+    TEST_RUNNER_E2E_PUSHES_COLD_START=1 \
+    xcodebuild test -project TwakeChat.xcodeproj -scheme TwakeChat -testPlan E2E \
+    -only-testing:"TwakeChatUITests/ColdStartFlowTests${COLD_START_TEST:+/$COLD_START_TEST}" -destination "platform=iOS Simulator,id=$udid" \
+    -resultBundlePath "$RESULTS-cold-start.xcresult" >"$RESULTS-cold-start.log" 2>&1 &
+  pid=$!
+  token=$(login_token ios-alice "$PASSWORD")
+  curl -fsS -X DELETE "$HS/_matrix/client/v3/directory/room/$alias" -H "Authorization: Bearer $token" >/dev/null 2>&1 || true
+  pushed=" "
+  while kill -0 "$pid" 2>/dev/null; do
+    room=$(curl -fsS "$HS/_matrix/client/v3/directory/room/$alias" -H "Authorization: Bearer $token" 2>/dev/null |
+      sed -n 's/.*"room_id":"\([^"]*\)".*/\1/p' || true)
+    event=""
+    if [ -n "$room" ]; then
+      event=$(api "$token" GET "/rooms/$room/messages?dir=b&limit=5" 2>/dev/null |
+        python3 -c 'import json,sys; print(next((e["event_id"] for e in json.load(sys.stdin)["chunk"] if e["type"]=="m.room.message" and "cold start ping" in e.get("content",{}).get("body","")),""))' || true)
+    fi
+    if [ -n "$event" ] && [ "${pushed#* $event }" = "$pushed" ]; then
+      pushed="$pushed$event "
+      sleep 3
+      payload=$(mktemp)
+      printf '{"Simulator Target Bundle":"app.twake.ios.chat","aps":{"alert":{"title":"Cold start","body":"cold start ping"},"mutable-content":1,"sound":"default"},"room_id":"%s","event_id":"%s"}' \
+        "$room" "$event" >"$payload"
+      log "pushing $event in $room"
+      xcrun simctl push "$udid" app.twake.ios.chat "$payload"
+      rm -f "$payload"
+    fi
+    sleep 1
+  done
+  wait "$pid" || status=$?
+  api "$token" POST /logout '{}' >/dev/null 2>&1 || true
+  grep -E '(Test Case|error:|\*\* )' "$RESULTS-cold-start.log" || true
+  log "result bundle: $RESULTS-cold-start.xcresult (exit $status)"
+  return "$status"
+}
+
 case "${1:-all}" in
   up) up ;;
   seed) seed ;;
   check) check_server ;;
   test) check_server && run_tests "$HS" ios-alice "$PASSWORD" "@ios-bob:localhost" ;;
   down) down ;;
+  cold-start) check_server && cold_start ;;
   all)
     up
     status=0

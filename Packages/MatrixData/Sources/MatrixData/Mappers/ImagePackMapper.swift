@@ -37,6 +37,30 @@ enum ImagePackMapper {
     return StickerPack(id: id, name: name, avatar: avatar, stickers: stickers)
   }
 
+  static func emotes(content: [String: Any], source: (String) -> String?) -> [Emote] {
+    guard let images = content["images"] as? [String: Any] else { return [] }
+    let packUsage = (content["pack"] as? [String: Any])?["usage"] as? [String]
+    return images.keys.sorted().compactMap { shortcode in
+      guard let image = images[shortcode] as? [String: Any],
+        let url = image["url"] as? String, url.hasPrefix("mxc://"),
+        isEmoticon(image["usage"] as? [String] ?? packUsage),
+        shortcode.wholeMatch(of: /[A-Za-z0-9_+\-.]+/) != nil,
+        let reference = source(url)
+      else { return nil }
+      let info = image["info"] as? [String: Any] ?? [:]
+      return Emote(
+        shortcode: shortcode, url: url,
+        media: MediaReference(
+          source: reference, mimeType: info["mimetype"] as? String, size: info["size"] as? Int,
+          width: info["w"] as? Int, height: info["h"] as? Int))
+    }
+  }
+
+  static func isEmoticon(_ usage: [String]?) -> Bool {
+    guard let usage, !usage.isEmpty else { return true }
+    return usage.contains("emoticon")
+  }
+
   static func isSticker(_ usage: [String]?) -> Bool {
     guard let usage, !usage.isEmpty else { return true }
     return usage.contains("sticker")

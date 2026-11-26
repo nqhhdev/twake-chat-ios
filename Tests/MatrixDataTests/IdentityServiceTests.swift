@@ -170,4 +170,36 @@ struct IdentityServiceTests {
     let state = body["initial_state"] as? [[String: Any]]
     #expect(state?.first?["type"] as? String == "m.room.encryption")
   }
+
+  @Test func theAccountChoiceWinsOverTheServerAnnouncement() {
+    let announced = ServerCapabilities(identityServer: URL(string: "https://tom.example.org"))
+    let chosen = Data(#"{"base_url":"https://vector.im"}"#.utf8)
+    let removed = Data(#"{"base_url":null}"#.utf8)
+    #expect(
+      IdentityServerProxy.server(accountData: chosen, capabilities: announced)?.absoluteString
+        == "https://vector.im")
+    #expect(IdentityServerProxy.server(accountData: removed, capabilities: announced) == nil)
+    #expect(
+      IdentityServerProxy.server(accountData: nil, capabilities: announced)?.absoluteString
+        == "https://tom.example.org")
+    #expect(
+      IdentityServerProxy.server(accountData: Data("oops".utf8), capabilities: announced)?
+        .absoluteString == "https://tom.example.org")
+    #expect(IdentityServerProxy.server(accountData: nil, capabilities: .none) == nil)
+  }
+
+  @Test func anotherAccountStartsWithoutTheServerTokenOrPepper() {
+    let service = IdentityService(baseURL: base, transport: { _ in nil })
+    let alice = IdentityServerProxy.AccountState(
+      userId: "@alice:example.org", service: .some(service), token: "t", pepper: "p")
+    let same = alice.forAccount("@alice:example.org")
+    #expect(same.token == "t")
+    #expect(same.pepper == "p")
+    #expect(same.service != nil)
+    let bob = alice.forAccount("@bob:example.org")
+    #expect(bob.userId == "@bob:example.org")
+    #expect(bob.token == nil)
+    #expect(bob.pepper == nil)
+    #expect(bob.service == nil)
+  }
 }

@@ -16,6 +16,7 @@ struct ComposerView: View {
   @State private var linkAddress = ""
   /// How far the mic is dragged to the leading side; past `cancelDistance` the recording is dropped.
   @State private var dragOffset: CGFloat = 0
+  @State private var isScheduling = false
   private static let cancelDistance: CGFloat = 100
 
   var body: some View {
@@ -24,6 +25,14 @@ struct ComposerView: View {
       if !commands.isEmpty {
         CommandSuggestions(commands: commands) { command in
           viewModel.pick(command)
+          isFocused = true
+        }
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+      }
+      let emotes = viewModel.emoteSuggestions
+      if !emotes.isEmpty {
+        EmoteSuggestions(emotes: emotes, viewModel: viewModel) { emote in
+          viewModel.pickEmote(emote)
           isFocused = true
         }
         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -43,6 +52,10 @@ struct ComposerView: View {
           isFocused = true
         }
         .transition(.move(edge: .bottom).combined(with: .opacity))
+      }
+      if !viewModel.scheduled.isEmpty {
+        ScheduledBanner(viewModel: viewModel)
+          .transition(.move(edge: .bottom).combined(with: .opacity))
       }
       banner
       if let typing = viewModel.typingText {
@@ -179,6 +192,12 @@ struct ComposerView: View {
     }
     .buttonStyle(PressScaleButtonStyle())
     .keyboardShortcut(.return, modifiers: .command)
+    .contextMenu {
+      if viewModel.canScheduleDraft {
+        Button("Schedule Message", systemImage: "clock") { isScheduling = true }
+      }
+    }
+    .sheet(isPresented: $isScheduling) { ScheduleSheet(viewModel: viewModel) }
     .accessibilityLabel(isEditing ? "Save the edit" : "Send message")
     .accessibilityIdentifier(A11yIdentifiers.room.send)
     .transition(.scale(scale: 0.4).combined(with: .opacity))
