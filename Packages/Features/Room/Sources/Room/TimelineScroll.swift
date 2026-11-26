@@ -22,10 +22,13 @@ struct TimelineScroll: View {
   @State private var lastSeenRowId: String?
   /// The row at the top of the viewport when a page was asked for, so a prepend keeps it there.
   @State private var paginationAnchorId: String?
+  @State private var shownLastRowId: String?
 
   var body: some View {
     let rows = viewModel.rows
     let newCount = ChatRow.incomingCount(after: lastSeenRowId, in: rows)
+    let animatesAppend = RoomMetrics.animatesAppend(
+      previousLastId: shownLastRowId, rowIds: rows.map(\.id))
     ScrollView {
       LazyVStack(spacing: 0) {
         if let placeholder = viewModel.placeholder {
@@ -55,13 +58,15 @@ struct TimelineScroll: View {
         }
         ForEach(rows) { row in
           ChatRowView(row: row, bubbleWidth: bubbleWidth, viewModel: viewModel)
-            .transition(Self.insertion(for: row))
+            .transition(animatesAppend ? Self.insertion(for: row) : .identity)
         }
       }
-      .padding(.horizontal, 12)
+      .padding(.horizontal, RoomMetrics.gutter)
       .padding(.vertical, 8)
-      // Only the newest row animates in; loading older messages at the top does not move the view.
-      .animation(.spring(response: 0.38, dampingFraction: 0.78), value: rows.last?.id)
+      .animation(
+        animatesAppend ? .spring(response: 0.38, dampingFraction: 0.78) : nil,
+        value: rows.last?.id
+      )
       .scrollTargetLayout()
       // The content is exactly as wide as the screen. A row that asked for more made it wider, and then each jump
       // or page (`scrollTo` centres its row across too) slid the whole chat sideways: the avatars touched the left
@@ -69,6 +74,7 @@ struct TimelineScroll: View {
       .containerRelativeFrame(.horizontal)
     }
     .scrollPosition($position, anchor: .top)
+    .onChange(of: rows.last?.id, initial: true) { _, lastId in shownLastRowId = lastId }
     .onChange(of: viewModel.scrollTarget) { _, target in
       guard let target else { return }
       withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
@@ -270,7 +276,7 @@ struct NoticesRow: View {
         }
         .font(.footnote.weight(.medium))
         .foregroundStyle(SysColors.textSecondary)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, RoomMetrics.capsuleInset)
         .padding(.vertical, 6)
         .background(SysColors.surface, in: Capsule())
       }
@@ -302,7 +308,7 @@ struct OtherRow: View {
       Text(RoomViewModel.dayTitle(date))
         .textStyle(TextStyles.labelMedium)
         .foregroundStyle(SysColors.onSurface)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, RoomMetrics.capsuleInset)
         .padding(.vertical, 4)
         .background(SysColors.surface, in: Capsule())
         .padding(.vertical, 10)

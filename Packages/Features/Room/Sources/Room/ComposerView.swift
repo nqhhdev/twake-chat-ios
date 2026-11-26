@@ -86,7 +86,7 @@ struct ComposerView: View {
           micButton
         }
       }
-      .padding(.horizontal, 12)
+      .padding(.horizontal, RoomMetrics.gutter)
       .padding(.vertical, 8)
     }
     .background(SysColors.background)
