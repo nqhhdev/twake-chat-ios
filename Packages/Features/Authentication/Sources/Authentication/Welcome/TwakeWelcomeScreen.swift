@@ -16,7 +16,7 @@ public struct TwakeWelcomeScreen: View {
       Spacer()
       TwakeLogo(TwakeLogo.welcomeResource)
         .padding(.bottom, 32)
-      Text("An open source messenger encrypt\nyour data with matrix protocol")
+      Text(localized("An open source messenger encrypt\nyour data with matrix protocol"))
         .textStyle(Self.buttonText)
         .multilineTextAlignment(.center)
         .foregroundStyle(Color.black)
@@ -47,13 +47,16 @@ public struct TwakeWelcomeScreen: View {
     VStack(spacing: 12) {
       if viewModel.configuration.offersTwakeID {
         WelcomeButton(
-          "Create Twake ID", background: SysColors.primary, foreground: SysColors.onPrimary
+          localized("Create Twake ID"), background: SysColors.primary,
+          foreground: SysColors.onPrimary
         ) { Task { await viewModel.createTwakeID() } }
-        WelcomeButton("Sign in", background: SysColors.surface, foreground: SysColors.primary) {
+        WelcomeButton(
+          localized("Sign in"), background: SysColors.surface, foreground: SysColors.primary
+        ) {
           Task { await viewModel.signIn() }
         }
       }
-      Button("Use your company server") { viewModel.useCompanyServer() }
+      Button(localized("Use your company server")) { viewModel.useCompanyServer() }
         .accessibilityIdentifier(A11yIdentifiers.welcome.companyServer)
         .textStyle(Self.buttonText)
         .underline()
@@ -66,10 +69,10 @@ public struct TwakeWelcomeScreen: View {
 
   private var footer: some View {
     VStack(spacing: 0) {
-      Text("By continuing, you're agreeing to our")
+      Text(localized("By continuing, you're agreeing to our"))
         .textStyle(TextStyleToken(size: 12, lineHeight: 16, weight: .medium, letterSpacing: 0))
         .foregroundStyle(Color(argb: SysColors.outlineVariant.dark))
-      Button("Privacy Policy") { openURL(viewModel.configuration.privacyURL) }
+      Button(localized("Privacy Policy")) { openURL(viewModel.configuration.privacyURL) }
         .textStyle(TextStyleToken(size: 14, lineHeight: 20, weight: .medium, letterSpacing: 0))
         .foregroundStyle(SysColors.primary)
     }
