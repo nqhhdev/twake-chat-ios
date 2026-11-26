@@ -28,9 +28,9 @@ extension RoomViewModel {
     do {
       try await saved.setSaved(save, roomId: roomId, eventId: eventId)
       if save { savedEventIds.insert(eventId) } else { savedEventIds.remove(eventId) }
-      showToast(save ? "Saved" : "Removed from saved messages")
+      showToast(save ? localized("Saved") : localized("Removed from saved messages"))
     } catch {
-      errorMessage = "Could not update your saved messages."
+      errorMessage = localized("Could not update your saved messages.")
     }
   }
 
@@ -51,12 +51,13 @@ extension RoomViewModel {
   public func retry(_ message: TimelineMessage) async {
     guard message.sendState == .failed, let transactionId = message.transactionId else { return }
     await repository.retrySend(transactionId: transactionId)
-    showToast("Sending again")
+    showToast(localized("Sending again"))
   }
 
   /// Shows who sent a reaction.
   func showReactors(_ reaction: TimelineMessage.Reaction) {
-    peopleSheet = PeopleSheet(title: "Reacted \(reaction.key)", userIds: reaction.senderIds)
+    peopleSheet = PeopleSheet(
+      title: localized("Reacted \(reaction.key)"), userIds: reaction.senderIds)
   }
 
   /// The room's members, for names and pictures in the people sheets.
@@ -69,7 +70,7 @@ extension RoomViewModel {
 
   /// Shows who has seen a message.
   func showReaders(of message: TimelineMessage) {
-    peopleSheet = PeopleSheet(title: "Seen by", userIds: message.readerIds)
+    peopleSheet = PeopleSheet(title: localized("Seen by"), userIds: message.readerIds)
   }
 
   public func startSelecting(_ message: TimelineMessage) {
@@ -116,7 +117,9 @@ extension RoomViewModel {
 
   public func copySelection() {
     UIPasteboard.general.string = selectionText
-    showToast(selectedMessages.count == 1 ? "Copied" : "Copied \(selectedMessages.count) messages")
+    showToast(
+      selectedMessages.count == 1
+        ? localized("Copied") : localized("Copied \(selectedMessages.count) messages"))
     endSelecting()
   }
 
@@ -136,9 +139,9 @@ extension RoomViewModel {
     }
     endSelecting()
     if failed {
-      errorMessage = "Could not forward every message."
+      errorMessage = localized("Could not forward every message.")
     } else {
-      showToast("Forwarded to \(room.name)")
+      showToast(localized("Forwarded to \(room.name)"))
     }
   }
 
@@ -146,9 +149,9 @@ extension RoomViewModel {
     guard let eventId = message.eventId else { return }
     do {
       try await repository.forward(eventId: eventId, to: room.id)
-      showToast("Forwarded to \(room.name)")
+      showToast(localized("Forwarded to \(room.name)"))
     } catch {
-      errorMessage = "Could not forward the message."
+      errorMessage = localized("Could not forward the message.")
     }
   }
 
@@ -158,9 +161,9 @@ extension RoomViewModel {
     let reason = reason.trimmingCharacters(in: .whitespacesAndNewlines)
     do {
       try await repository.report(eventId: eventId, reason: reason.isEmpty ? nil : reason)
-      showToast("Reported")
+      showToast(localized("Reported"))
     } catch {
-      errorMessage = "Could not report the message. Please try again."
+      errorMessage = localized("Could not report the message. Please try again.")
     }
   }
 
@@ -168,14 +171,14 @@ extension RoomViewModel {
   public func block(_ message: TimelineMessage) async {
     do {
       try await repository.ignore(userId: message.senderId)
-      showToast("Blocked \(message.senderName)")
+      showToast(localized("Blocked \(message.senderName)"))
       if message.senderId == directUserId {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
           blockedUserId = message.senderId
         }
       }
     } catch {
-      errorMessage = "Could not block \(message.senderName). Please try again."
+      errorMessage = localized("Could not block \(message.senderName). Please try again.")
     }
   }
 
@@ -198,7 +201,7 @@ extension RoomViewModel {
   public func copyLink(to message: TimelineMessage) {
     guard let url = link(to: message) else { return }
     UIPasteboard.general.url = url
-    showToast("Link copied")
+    showToast(localized("Link copied"))
   }
 
   public func delete(_ message: TimelineMessage) async {
@@ -210,7 +213,7 @@ extension RoomViewModel {
         try await repository.discardUnsent(transactionId: transactionId)
       }
     } catch {
-      errorMessage = "Could not delete the message."
+      errorMessage = localized("Could not delete the message.")
     }
   }
 
@@ -230,7 +233,7 @@ extension RoomViewModel {
         await repository.addRecentReaction(key)
       }
     } catch {
-      errorMessage = "Could not send the reaction."
+      errorMessage = localized("Could not send the reaction.")
     }
   }
 
@@ -240,7 +243,7 @@ extension RoomViewModel {
     do {
       return try await media.file(reference, filename: Self.fileName(of: message))
     } catch {
-      errorMessage = "Could not download the file."
+      errorMessage = localized("Could not download the file.")
       return nil
     }
   }

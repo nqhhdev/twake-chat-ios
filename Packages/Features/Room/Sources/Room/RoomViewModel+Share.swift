@@ -33,7 +33,7 @@ extension RoomViewModel {
     if await rejoinRoom() {
       withAnimation { isArchived = false }
     } else {
-      errorMessage = "Could not join this chat again. It may need an invitation."
+      errorMessage = localized("Could not join this chat again. It may need an invitation.")
     }
   }
 }

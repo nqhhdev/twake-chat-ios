@@ -30,9 +30,9 @@ extension RoomViewModel {
     do {
       try await repository.setPinned(pin, eventId: eventId)
       await loadPinned()
-      showToast(pin ? "Pinned" : "Unpinned")
+      showToast(pin ? localized("Pinned") : localized("Unpinned"))
     } catch {
-      errorMessage = "Could not pin the message."
+      errorMessage = localized("Could not pin the message.")
     }
   }
 }

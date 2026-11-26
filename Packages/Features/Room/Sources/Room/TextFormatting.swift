@@ -8,13 +8,13 @@ enum TextFormat: CaseIterable, Sendable {
   /// What VoiceOver reads for the button.
   var label: String {
     switch self {
-    case .bold: "Bold"
-    case .italic: "Italic"
-    case .strike: "Strikethrough"
-    case .spoiler: "Spoiler"
-    case .code: "Code"
-    case .codeBlock: "Code block"
-    case .link: "Link"
+    case .bold: localized("Bold")
+    case .italic: localized("Italic")
+    case .strike: localized("Strikethrough")
+    case .spoiler: localized("Spoiler")
+    case .code: localized("Code")
+    case .codeBlock: localized("Code block")
+    case .link: localized("Link")
     }
   }
 

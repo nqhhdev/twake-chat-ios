@@ -42,16 +42,16 @@ struct TranslatedText: View {
         .italic()
         .frame(maxWidth: .infinity, alignment: .leading)
       HStack(spacing: 6) {
-        Text("TRANSLATED")
+        Text(localized("TRANSLATED"))
           .font(.caption2.weight(.semibold))
           .foregroundStyle(SysColors.textSecondary)
-        Button("Show original", action: showOriginal)
+        Button(localized("Show original"), action: showOriginal)
           .font(.caption2.weight(.semibold))
           .foregroundStyle(SysColors.primary)
           .buttonStyle(.plain)
       }
     }
     .accessibilityElement(children: .combine)
-    .accessibilityHint("Translated on this device")
+    .accessibilityHint(localized("Translated on this device"))
   }
 }

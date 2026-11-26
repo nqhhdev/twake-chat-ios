@@ -46,7 +46,7 @@ struct EmoteSuggestions: View {
           .contentShape(Rectangle())
         }
         .buttonStyle(MenuRowButtonStyle())
-        .accessibilityLabel("Emote \(emote.shortcode)")
+        .accessibilityLabel(localized("Emote \(emote.shortcode)"))
       }
     }
     .background(.regularMaterial, in: .rect(cornerRadius: 14))
@@ -55,7 +55,7 @@ struct EmoteSuggestions: View {
     .padding(.horizontal, 12)
     .padding(.bottom, 4)
     .accessibilityElement(children: .contain)
-    .accessibilityLabel("Emotes")
+    .accessibilityLabel(localized("Emotes"))
   }
 }
 
@@ -94,6 +94,6 @@ struct EmojiSuggestions: View {
     .padding(.horizontal, 12)
     .padding(.bottom, 4)
     .accessibilityElement(children: .contain)
-    .accessibilityLabel("Emojis")
+    .accessibilityLabel(localized("Emojis"))
   }
 }

@@ -18,24 +18,24 @@ struct ScheduleSheet: View {
     NavigationStack {
       Form {
         DatePicker(
-          "Send at", selection: $date, in: Date.now.addingTimeInterval(60)...,
+          localized("Send at"), selection: $date, in: Date.now.addingTimeInterval(60)...,
           displayedComponents: [.date, .hourAndMinute]
         )
         .datePickerStyle(.graphical)
         Section {
-          Text("The server sends it at this time, even with the app closed.")
+          Text(localized("The server sends it at this time, even with the app closed."))
             .font(.footnote)
             .foregroundStyle(SysColors.textSecondary)
         }
       }
-      .navigationTitle("Schedule Message")
+      .navigationTitle(localized("Schedule Message"))
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
+          Button(localized("Cancel")) { dismiss() }
         }
         ToolbarItem(placement: .confirmationAction) {
-          Button("Schedule") {
+          Button(localized("Schedule")) {
             isScheduling = true
             Task {
               if await viewModel.schedule(at: date) { dismiss() }
@@ -59,8 +59,7 @@ struct ScheduledBanner: View {
       isListShown = true
     } label: {
       Label(
-        viewModel.scheduled.count == 1
-          ? "1 scheduled message" : "\(viewModel.scheduled.count) scheduled messages",
+        localized("\(viewModel.scheduled.count) scheduled messages"),
         systemImage: "clock"
       )
       .textStyle(TextStyles.labelLarge)
@@ -90,19 +89,19 @@ struct ScheduledListSheet: View {
             Text(message.text).lineLimit(4)
           }
           .swipeActions {
-            Button("Cancel", systemImage: "trash", role: .destructive) {
+            Button(localized("Cancel"), systemImage: "trash", role: .destructive) {
               Task { await viewModel.cancelScheduled(message) }
             }
           }
           .contextMenu {
-            Button("Send Now", systemImage: "paperplane") {
+            Button(localized("Send Now"), systemImage: "paperplane") {
               Task { await viewModel.sendScheduledNow(message) }
             }
-            Button("Edit", systemImage: "pencil") {
+            Button(localized("Edit"), systemImage: "pencil") {
               dismiss()
               Task { await viewModel.editScheduled(message) }
             }
-            Button("Cancel Message", systemImage: "trash", role: .destructive) {
+            Button(localized("Cancel Message"), systemImage: "trash", role: .destructive) {
               Task { await viewModel.cancelScheduled(message) }
             }
           }
@@ -110,14 +109,14 @@ struct ScheduledListSheet: View {
       }
       .overlay {
         if viewModel.scheduled.isEmpty {
-          ContentUnavailableView("No scheduled messages", systemImage: "clock")
+          ContentUnavailableView(localized("No scheduled messages"), systemImage: "clock")
         }
       }
-      .navigationTitle("Scheduled")
+      .navigationTitle(localized("Scheduled"))
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
-          Button("Done") { dismiss() }
+          Button(localized("Done")) { dismiss() }
         }
       }
     }

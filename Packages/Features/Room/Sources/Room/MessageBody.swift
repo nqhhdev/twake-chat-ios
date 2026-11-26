@@ -34,7 +34,9 @@ struct MessageBody: View {
         .onTapGesture {
           withAnimation(reduceMotion ? nil : .easeOut(duration: 0.35)) { revealsSpoilers.toggle() }
         }
-        .accessibilityHint(revealsSpoilers ? "Hides the spoiler" : "Shows the spoiler")
+        .accessibilityHint(
+          revealsSpoilers ? localized("Hides the spoiler") : localized("Shows the spoiler")
+        )
         .accessibilityAddTraits(.isButton)
     } else if text.hasEmotes, let emotes {
       EmoteText(text: text, viewModel: emotes)
@@ -88,9 +90,9 @@ struct MessageBody: View {
       case .emote(let text): rich(Self.emote(formatted ?? Self.plain(text)))
       case .notice(let text):
         rich(formatted ?? Self.plain(text)).foregroundStyle(SysColors.textSecondary)
-      case .image(let caption): Label(caption ?? "Picture", systemImage: "photo")
-      case .video(let caption): Label(caption ?? "Video", systemImage: "video")
-      case .audio(let caption): Label(caption ?? "Audio", systemImage: "waveform")
+      case .image(let caption): Label(caption ?? localized("Picture"), systemImage: "photo")
+      case .video(let caption): Label(caption ?? localized("Video"), systemImage: "video")
+      case .audio(let caption): Label(caption ?? localized("Audio"), systemImage: "waveform")
       case .file(let name): Label(name, systemImage: "doc")
       case .location(let text, let place):
         if let place {
@@ -101,18 +103,20 @@ struct MessageBody: View {
       case .sticker(let text): Text(text)
       case .poll(let question): Label(question, systemImage: "chart.bar")
       case .redacted:
-        Label("This message has been deleted", systemImage: "trash").foregroundStyle(
+        Label(localized("This message has been deleted"), systemImage: "trash").foregroundStyle(
           SysColors.textSecondary)
       case .unableToDecrypt(let reason):
         // The web's wording: the line, then why the key is missing or what brings it back.
         VStack(alignment: .leading, spacing: 2) {
-          Label("This message cannot be read on this device yet.", systemImage: "lock.badge.clock")
+          Label(
+            localized("This message cannot be read on this device yet."),
+            systemImage: "lock.badge.clock")
           Text(reason.help(isDeviceVerified: isDeviceVerified))
             .textStyle(TextStyles.labelSmall)
         }
         .foregroundStyle(SysColors.textSecondary)
       case .unsupported:
-        Text("Unknown event").foregroundStyle(SysColors.textSecondary)
+        Text(localized("Unknown event")).foregroundStyle(SysColors.textSecondary)
       }
     }
     .textStyle(TextStyleToken(size: 15, lineHeight: 20, weight: .regular, letterSpacing: 0))
@@ -273,7 +277,7 @@ struct LinkPreviewCard: View {
         .clipShape(.rect(topLeadingRadius: 10, bottomLeadingRadius: 10))
     }
     .accessibilityElement(children: .combine)
-    .accessibilityHint("Opens the link")
+    .accessibilityHint(localized("Opens the link"))
   }
 }
 
@@ -297,19 +301,19 @@ private struct LocationCard: View {
             MKCoordinateRegion(center: coordinate, latitudinalMeters: 800, longitudinalMeters: 800)),
           interactionModes: []
         ) {
-          Marker("", coordinate: coordinate)
+          Marker(String(), coordinate: coordinate)
         }
         .frame(height: 140)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .allowsHitTesting(false)
         Label(text, systemImage: "mappin.and.ellipse")
           .multilineTextAlignment(.leading)
-        Text("Open in Maps")
+        Text(localized("Open in Maps"))
           .textStyle(TextStyles.bodyMedium)
           .foregroundStyle(SysColors.textSecondary)
       }
     }
     .buttonStyle(.plain)
-    .accessibilityLabel("Location: \(text). Open in Maps")
+    .accessibilityLabel(localized("Location: \(text). Open in Maps"))
   }
 }
