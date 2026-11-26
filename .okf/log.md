@@ -136,3 +136,5 @@
 * **Change**: Localization starts (#90): Authentication's strings move to its String Catalog with French and Vietnamese, through `localized()` and `Bundle.module`, checked by `LocalizationTests`; the Localization convention page records the pattern for the other packages.
 * **Change**: Domain (typing line, presence line, undecryptable reasons, Passcode) and DesignSystem (Online, Away, Edit) localized in French and Vietnamese (#90).
 * **Change**: People localized in French and Vietnamese (#90): 98 keys, found from the compiler's `.stringsdata` (bare SwiftUI literals and `localized()` keys) rather than by hand.
+* **Change**: A call outlives its room (#223, ADR 0038). `CallCenter` holds the call and `CallOverlay` shows it above every screen; the chevron minimizes it to a floating window that keeps the same web view, a tap or the room banner's "Return to call" brings it back, and a red button leaves. A call in another room ends the first; switching accounts ends it. System picture in picture is left for a device (ADR 0038, "Left for later" 2).
+

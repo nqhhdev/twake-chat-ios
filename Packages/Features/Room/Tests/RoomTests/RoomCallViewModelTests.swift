@@ -65,7 +65,8 @@ struct RoomCallViewModelTests {
   private static let active = RoomCallState(isActive: true, participants: ["@bob:example.org"])
 
   @Test func callsAreHiddenWhenTheServerHasNoFocus() async {
-    let viewModel = RoomCallViewModel(roomId: "!r", repository: FakeCalls(available: false))
+    let viewModel = RoomCallViewModel(
+      roomId: "!r", repository: FakeCalls(available: false), center: CallCenter())
     await viewModel.load()
     #expect(!viewModel.isAvailable)
     await viewModel.open(title: "Room")
@@ -75,7 +76,8 @@ struct RoomCallViewModelTests {
   @Test func startingWithNoCallStartsOneAndReportsIt() async {
     let calls = FakeCalls()
     let system = FakeSystem()
-    let viewModel = RoomCallViewModel(roomId: "!r", repository: calls, system: system)
+    let viewModel = RoomCallViewModel(
+      roomId: "!r", repository: calls, system: system, center: CallCenter())
     await viewModel.load()
     #expect(viewModel.actionTitle == "Start call")
     await viewModel.open(title: "Room")
@@ -86,7 +88,8 @@ struct RoomCallViewModelTests {
 
   @Test func anActiveCallIsJoined() async {
     let calls = FakeCalls(states: [Self.active])
-    let viewModel = RoomCallViewModel(roomId: "!r", repository: calls)
+    let viewModel = RoomCallViewModel(
+      roomId: "!r", repository: calls, center: CallCenter())
     await viewModel.load()
     await viewModel.watch()
     #expect(viewModel.state == Self.active)
@@ -99,7 +102,8 @@ struct RoomCallViewModelTests {
   @Test func widgetMessagesGoToTheDriverAndJoiningConnects() async {
     let calls = FakeCalls()
     let system = FakeSystem()
-    let viewModel = RoomCallViewModel(roomId: "!r", repository: calls, system: system)
+    let viewModel = RoomCallViewModel(
+      roomId: "!r", repository: calls, system: system, center: CallCenter())
     await viewModel.load()
     await viewModel.open(title: "Room")
     await viewModel.fromWidget(joinedMessage)
@@ -112,7 +116,8 @@ struct RoomCallViewModelTests {
   func hangingUpInTheWidgetEndsTheCall(_ message: String) async {
     let calls = FakeCalls()
     let system = FakeSystem()
-    let viewModel = RoomCallViewModel(roomId: "!r", repository: calls, system: system)
+    let viewModel = RoomCallViewModel(
+      roomId: "!r", repository: calls, system: system, center: CallCenter())
     await viewModel.load()
     await viewModel.open(title: "Room")
     await viewModel.fromWidget(message)
@@ -125,7 +130,8 @@ struct RoomCallViewModelTests {
   @Test(.timeLimit(.minutes(1))) func endingFromTheSystemClosesTheCall() async {
     let calls = FakeCalls()
     let system = FakeSystem()
-    let viewModel = RoomCallViewModel(roomId: "!r", repository: calls, system: system)
+    let viewModel = RoomCallViewModel(
+      roomId: "!r", repository: calls, system: system, center: CallCenter())
     await viewModel.load()
     await viewModel.open(title: "Room")
     guard let id = viewModel.activeCall?.id else {
@@ -145,7 +151,8 @@ struct RoomCallViewModelTests {
     (RoomCallError.unavailable, "The call could not be started. Please try again."),
   ])
   func aFailedOpenSaysWhy(_ failure: RoomCallError, _ message: String) async {
-    let viewModel = RoomCallViewModel(roomId: "!r", repository: FakeCalls(failure: failure))
+    let viewModel = RoomCallViewModel(
+      roomId: "!r", repository: FakeCalls(failure: failure), center: CallCenter())
     await viewModel.load()
     await viewModel.open(title: "Room")
     #expect(viewModel.activeCall == nil)
@@ -158,5 +165,68 @@ struct RoomCallViewModelTests {
     #expect(!CallWidgetAction.isHangUp("not json"))
     #expect(CallWidgetAction.isJoined(joinedMessage))
     #expect(!CallWidgetAction.isJoined(hangUpMessage))
+  }
+
+  @Test func theCallOutlivesTheRoomScreenAndComesBackFromIt() async {
+    let center = CallCenter()
+    let system = FakeSystem()
+    let first = RoomCallViewModel(
+      roomId: "!r", repository: FakeCalls(), system: system, center: center)
+    await first.load()
+    await first.open(title: "Room")
+    let call = first.activeCall
+    #expect(call != nil)
+    center.minimize()
+    #expect(center.isMinimized)
+
+    let reopened = RoomCallViewModel(
+      roomId: "!r", repository: FakeCalls(), system: system, center: center)
+    await reopened.load()
+    #expect(reopened.activeCall === call)
+    await reopened.open(title: "Room")
+    #expect(!center.isMinimized)
+    #expect(center.call === call)
+  }
+
+  @Test func anotherRoomDoesNotSeeTheCall() async {
+    let center = CallCenter()
+    let room = RoomCallViewModel(roomId: "!r", repository: FakeCalls(), center: center)
+    await room.load()
+    await room.open(title: "Room")
+    let other = RoomCallViewModel(roomId: "!other", repository: FakeCalls(), center: center)
+    #expect(other.activeCall == nil)
+    #expect(center.roomId == "!r")
+  }
+
+  @Test func aCallInAnotherRoomEndsTheFirstOne() async {
+    let center = CallCenter()
+    let first = RoomCallViewModel(roomId: "!r", repository: FakeCalls(), center: center)
+    await first.load()
+    await first.open(title: "Room")
+    let firstCall = first.activeCall
+    let second = RoomCallViewModel(roomId: "!other", repository: FakeCalls(), center: center)
+    await second.load()
+    await second.open(title: "Other")
+    #expect(firstCall?.hasEnded == true)
+    #expect(center.roomId == "!other")
+    #expect(first.activeCall == nil)
+  }
+
+  @Test func endingClearsTheCallAndTheMinimizedState() async {
+    let center = CallCenter()
+    let room = RoomCallViewModel(roomId: "!r", repository: FakeCalls(), center: center)
+    await room.load()
+    await room.open(title: "Room")
+    center.minimize()
+    await center.end()
+    #expect(center.call == nil)
+    #expect(!center.isMinimized)
+    #expect(room.activeCall == nil)
+  }
+
+  @Test func minimizingWithoutACallDoesNothing() {
+    let center = CallCenter()
+    center.minimize()
+    #expect(!center.isMinimized)
   }
 }

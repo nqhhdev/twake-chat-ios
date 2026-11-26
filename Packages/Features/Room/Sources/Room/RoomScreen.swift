@@ -50,7 +50,8 @@ public struct RoomScreen: View {
           IdentityWarningBanner(warning: warning) { Task { await viewModel.accept(warning) } }
             .transition(.move(edge: .top).combined(with: .opacity))
         }
-        if let roomCall, roomCall.isAvailable, roomCall.state.isActive, roomCall.activeCall == nil {
+        if let roomCall, roomCall.isAvailable, roomCall.state.isActive || roomCall.activeCall != nil
+        {
           ActiveCallBanner(calls: roomCall, title: viewModel.roomName)
             .transition(.move(edge: .top).combined(with: .opacity))
         }

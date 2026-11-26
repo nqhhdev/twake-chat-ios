@@ -64,18 +64,23 @@ public final class RoomCallViewModel {
   public private(set) var state = RoomCallState.idle
   public private(set) var isOpening = false
   public var errorMessage: String?
-  public var activeCall: ActiveCall?
 
   @ObservationIgnored private let repository: any RoomCallRepository
   @ObservationIgnored private let system: (any CallSystemReporting)?
+  @ObservationIgnored let center: CallCenter
 
   public init(
     roomId: String, repository: any RoomCallRepository,
-    system: (any CallSystemReporting)? = nil
+    system: (any CallSystemReporting)? = nil, center: CallCenter = .shared
   ) {
     self.roomId = roomId
     self.repository = repository
     self.system = system
+    self.center = center
+  }
+
+  public var activeCall: ActiveCall? {
+    center.isInCall(roomId: roomId) ? center.call : nil
   }
 
   public var participantCount: Int { state.participants.count }
@@ -95,20 +100,19 @@ public final class RoomCallViewModel {
   }
 
   public func open(title: String) async {
-    guard isAvailable, !isOpening, activeCall == nil else { return }
+    if activeCall != nil {
+      center.restore()
+      return
+    }
+    guard isAvailable, !isOpening else { return }
     isOpening = true
     defer { isOpening = false }
     errorMessage = nil
     do {
       let session = try await repository.open(
         roomId: roomId, intent: state.isActive ? .join : .start)
-      let call = ActiveCall(session: session, title: title)
-      activeCall = call
-      system?.onEndedBySystem = { [weak self] id in
-        guard let self, self.activeCall?.id == id else { return }
-        Task { await self.close() }
-      }
-      await system?.reportStarted(call.id, title: title)
+      await center.start(
+        ActiveCall(session: session, title: title), roomId: roomId, system: system)
     } catch RoomCallError.notAllowed {
       errorMessage = localized("You may not join a call in this chat.")
     } catch RoomCallError.notJoined {
@@ -119,20 +123,12 @@ public final class RoomCallViewModel {
   }
 
   public func fromWidget(_ message: String) async {
-    guard let call = activeCall else { return }
-    if await call.fromWidget(message) {
-      system?.reportConnected(call.id)
-    }
-    if call.hasEnded {
-      await close()
-    }
+    guard activeCall != nil else { return }
+    await center.fromWidget(message)
   }
 
   public func close() async {
-    guard let call = activeCall else { return }
-    activeCall = nil
-    call.markEnded()
-    await call.session.end()
-    await system?.reportEnded(call.id)
+    guard activeCall != nil else { return }
+    await center.end()
   }
 }

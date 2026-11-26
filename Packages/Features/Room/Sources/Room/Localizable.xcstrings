@@ -3785,6 +3785,22 @@
         }
       }
     },
+    "Minimize call": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réduire l’appel"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thu nhỏ cuộc gọi"
+          }
+        }
+      }
+    },
     "Moderator": {
       "localizations": {
         "fr": {
@@ -5013,6 +5029,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Thử lại"
+          }
+        }
+      }
+    },
+    "Return to call": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revenir à l’appel"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quay lại cuộc gọi"
           }
         }
       }
