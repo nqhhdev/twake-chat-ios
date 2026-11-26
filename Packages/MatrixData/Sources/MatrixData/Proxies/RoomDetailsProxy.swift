@@ -13,6 +13,50 @@ public actor RoomDetailsProxy: RoomDetailsRepository {
     clientProxy = { await authentication.clientProxy }
   }
 
+  public func channelSettings(roomId: String) async -> ChannelSettings? {
+    guard let client = await clientProxy(), let room = try? await room(roomId),
+      let info = try? await room.roomInfo(), !info.isDirect
+    else { return nil }
+    let ownUserId = room.ownUserId()
+    let powerLevels = try? await room.getPowerLevels()
+    let canInvite = (try? powerLevels?.canUserInvite(userId: ownUserId)) ?? false
+    let level = powerLevels?.userPowerLevels()[ownUserId] ?? 0
+    let gifsContent = await stateContent(
+      ChannelSettings.gifsStateType, roomId: roomId, client: client)
+    return ChannelSettings(
+      isOwner: ChannelSettings.isOwner(canInvite: canInvite, powerLevel: level),
+      gifsEnabled: ChannelSettings.isEnabled(gifsContent) != false)
+  }
+
+  public func setGifs(_ enabled: Bool, roomId: String) async throws(RoomDetailsError) {
+    try await sendState(ChannelSettings.gifsStateType, enabled: enabled, roomId: roomId)
+  }
+
+  static func statePath(_ type: String, roomId: String) -> String {
+    "rooms/\(ClientServerRequest.encode(roomId))/state/\(type)/"
+  }
+
+  private func stateContent(_ type: String, roomId: String, client: ClientProxy) async
+    -> [String: Any]?
+  {
+    guard
+      let request = ClientServerRequest.make(
+        client: client.client, path: Self.statePath(type, roomId: roomId))
+    else { return nil }
+    return await ClientServerRequest.object(request)
+  }
+
+  private func sendState(_ type: String, enabled: Bool, roomId: String)
+    async throws(RoomDetailsError)
+  {
+    guard let client = await clientProxy(),
+      let request = ClientServerRequest.make(
+        client: client.client, path: Self.statePath(type, roomId: roomId), method: "PUT",
+        json: ["enabled": enabled])
+    else { throw .requestFailed }
+    guard await ClientServerRequest.succeeds(request) else { throw .requestFailed }
+  }
+
   public func details(roomId: String) async throws(RoomDetailsError) -> RoomDetails {
     let room = try await room(roomId)
     do {

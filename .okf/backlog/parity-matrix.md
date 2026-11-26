@@ -62,7 +62,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Emoji shortcodes, bot commands (MSC4332) | `command_hints` | README | Built: `Room/EmojiSuggestions.swift`, `Domain/Models/BotCommand.swift` | Matrix | — |
 | Custom emotes and packs (MSC2545) | `settings_emotes` | — | Built: shown, picked and sent (`RoomViewModel+Emotes.swift`); packs not editable, [ADR 0035](../../docs/adr/0035-timeline-extras-formats.md) | Matrix | #186 |
 | Stickers: shown / sent | `sticker_picker_dialog` | — | Built: `StickerViews.swift` (shown without a bubble), sent from MSC2545 packs, [ADR 0028](../../docs/adr/0028-gifs-stickers-checklists.md) | Matrix | #105 |
-| GIF picker | — | D63, D146 | Built: `GifPickerSheet.swift`; received GIFs not hidden when off, no owner switch yet | Twake (common proxy), ADR 0028 | #140 |
+| GIF picker | — | D63, D146 | Built: `GifPickerSheet.swift`; the owner's GIFs switch in the channel info (`ChannelSettingsSection.swift`); with GIFs off the picker hides and a received GIF shows as "GIF hidden" (`HiddenGifNotice`, `RoomViewModel.isHiddenGif`) | Twake (common proxy), ADR 0028 | #140 |
 | Typing line, receipts, Seen by, unread marker, mark unread | `seen_by_row` | Phase 2, 2b | Built: `Room/RoomScreen.swift`, `TimelineRows.swift` | Matrix | — |
 | Draft per chat and per thread, reopen where left | `chat_draft` | Phase 2b | Built: `TimelineRepository.saveDraft`, `Room/TimelineScrollMemory.swift` | Matrix | — |
 | Forward, pin, edit history (encrypted too), report, ignore | `forward`, `chat_pinned_events` | Phase 2b | Built: `Room/PinnedAndForward.swift`, `MatrixData/Proxies/EncryptedEditHistory.swift` | Matrix | — |
@@ -70,8 +70,8 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Search in a chat: unencrypted on the server, encrypted on device | `chat_search` | Phase 4 (D21) | Built: `Room/RoomSearch.swift`, `RoomSearchProxy.swift`, on-device index of decrypted messages (ADR 0040) | Matrix | #94 |
 | Threads: list, reply, thread screen | — | Phase 2 | Built: `Room/Threads.swift`, `ThreadPrefsProxy.swift` | Matrix | #93 (notifications) |
 | Polls (MSC3381) | — | Phase 10 | Built: `Room/Polls.swift`, `Domain/Models/Poll.swift` | Matrix | — |
-| Checklists next to polls | — | THR-11 | Off: no event format defined ([ADR 0028](../../docs/adr/0028-gifs-stickers-checklists.md)) | Matrix | #105 |
-| Voice messages (MSC3245), playback speed | `chat_audio_player_widget` | Phase 10 | Built: `Room/VoiceRecorder.swift`, `Players.swift`; interop to verify | Matrix | #108 |
+| Checklists next to polls | — | THR-11 | Off: no event format defined ([ADR 0028](../../docs/adr/0028-gifs-stickers-checklists.md)) | Matrix | #224 |
+| Voice messages (MSC3245), playback speed | `chat_audio_player_widget` | Phase 10 | Built: `Room/VoiceRecorder.swift`, `Players.swift`. Same event as web (`adapters/matrix/matrixAttachments.ts`) and Flutter (`pages/chat/chat.dart:914`): `m.audio` with `org.matrix.msc3245.voice` and `org.matrix.msc1767.audio` (`duration` in ms, `waveform` integers 0 to 1024); the received waveform and duration are drawn (`TimelineMessage.Voice`) | Matrix | #108 |
 | Transcribe a voice message | — | MSG-13 | Built: on-device `SFSpeechRecognizer` (`SpeechTranscriber.swift`) | Device | #182 |
 | Translate a message | — | MSG-15 | Built: Apple Translation on the device (`MessageTranslationViews.swift`) | Device (ADR 0026) | #181 |
 | Scribe in the composer | — | D53, D73, D215 | Not built; owner decision | Twake (Assistant) | #183 |
@@ -90,7 +90,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Feature | Flutter | Web | iOS | Server | Issue |
 |---|---|---|---|---|---|
 | Inline pictures and video, viewer, Quick Look, save to Photos | `image_viewer`, `media_viewer` | Phase 2, 11 | Built: `Room/MediaViews.swift`, `SaveToPhotos.swift` | Matrix | — |
-| Preview before sending, album, camera, paste, drag and drop | `send_media_native_dialog`, `domain/media_album` | Phase 2 | Built: `Room/AttachmentPicking.swift`, `AttachmentDrop.swift`; album format to verify | Matrix | #115 |
+| Preview before sending, album, camera, paste, drag and drop | `send_media_native_dialog`, `domain/media_album` | Phase 2 | Built: `Room/AttachmentPicking.swift`, `AttachmentDrop.swift`. Albums are read by `app.twake.chat.batch` (`MatrixData/Mappers/MediaBatch.swift`), the key Flutter writes on each picture of a send of two or more (`domain/media_album/policy/media_batch_stamp.dart`); iOS does not write it yet, so its multi-picture sends show as single pictures on Flutter and web | Matrix | #210 |
 | Upload progress, size limit from `/media/v3/config` | `send_file_dialog` | Phase 2 | Built: `MatrixData/Proxies/MediaProxy.swift` | Matrix | — |
 | Media, Files, Links tabs in chat info | `chat_details_page_view` | — | Built: `Room/RoomDetailsScreen.swift` | Matrix | — |
 | Alternative text on sent pictures | — | A11Y-04 | Built: sent as the picture's caption ([ADR 0035](../../docs/adr/0035-timeline-extras-formats.md)) | Matrix | #179 |
@@ -137,7 +137,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Feature | Flutter | Web | iOS | Server | Issue |
 |---|---|---|---|---|---|
 | Meet link button and call events in the timeline | `chat_video_call_button`, `domain/video_call` | D30, D105 | Built: `Room/MeetCalls.swift`, `MatrixData/Discovery/TwakeMeet.swift`, `Mappers/CallEvents.swift` (#161) | ToM + Twake (Meet) | — |
-| Calls in the app (MatrixRTC, LiveKit, ringing) | `dialer` | Phase 7, 7 bis | Built ([ADR 0038](../../docs/adr/0038-in-app-calls-with-element-call-widget.md)): Element Call in a web view driven by the SDK widget driver (`MatrixData/Proxies/ElementCallProxy.swift`, `Room/RoomCalls.swift`), start or join from the header, active-call banner, CallKit (`Room/CallKitReporter.swift`); shown only with a `livekit_service_url` focus. Incoming ring in the background not built | Matrix + LiveKit token service | #191 |
+| Calls in the app (MatrixRTC, LiveKit, ringing) | `dialer` | Phase 7, 7 bis | Built ([ADR 0038](../../docs/adr/0038-in-app-calls-with-element-call-widget.md)): Element Call in a web view driven by the SDK widget driver (`MatrixData/Proxies/ElementCallProxy.swift`, `Room/RoomCalls.swift`), start or join from the header, active-call banner, CallKit (`Room/CallKitReporter.swift`); shown only with a `livekit_service_url` focus. Incoming ring not built (#222), no picture in picture (#223), no screen sharing (out of scope, ADR 0038) | Matrix + LiveKit token service | #222, #223 |
 
 ## Settings
 
@@ -153,6 +153,18 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Stories, emotes settings, style (theme, wallpaper) | `settings_stories`, `story`, `settings_style` | — | Dropped (ADR 0026): not in Twake's settings list, iOS system appearance | — | none |
 | iPad layout | `chat_adaptive_scaffold` | Phase 8 | Built: `DesignSystem/Layout/TwakeLayout.swift`, `TwakeChat/ChatShell.swift` | Device | #103 |
 | Localisation, accessibility pass, performance | `assets/l10n` | Phase 8, 9 | Partly | Device | #90, #96 |
+
+## Reference-client facts (#115)
+
+Checked on 2026-11-26: Flutter `twake-on-matrix` at `9c769f877`, web `twake-space-chat` at `67f2ca6e`.
+
+| Fact | Finding | Evidence |
+|---|---|---|
+| Flutter: edit history UI | None: an edited message shows "edited" next to its time; edits are aggregated only to resend failed ones | `lib/pages/chat/events/message_time.dart:63`, `lib/pages/chat/chat.dart:1220` |
+| Web: sending stickers | Not sent and not drawn: `m.sticker` is an unsupported type; the GIF decision says "no stickers" | `src/adapters/matrix/readMessages.ts:72`, `DECISION.md` (GIF entry, "Limits") |
+| Flutter: accessibility | Minimal: four `Semantics` widgets and a few `semanticLabel`s, no accessibility pass | `lib/pages/chat/events/images_builder/image_bubble.dart`, `lib/pages/chat_list/room_list_filter/` |
+| Flutter: crash reporting | Sentry (`sentry_flutter` 9.10), DSN from `AppConfig.sentryDsn`, off in local builds | `pubspec.yaml:173`, `lib/utils/sentry_init.dart`, `lib/main.dart:149` |
+| Flutter: album format | `app.twake.chat.batch`, a UUID on each picture of a send of two or more | `lib/domain/media_album/policy/media_batch_stamp.dart:21` |
 
 ## Cross-cutting
 

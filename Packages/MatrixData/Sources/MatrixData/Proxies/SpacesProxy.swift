@@ -106,12 +106,14 @@ public actor SpacesProxy: SpacesRepository {
       let roomId = object["room_id"] as? String
     else { throw .requestFailed }
     if let parentId = space.parentId {
-      do {
-        try await client.spaceService().addChildToSpace(childId: roomId, spaceId: parentId)
-      } catch {
-        DebugLog.failure("addChildToSpace", error)
-        throw .requestFailed
-      }
+      guard
+        let child = ClientServerRequest.make(
+          client: client,
+          path: "rooms/\(ClientServerRequest.encode(parentId))/state/m.space.child/"
+            + ClientServerRequest.encode(roomId), method: "PUT",
+          json: NewSpace.childContent(childId: roomId, ownServer: ownServer)),
+        await ClientServerRequest.succeeds(child)
+      else { throw .requestFailed }
     }
     return roomId
   }

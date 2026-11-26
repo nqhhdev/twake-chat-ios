@@ -125,7 +125,17 @@ enum TimelineItemMapper {
       replyToEventId: content.inReplyTo?.eventId(), formatted: formatted,
       uploadProgress: uploadProgress(event.localSendState), poll: poll,
       thread: content.threadSummary.map(thread), threadRootId: content.threadRoot,
-      batchId: batchId(body, event), transactionId: transactionId, call: call(body, event))
+      batchId: batchId(body, event), transactionId: transactionId, call: call(body, event),
+      voice: voice(content.kind))
+  }
+
+  static func voice(_ kind: MsgLikeKind) -> TimelineMessage.Voice? {
+    guard case .message(let message) = kind, case .audio(let audio) = message.msgType,
+      audio.voice != nil || audio.audio != nil
+    else { return nil }
+    return TimelineMessage.Voice(
+      duration: audio.info?.duration ?? audio.audio?.duration,
+      waveform: TimelineMessage.Voice.waveform(amplitudes: audio.audio?.waveform ?? []))
   }
 
   /// The call a text message starts (`CallEvents`), read from the event's original JSON; other messages skip it.

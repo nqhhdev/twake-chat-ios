@@ -147,6 +147,9 @@ public struct RoomDetailsScreen: View {
           }
           .disabled(viewModel.notificationMode == nil)
         }
+        if let channel = viewModel.channel {
+          ChannelSettingsSection(viewModel: viewModel, channel: channel)
+        }
         if viewModel.hasContentTabs {
           Section {
             ForEach(RoomContentKind.tabs) { kind in

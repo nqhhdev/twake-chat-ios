@@ -201,6 +201,8 @@ public protocol RoomDetailsRepository: Sendable {
   /// Removes the room's avatar.
   func removeAvatar(roomId: String) async throws(RoomDetailsError)
   /// The group chats the user and `userId` are both in, by name (direct chats left out).
+  func channelSettings(roomId: String) async -> ChannelSettings?
+  func setGifs(_ enabled: Bool, roomId: String) async throws(RoomDetailsError)
   func roomsInCommon(with userId: String) async -> [RoomInCommon]
   /// The status message `userId` set (Matrix presence `status_msg`), or `nil`.
   func statusMessage(of userId: String) async -> String?
@@ -210,6 +212,10 @@ public protocol RoomDetailsRepository: Sendable {
 }
 
 extension RoomDetailsRepository {
+  public func channelSettings(roomId: String) async -> ChannelSettings? { nil }
+  public func setGifs(_ enabled: Bool, roomId: String) async throws(RoomDetailsError) {
+    throw .requestFailed
+  }
   public func roomsInCommon(with userId: String) async -> [RoomInCommon] { [] }
   public func statusMessage(of userId: String) async -> String? { nil }
   public func presence(of userId: String) async -> Presence? { nil }

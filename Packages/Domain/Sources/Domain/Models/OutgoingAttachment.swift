@@ -19,11 +19,13 @@ public struct OutgoingAttachment: Sendable, Equatable {
   public let caption: String?
   /// The event this attachment answers, when it is a reply.
   public let replyTo: String?
+  public let batchId: String?
 
   public init(
     kind: Kind, fileURL: URL, mimeType: String?, size: Int?, caption: String? = nil,
-    replyTo: String? = nil
+    replyTo: String? = nil, batchId: String? = nil
   ) {
+    self.batchId = batchId
     self.kind = kind
     self.fileURL = fileURL
     self.mimeType = mimeType

@@ -66,6 +66,7 @@ public final class RoomViewModel {
   public private(set) var botCommands: [BotCommand] = []
   @ObservationIgnored let gifs: (any GifRepository)?
   public internal(set) var gifsAvailable = false
+  public internal(set) var gifsOff = false
   public internal(set) var stickerPacks: [StickerPack] = []
   var presenceDots: [String: Presence.Dot] = [:]
   public internal(set) var emotes: [Emote] = []
@@ -249,6 +250,12 @@ public final class RoomViewModel {
             return false
           }
         })
+    }
+    .map { details in
+      details.onGifsChanged = { [weak self] enabled in
+        Task { await self?.gifsChanged(enabled: enabled) }
+      }
+      return details
     }
   }
 
@@ -526,12 +533,11 @@ public final class RoomViewModel {
     await repository.retryDecryption(sessionIds: [])
   }
 
-  /// Reads the other person's presence now and every `interval` while the chat shows in the foreground, as the web
-  /// reads the presence of the people shown (D80). The room screen cancels this task when the scene is not active,
-  /// so a DM left in the background does not keep polling. It also ends when the task is cancelled.
-  public func watchPresence(every interval: Duration = .seconds(15)) async {
+  public func watchPresence(
+    every interval: Duration = .seconds(15), lowPower lowPowerInterval: Duration = .seconds(60),
+    isLowPower: @escaping @Sendable () -> Bool = { ProcessInfo.processInfo.isLowPowerModeEnabled }
+  ) async {
     guard threadRootId == nil, let detailsRepository else { return }
-    // The room's details load with the timeline: wait a few seconds for them to say whether this is a direct chat.
     var waits = 0
     while !Task.isCancelled {
       guard let userId = directUserId else {
@@ -544,7 +550,7 @@ public final class RoomViewModel {
       if line != presenceLine {
         withAnimation(.easeInOut(duration: 0.25)) { presenceLine = line }
       }
-      try? await Task.sleep(for: interval)
+      try? await Task.sleep(for: isLowPower() ? lowPowerInterval : interval)
     }
   }
 

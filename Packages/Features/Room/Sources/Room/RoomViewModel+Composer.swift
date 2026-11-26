@@ -31,7 +31,7 @@ extension RoomViewModel {
   /// `fileURL` must stay until the upload ends; the caller removes it after.
   public func send(
     attachment kind: OutgoingAttachment.Kind, fileURL: URL, mimeType: String?, size: Int?,
-    caption: String? = nil
+    caption: String? = nil, batchId: String? = nil
   ) async {
     var replyTo: String?
     if case .reply(let eventId, _) = composerMode {
@@ -46,7 +46,7 @@ extension RoomViewModel {
       try await repository.sendAttachment(
         OutgoingAttachment(
           kind: kind, fileURL: fileURL, mimeType: mimeType, size: size, caption: caption,
-          replyTo: replyTo))
+          replyTo: replyTo, batchId: batchId))
     } catch {
       errorMessage = Self.attachmentFailureMessage(error)
     }
@@ -85,15 +85,23 @@ extension RoomViewModel {
         ? "This file is larger than the server allows (\(size))."
         : "\(tooLarge.count) files are larger than the server allows (\(size))."
     }
+    let batchId = Self.albumId(for: batch)
     for (index, item) in batch.enumerated() {
       let isLast = index == batch.count - 1
       await send(
         attachment: item.kind, fileURL: item.fileURL, mimeType: item.mimeType, size: item.size,
         caption: Self.caption(
-          of: item, descriptions: descriptions, batchCaption: isLast ? caption : ""))
+          of: item, descriptions: descriptions, batchCaption: isLast ? caption : ""),
+        batchId: item.isVisual ? batchId : nil)
       AttachmentLoader.remove(item)
     }
     if let limitMessage { errorMessage = limitMessage }
+  }
+
+  static func albumId(for batch: [AttachmentLoader.Loaded], make: () -> UUID = UUID.init)
+    -> String?
+  {
+    batch.filter(\.isVisual).count >= 2 ? make().uuidString.lowercased() : nil
   }
 
   static func caption(

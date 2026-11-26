@@ -8,12 +8,14 @@ import Testing
 /// A hand-written `ThreadPrefsRepository` (ADR 0010) that answers the followed threads it was given.
 private struct FakeThreadPrefs: ThreadPrefsRepository {
   let followed: [FollowedThread]
+  var active: [FollowedThread] = []
 
   func threadPrefs() async -> [ThreadPrefEntry] { followed.map(\.entry) }
   func setThreadPref(_ pref: ThreadPref, roomId: String, threadId: String)
     async throws(TimelineError)
   {}
   func followedThreads() async -> [FollowedThread] { followed }
+  func activeThreads(inRooms roomIds: [String]) async -> [FollowedThread] { active }
 }
 
 @MainActor
@@ -51,5 +53,30 @@ struct ActivityFollowedThreadsTests {
     #expect(ChatListViewModel.preview(of: thread("$1", sender: nil, text: "Lunch?")) == "Lunch?")
     #expect(ChatListViewModel.preview(of: thread("$1", sender: "Alice", text: nil)) == "Thread")
     #expect(ChatListViewModel.preview(of: thread("$1", sender: "Alice", text: "")) == "Thread")
+  }
+
+  @Test func threadsWithNewRepliesComeBeforeTheOnlyFollowedOnes() async {
+    let followed = [thread("$1", sender: "Alice", text: "Lunch?")]
+    let active = FollowedThread(
+      entry: ThreadPrefEntry(roomId: "!team:example.org", threadId: "$2", pref: .follow),
+      roomName: "Team", rootSenderName: "Me", rootText: "Plan", date: Date(),
+      latestSenderName: "Bob", latestText: "Done", replyCount: 3)
+    let viewModel = ChatListViewModel(
+      repository: FakeRoomListRepository(),
+      threadPrefs: FakeThreadPrefs(followed: followed, active: [active]), logOut: { true })
+    await viewModel.loadFollowedThreads()
+    #expect(viewModel.followedThreads.map(\.entry.threadId) == ["$2", "$1"])
+  }
+
+  @Test func aThreadWithRepliesPreviewsItsLatestReply() {
+    let entry = ThreadPrefEntry(roomId: "!team:example.org", threadId: "$2", pref: .follow)
+    let many = FollowedThread(
+      entry: entry, roomName: "Team", rootSenderName: "Me", rootText: "Plan", date: nil,
+      latestSenderName: "Bob", latestText: "Done", replyCount: 3)
+    let one = FollowedThread(
+      entry: entry, roomName: "Team", rootSenderName: "Me", rootText: "Plan", date: nil,
+      latestSenderName: "Bob", latestText: "Done", replyCount: 1)
+    #expect(ChatListViewModel.preview(of: many) == "3 replies · Bob: Done")
+    #expect(ChatListViewModel.preview(of: one) == "Bob: Done")
   }
 }
