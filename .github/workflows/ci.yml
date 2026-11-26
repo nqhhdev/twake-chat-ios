@@ -51,7 +51,7 @@ jobs:
           - module: scripts
             path: scripts
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: swift-actions/setup-swift@v2
         with:
@@ -65,7 +65,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check architecture (ADR 0005)
         run: scripts/check-architecture.sh
@@ -84,7 +84,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - id: setup
         uses: ./.github/actions/xcode-setup
@@ -103,7 +103,7 @@ jobs:
 
       - name: Save DerivedData
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: build/DerivedData
           key: ${{ steps.setup.outputs.derived-data-key }}
@@ -116,7 +116,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - id: setup
         uses: ./.github/actions/xcode-setup
@@ -141,7 +141,7 @@ jobs:
 
       - name: Upload test results
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: unit-tests-xcresult
           path: build/TestResults.xcresult
@@ -150,7 +150,7 @@ jobs:
 
       - name: Save DerivedData
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: build/DerivedData
           key: ${{ steps.setup.outputs.derived-data-key }}
