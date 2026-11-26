@@ -21,6 +21,7 @@ public actor TimelineProxy: TimelineRepository {
   private var opened: Opened?
   private var knownEmotes: [String: String] = [:]
   private var delayedEventsSupported: Bool?
+  private let capabilities: (any ServerCapabilitiesRepository)?
 
   /// - Parameters:
   ///   - roomId: The room this timeline shows.
@@ -29,8 +30,10 @@ public actor TimelineProxy: TimelineRepository {
   ///   - threadRoot: Shows this thread (its root and replies); what is sent goes into it.
   public init(
     roomId: String, authentication: MatrixAuthenticationRepository,
-    only content: RoomContentKind? = nil, threadRoot: String? = nil
+    only content: RoomContentKind? = nil, threadRoot: String? = nil,
+    capabilities: (any ServerCapabilitiesRepository)? = nil
   ) {
+    self.capabilities = capabilities
     self.roomId = roomId
     self.content = content
     self.threadRoot = threadRoot
@@ -446,6 +449,11 @@ public actor TimelineProxy: TimelineRepository {
       (try? await opened.room.latestEncryptionState()) == .notEncrypted
     else { return false }
     if let delayedEventsSupported { return delayedEventsSupported }
+    if let capabilities {
+      let supported = await capabilities.current().supports(DelayedEvents.feature)
+      delayedEventsSupported = supported
+      return supported
+    }
     guard
       let request = ClientServerRequest.make(
         client: opened.client.client, path: "", version: "versions"),
