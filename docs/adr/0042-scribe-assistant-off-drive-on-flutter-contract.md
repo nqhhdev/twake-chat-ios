@@ -46,7 +46,9 @@ The owner's direction of 2026-11-25, verbatim:
    when `app.twake.chat.enable_twake_drive` is `true` and the account's server has an OIDC issuer, read through
    `ServerCapabilities` ([ADR 0034](0034-server-capabilities-and-account-services.md)). The SSO refresh token goes in
    the Keychain ([ADR 0007](0007-shared-session-store-app-group.md)). Until that change merges, nothing is shown;
-   other providers stay reachable through the Files app.
+   other providers stay reachable through the Files app. Built in #175: `MatrixData/Drive/TwakeSSO.swift`,
+   `WorkplaceAPI.swift`, `Proxies/TwakeDriveProxy.swift`, `Domain/Models/DrivePickPlan.swift`, and
+   `Room/DrivePicking.swift` with `RoomViewModel+Drive.swift`.
 
 ## Consequences
 **Good.** No Twake-only button appears on a plain Matrix server, and no text is sent to an assistant no server

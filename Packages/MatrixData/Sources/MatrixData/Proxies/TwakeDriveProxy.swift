@@ -68,6 +68,10 @@ public actor TwakeDriveProxy: TwakeDriveRepository {
 
   static func tokenAccount(_ userId: String) -> String { "drive.\(userId)" }
 
+  public static func forget(userId: String, in secrets: KeychainSecretStore) {
+    secrets.delete(account: tokenAccount(userId))
+  }
+
   public func isAvailable() async -> Bool {
     await capabilities.current().driveSignInIssuer != nil
   }

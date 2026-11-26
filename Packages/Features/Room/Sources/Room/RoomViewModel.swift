@@ -67,6 +67,9 @@ public final class RoomViewModel {
   @ObservationIgnored let gifs: (any GifRepository)?
   public internal(set) var gifsAvailable = false
   public internal(set) var gifsOff = false
+  @ObservationIgnored let drive: DriveAccess?
+  public internal(set) var driveAvailable = false
+  public internal(set) var isOpeningDrive = false
   public internal(set) var stickerPacks: [StickerPack] = []
   var presenceDots: [String: Presence.Dot] = [:]
   public internal(set) var emotes: [Emote] = []
@@ -189,9 +192,11 @@ public final class RoomViewModel {
     threadTimeline: ThreadTimeline? = nil, threadRootId: String? = nil,
     threadPrefs: (any ThreadPrefsRepository)? = nil,
     scrollMemory: TimelineScrollMemory? = nil,
-    gifs: (any GifRepository)? = nil
+    gifs: (any GifRepository)? = nil,
+    drive: DriveAccess? = nil
   ) {
     self.gifs = gifs
+    self.drive = drive
     self.scrollMemory = scrollMemory
     self.threadPrefs = threadPrefs
     self.threadTimeline = threadTimeline
@@ -230,7 +235,7 @@ public final class RoomViewModel {
       openDirectChat: openDirectChat, search: nil, isArchived: isArchived, rejoin: nil,
       linkPreviews: linkPreviews, checkSession: nil, display: display, blocking: blocking,
       saved: saved, threadTimeline: nil, threadRootId: eventId, threadPrefs: threadPrefs,
-      gifs: gifs)
+      gifs: gifs, drive: drive)
   }
 
   /// The details page of this room, or `nil` when the app gave no details repository.
@@ -346,9 +351,11 @@ public final class RoomViewModel {
       async let stickers: Void = loadStickerPacks()
       async let emotes: Void = loadEmotes()
       async let scheduling: Void = loadScheduling()
+      async let driveAvailability: Void = loadDriveAvailability()
       let commands = await repository.botCommands()
       _ = await (
-        pinned, roomState, reactions, saved, threadPref, gifs, stickers, emotes, scheduling
+        pinned, roomState, reactions, saved, threadPref, gifs, stickers, emotes, scheduling,
+        driveAvailability
       )
       botCommands = commands
     }

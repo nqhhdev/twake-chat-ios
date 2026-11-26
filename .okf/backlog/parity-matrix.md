@@ -94,7 +94,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Upload progress, size limit from `/media/v3/config` | `send_file_dialog` | Phase 2 | Built: `MatrixData/Proxies/MediaProxy.swift` | Matrix | — |
 | Media, Files, Links tabs in chat info | `chat_details_page_view` | — | Built: `Room/RoomDetailsScreen.swift` | Matrix | — |
 | Alternative text on sent pictures | — | A11Y-04 | Built: sent as the picture's caption ([ADR 0035](../../docs/adr/0035-timeline-extras-formats.md)) | Matrix | #179 |
-| Twake Drive picker | `drive_picker` | D36, D200 | Not built; to follow Flutter's picker behind `enable_twake_drive` ([ADR 0042](../../docs/adr/0042-scribe-assistant-off-drive-on-flutter-contract.md)); "+" › Files meanwhile | Twake (Drive) | #175 |
+| Twake Drive picker | `drive_picker` | D36, D200 | Built: "+" › Add from Drive behind `enable_twake_drive` and an OIDC issuer ([ADR 0042](../../docs/adr/0042-scribe-assistant-off-drive-on-flutter-contract.md)); `Room/DrivePicking.swift`, `Room/RoomViewModel+Drive.swift`, `Domain/Models/DrivePickPlan.swift`, `MatrixData/Proxies/TwakeDriveProxy.swift` | Twake (Drive) | #175 |
 | Location: shown | — | — | Built: `Domain/Models/GeoPoint.swift`, `MessageBody.swift` | Matrix | — |
 
 ## People and rooms

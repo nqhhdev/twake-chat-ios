@@ -246,6 +246,7 @@ struct WorkplaceAPITests {
     let config = try #require(attributes["data"] as? [String: Any])
     #expect((config["sharingLink"] as? [String: Any])?["label"] as? String == "Add link")
     #expect((config["downloadLink"] as? [String: Any])?["maxFileSize"] as? Int == 1000)
+    #expect((config["downloadLink"] as? [String: Any])?["allowFolder"] as? Bool == false)
     #expect((config["theme"] as? [String: Any])?["type"] as? String == "light")
     let acknowledgement = try #require(
       try JSONSerialization.jsonObject(with: Data(picker.acknowledgement.utf8)) as? [String: Any])
@@ -261,6 +262,16 @@ struct WorkplaceAPITests {
       try await api.createIntent(accessToken: "old", options: DriveFixtures.options)
     }
     await #expect(throws: WorkplaceAPI.Failure.drive(.exchangeRejected)) {
+      try await api.exchangeToken(idToken: "id")
+    }
+  }
+
+  @Test func aDriveWithoutTheChatAppIsToldApart() async {
+    let routes = RoutedTransport([
+      "/auth/token_exchange": [(400, #"{"error":"Application twake-chat not installed"}"#)]
+    ])
+    let api = WorkplaceAPI(platform: platform, transport: routes.transport)
+    await #expect(throws: WorkplaceAPI.Failure.drive(.chatAppMissing)) {
       try await api.exchangeToken(idToken: "id")
     }
   }
