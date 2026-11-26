@@ -51,6 +51,7 @@ struct TwakeChatApp: App {
       defaultHomeserver: E2EHarness.homeserver ?? url("DefaultHomeserver"),
       privacyURL: url("PrivacyURL") ?? URL(string: "https://twake.app/policy")!)
     let roomList = RoomListProxy(authentication: repository)
+    let messageIndex = MessageIndex(authentication: repository)
     let capabilities = ServerCapabilitiesProxy(
       authentication: repository, build: BuildServices.from(.main))
     let devices = DevicesProxy(authentication: repository)
@@ -64,13 +65,16 @@ struct TwakeChatApp: App {
         spaces: SpacesProxy(authentication: repository),
         folders: FoldersProxy(authentication: repository),
         linkPreviews: LinkPreviewProxy(authentication: repository),
-        makeTimeline: { TimelineProxy(roomId: $0, authentication: repository, only: $1) },
+        makeTimeline: {
+          TimelineProxy(roomId: $0, authentication: repository, only: $1, index: messageIndex)
+        },
         makeThreadTimeline: {
-          TimelineProxy(roomId: $0, authentication: repository, threadRoot: $1)
+          TimelineProxy(
+            roomId: $0, authentication: repository, threadRoot: $1, index: messageIndex)
         },
         media: MediaProxy(authentication: repository),
         roomDetails: RoomDetailsProxy(authentication: repository),
-        roomSearch: RoomSearchProxy(authentication: repository),
+        roomSearch: RoomSearchProxy(authentication: repository, index: messageIndex),
         savedMessages: SavedMessagesProxy(authentication: repository),
         threadPrefs: ThreadPrefsProxy(authentication: repository),
         activityReactions: ActivityReactionsProxy(authentication: repository),
