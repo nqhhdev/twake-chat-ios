@@ -9,11 +9,14 @@ public actor PeopleProxy: PeopleRepository {
 
   private let clientProxy: @Sendable () async -> ClientProxy?
   private let lookup = TwakeContactLookup()
-  /// The ToM server found for this account, looked up once.
-  private var tom: (baseURL: URL, serverName: String)??
+  private let capabilities: any ServerCapabilitiesRepository
 
-  public init(authentication: MatrixAuthenticationRepository) {
+  public init(
+    authentication: MatrixAuthenticationRepository,
+    capabilities: any ServerCapabilitiesRepository
+  ) {
     clientProxy = { await authentication.clientProxy }
+    self.capabilities = capabilities
   }
 
   public func search(_ text: String) async throws(PeopleError) -> [Person] {
@@ -23,7 +26,8 @@ public actor PeopleProxy: PeopleRepository {
     let ownUserId = try? client.userId
     var people: [Person] = []
     // Twake's address book first, as the Flutter app searches it; the Matrix user directory adds whoever it misses.
-    if let tom = await tomServer(ownUserId), let token = try? client.client.session().accessToken,
+    if let tom = await capabilities.current().tom,
+      let token = try? client.client.session().accessToken,
       let matches = try? await lookup.search(
         term, limit: Int(Self.searchLimit), tom: tom.baseURL, serverName: tom.serverName,
         accessToken: token)
@@ -43,14 +47,6 @@ public actor PeopleProxy: PeopleRepository {
       people.insert(Person(id: term, displayName: nil), at: 0)
     }
     return people
-  }
-
-  private func tomServer(_ userId: String?) async -> (baseURL: URL, serverName: String)? {
-    if let tom { return tom }
-    guard let userId else { return nil }
-    let found = await lookup.tomServer(forUserId: userId)
-    tom = .some(found)
-    return found
   }
 
   public func directChat(with userId: String) async throws(PeopleError) -> String {

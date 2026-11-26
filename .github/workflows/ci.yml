@@ -1,15 +1,14 @@
-# CI for every pull request and every push to main (ADR 0014): format, plus the
-# architecture check (ADR 0005). Uses no secret and no signing.
-#
-# Jobs run on ubuntu-24.04, not on GitHub-hosted macOS. macOS minutes are billed
-# at 10× and the remaining quota is tight; format and the architecture scripts
-# do not need Xcode or a simulator. swift-format is invoked through scripts/lint.sh
-# (xcrun on a Mac, `swift format` after setup-swift here). The pinned .swift-format
-# file is the same; the Ubuntu toolchain may be a slightly older swift-format than
-# Xcode 26.2 (6.4.4). That is a known, accepted deviation from ADR 0014's
-# "GitHub-hosted macOS runners" clause. Builds and XCTest still run locally
-# (.okf/workflows/build.md, section CI).
-# Each module is its own job, so they run in parallel and a finding names its module.
+# CI for every pull request and every push to main.
+# format and architecture (ADR 0014, ADR 0005) run on ubuntu-24.04: they need no Xcode.
+# build and unit tests (ADR 0027) run on the GitHub-hosted macos-26 image, which is
+# free for this public repository: the TwakeChat scheme is built for an iOS 26
+# simulator, then the host package tests and the TwakeChat test plan run. Staging
+# integration tests skip without credentials (ADR 0020); E2E stays in e2e.yml.
+# No secret and no signing anywhere.
+# swift-format runs through scripts/lint.sh (xcrun on a Mac, `swift format` after
+# setup-swift here); the Ubuntu toolchain may be a slightly older swift-format than
+# Xcode's, a known, accepted deviation from ADR 0014.
+# Each format module is its own job, so they run in parallel and a finding names its module.
 name: CI
 
 on:
@@ -23,6 +22,10 @@ permissions:
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  XCODE_VERSION: "26.6"
+  SIMULATOR_DESTINATION: "platform=iOS Simulator,OS=26.5,name=iPhone 17"
 
 jobs:
   format:
@@ -48,7 +51,7 @@ jobs:
           - module: scripts
             path: scripts
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: swift-actions/setup-swift@v2
         with:
@@ -62,7 +65,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check architecture (ADR 0005)
         run: scripts/check-architecture.sh
@@ -72,3 +75,82 @@ jobs:
 
       - name: No-comments check tests (ADR 0025)
         run: scripts/tests/check_no_comments_test.sh
+
+  build:
+    name: build
+    runs-on: macos-26
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: setup
+        uses: ./.github/actions/xcode-setup
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+          cache-name: build
+
+      - name: Build TwakeChat for the iOS Simulator
+        run: |
+          xcodebuild build \
+            -project TwakeChat.xcodeproj -scheme TwakeChat \
+            -derivedDataPath build/DerivedData \
+            -clonedSourcePackagesDirPath build/SourcePackages \
+            -destination "$SIMULATOR_DESTINATION" \
+            | xcbeautify --renderer github-actions
+
+      - name: Save DerivedData
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v6
+        with:
+          path: build/DerivedData
+          key: ${{ steps.setup.outputs.derived-data-key }}
+
+  unit-tests:
+    name: unit tests
+    runs-on: macos-26
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: setup
+        uses: ./.github/actions/xcode-setup
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+          cache-name: unit-tests
+
+      - name: Host tests (Domain, AppShared)
+        run: |
+          swift test --package-path Packages/Domain
+          swift test --package-path Packages/AppShared
+
+      - name: Simulator tests (TwakeChat test plan)
+        run: |
+          xcodebuild test \
+            -project TwakeChat.xcodeproj -scheme TwakeChat -testPlan TwakeChat \
+            -derivedDataPath build/DerivedData \
+            -clonedSourcePackagesDirPath build/SourcePackages \
+            -destination "$SIMULATOR_DESTINATION" \
+            -resultBundlePath build/TestResults.xcresult \
+            | xcbeautify --renderer github-actions
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-tests-xcresult
+          path: build/TestResults.xcresult
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Save DerivedData
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v6
+        with:
+          path: build/DerivedData
+          key: ${{ steps.setup.outputs.derived-data-key }}

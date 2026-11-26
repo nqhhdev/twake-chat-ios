@@ -7,6 +7,7 @@ public enum UndecryptableReason: Sendable, Equatable {
   case sentBeforeJoining
   /// The sender did not share the key with this device.
   case withheld
+  case withheldFromUnverifiedDevice
   /// The sender's device or identity cannot be trusted.
   case untrustedSender
   /// Sent before this device existed, and the key backup does not hold its key.
@@ -21,6 +22,10 @@ public enum UndecryptableReason: Sendable, Equatable {
     case .sentBeforeJoining:
       "This message was sent before you joined this chat, so no key exists for it."
     case .withheld: "The sender did not share the key for this message with this device."
+    case .withheldFromUnverifiedDevice:
+      isDeviceVerified
+        ? "The sender did not share the key for this message with this device."
+        : "Verify this device with your recovery key to read it."
     case .untrustedSender:
       "The device of the sender cannot be trusted, so this message stays hidden."
     case .historical:

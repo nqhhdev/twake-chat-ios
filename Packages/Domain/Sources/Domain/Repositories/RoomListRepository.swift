@@ -31,6 +31,8 @@ public protocol RoomListRepository: Sendable {
 
   /// Stops the updates and sync. Does nothing when not started.
   func stop() async
+
+  func retryDecryption(roomIds: [String]) async
 }
 
 extension RoomListRepository {
@@ -38,4 +40,6 @@ extension RoomListRepository {
   public func setLowPriority(_ lowPriority: Bool, roomId: String) async throws(RoomListError) {
     throw .requestFailed
   }
+
+  public func retryDecryption(roomIds: [String]) async {}
 }

@@ -27,7 +27,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Company server: picker, discovery, SSO, password fallback | `homeserver_picker`, `connect`, `login` | Phase 1 | Built: `Authentication/HomeserverPicker/`, `Connect/`, `PasswordLogin/`, `MatrixData/Discovery/HomeserverDiscovery.swift` | Matrix | — |
 | SSO sign-out | `settings` logout | Phase 1 | Built: `SignedInViewModel.swift` (issuer `?logout=1`) | Matrix | — |
 | Multiple accounts | `multiple_accounts` | `docs/multi-account-plan.md` | Not built | Matrix | #102 |
-| Delete account | `settings.dart:283` | — | Not built | Twake (common settings) else Matrix | #170 |
+| Delete account | `settings.dart:283` | — | Built: `Settings/DeleteAccount.swift`, `DevicesProxy.deactivateAccount` (ADR 0034) | Twake (common settings) else Matrix | #170 |
 
 ## Chat list
 
@@ -48,7 +48,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Saved messages | — | Phase 11 | Built: `ChatList/SavedMessages.swift`, `Domain/Models/SavedMessages.swift` | Matrix | — |
 | Global search: chats, people, server messages | `search` | D147, D199, D228, D238 | Built: `ChatListViewModel.searchMessages`; encrypted rooms not searched | Matrix + ToM | #94 |
 | Do not disturb with a banner | — | Phase 11 | Built: `SettingsScreen.swift`, `Connectivity.swift` (`.m.rule.master`) | Matrix | — |
-| App grid of Twake apps | `app_grid` | — | Not built | Twake (build setting) | #174 |
+| App grid of Twake apps | `app_grid` | — | Built: `Settings/AppGrid.swift`, `TwakeChat/TwakeApps.json` (ADR 0034) | Twake (build setting) | #174 |
 | Broadcast lists (one message into each direct chat) | — | MSG-29, not built on the web | Not built | Matrix | none: no reference |
 
 ## Chat screen
@@ -110,7 +110,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Person card, groups in common, status message | `profile_info`, `chat_profile_info` | Phase 3, 10, 11 | Built: `Room/MemberProfile.swift` | Matrix | #111 (polling) |
 | Matrix links open in the app | `invitation_link_web` (dropped) | Phase 5 | Built: `Domain/Models/MatrixLink.swift`, `TwakeChat/LinkRouter.swift` | Matrix | — |
 | Personal QR | `personal_qr` | — | Built: `Settings/PersonalQR.swift` (the `matrix.to` link as a QR code, Share, Copy link) and `Settings/QRCodeScanner.swift` (scan into `MatrixLink`, which also reads Flutter's `links.twake.app/chat/…`); download to Photos is the share sheet's Save Image | Matrix (ADR 0030) | #105 |
-| Support chat and Help | `create_support_chat_interactor`, `settings.dart:275` | — | Not built | Twake (well-known, build setting) | #171 |
+| Support chat and Help | `create_support_chat_interactor`, `settings.dart:275` | — | Built: `Settings/HelpAndSupport.swift` (ADR 0034) | Twake (well-known, build setting) | #171 |
 
 ## Encryption and security
 
@@ -148,8 +148,8 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Blocked users | `settings_blocked_users` | Phase 2b | Built: `SettingsScreen.swift` (ignored users) | Matrix | — |
 | Data and storage, linked e-mails and phones | `settings_data_and_storage`, `settings_3pid` | D78 | Built: add and remove an e-mail (link) or a phone (SMS code) with user-interactive auth, `SettingsScreen.swift`, `AccountSettingsProxy.swift` | Matrix | #98 |
 | Contacts visibility | `settings_contacts_visibility` | D78 | Built: `TwakeContactLookup.swift` | ToM | #98 |
-| App language, translations | `settings_app_language`, `assets/l10n` | D67 | Not built: one string localised | Device; ToM for D67 | #90, #172 |
-| Analytics with consent | — | D24, D26 | Not built | ToM | #173 |
+| App language, translations | `settings_app_language`, `assets/l10n` | D67 | Common settings language applied (`TwakeChat/CommonSettingsLanguage.swift`, #172); translations not built | Device; ToM for D67 | #90 |
+| Analytics with consent | — | D24, D26, D404 | Built, off in both builds: `Domain/Models/Analytics.swift`, `MatrixData/Proxies/AnalyticsProxy.swift`, `Settings/UsageAnalytics.swift` (ADR 0034) | Twake (side service) | #173 |
 | Stories, emotes settings, style (theme, wallpaper) | `settings_stories`, `story`, `settings_style` | — | Dropped (ADR 0026): not in Twake's settings list, iOS system appearance | — | none |
 | iPad layout | `chat_adaptive_scaffold` | Phase 8 | Built: `DesignSystem/Layout/TwakeLayout.swift`, `TwakeChat/ChatShell.swift` | Device | #103 |
 | Localisation, accessibility pass, performance | `assets/l10n` | Phase 8, 9 | Partly | Device | #90, #96 |
@@ -158,6 +158,6 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 
 | Item | iOS | Issue |
 |---|---|---|
-| One read of the server's features (ADR 0026) | Each Twake feature reads the well-known itself | #192 |
+| One read of the server's features (ADR 0026) | Built: `Domain/Models/ServerCapabilities.swift`, `MatrixData/Proxies/ServerCapabilitiesProxy.swift` (ADR 0034) | #192 |
 | Share extension | Built: `TwakeChatShare/` | — |
 | First-launch cleanup over the Flutter app | Owner decision | #10, #87 |

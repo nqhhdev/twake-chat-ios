@@ -51,10 +51,12 @@ struct TwakeChatApp: App {
       defaultHomeserver: E2EHarness.homeserver ?? url("DefaultHomeserver"),
       privacyURL: url("PrivacyURL") ?? URL(string: "https://twake.app/policy")!)
     let roomList = RoomListProxy(authentication: repository)
-    // The recovery key kept on ToM (ADR 0024): Settings gives it a new key, the unlock after sign-in reads it.
-    let recoveryVault = TomRecoveryVault(authentication: repository)
+    let capabilities = ServerCapabilitiesProxy(
+      authentication: repository, build: BuildServices.from(.main))
+    let devices = DevicesProxy(authentication: repository)
+    let recoveryVault = TomRecoveryVault(authentication: repository, capabilities: capabilities)
     let accountSettings = AccountSettingsProxy(
-      authentication: repository, recoveryVault: recoveryVault)
+      authentication: repository, recoveryVault: recoveryVault, capabilities: capabilities)
     _root = State(
       initialValue: RootCoordinator(
         repository: repository, roomList: roomList, archive: roomList,
@@ -75,7 +77,7 @@ struct TwakeChatApp: App {
         roomLinks: RoomLinkProxy(authentication: repository),
         accountSettings: accountSettings,
         deviceUnlock: DeviceUnlocker(encryption: accountSettings, vault: recoveryVault),
-        people: PeopleProxy(authentication: repository),
+        people: PeopleProxy(authentication: repository, capabilities: capabilities),
         push: url("PushGatewayURL").map {
           PusherProxy(
             authentication: repository, gatewayURL: $0.absoluteString,
@@ -83,17 +85,19 @@ struct TwakeChatApp: App {
         },
         notificationActions: NotificationActionProxy(authentication: repository),
         verification: VerificationProxy(authentication: repository),
-        devices: DevicesProxy(authentication: repository), chatDisplay: ChatDisplayDefaults(),
+        devices: devices, chatDisplay: ChatDisplayDefaults(),
         appLock: AppLock(), sync: repository, sessionExpiry: repository,
-        meetCalls: MeetCallProxy(authentication: repository),
+        meetCalls: MeetCallProxy(authentication: repository, capabilities: capabilities),
         roomCalls: ElementCallProxy(
           authentication: repository, fallbackURL: url("ElementCallURL"),
           clientId: Bundle.main.bundleIdentifier ?? "app.twake.ios.chat"),
         identity: IdentityServerProxy(authentication: repository),
         addressBook: SystemAddressBook(),
-        twakeContacts: TomContactsProxy(authentication: repository),
+        twakeContacts: TomContactsProxy(authentication: repository, capabilities: capabilities),
         gifs: url("TwakeProxyURL").map { GifProxy(baseURL: $0, authentication: repository) },
-        signInConfiguration: configuration, webAuthenticator: SystemWebAuthenticator()))
+        signInConfiguration: configuration, webAuthenticator: SystemWebAuthenticator(),
+        capabilities: capabilities, accountDeletion: devices,
+        analytics: AnalyticsProxy(authentication: repository)))
     AppDelegate.push = root.push
   }
 

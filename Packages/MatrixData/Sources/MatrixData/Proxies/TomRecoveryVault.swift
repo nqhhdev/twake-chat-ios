@@ -1,23 +1,27 @@
 import Domain
 import Foundation
 
-/// `RecoveryVault` on the ToM server of the signed-in account (ADR 0024). ToM is found through `t.server` in the
-/// homeserver's `.well-known` (`TwakeContactLookup`), once per session. Nothing here logs: the body is the recovery key.
 public actor TomRecoveryVault: RecoveryVault {
   private let clientProxy: @Sendable () async -> ClientProxy?
-  private let lookup: TwakeContactLookup
+  private let capabilities: any ServerCapabilitiesRepository
   private let session: URLSession
-  /// The ToM server found for a user, so polling does not read `.well-known` each time.
-  private var tom: (userId: String, baseURL: URL)?
 
-  public init(authentication: MatrixAuthenticationRepository) {
-    self.init(clientProxy: { await authentication.clientProxy }, session: .shared)
+  public init(
+    authentication: MatrixAuthenticationRepository,
+    capabilities: any ServerCapabilitiesRepository
+  ) {
+    self.init(
+      clientProxy: { await authentication.clientProxy }, capabilities: capabilities,
+      session: .shared)
   }
 
-  init(clientProxy: @escaping @Sendable () async -> ClientProxy?, session: URLSession) {
+  init(
+    clientProxy: @escaping @Sendable () async -> ClientProxy?,
+    capabilities: any ServerCapabilitiesRepository, session: URLSession
+  ) {
     self.clientProxy = clientProxy
+    self.capabilities = capabilities
     self.session = session
-    lookup = TwakeContactLookup(session: session)
   }
 
   public func fetchRecoveryKey() async throws(RecoveryVaultError) -> String? {
@@ -35,14 +39,10 @@ public actor TomRecoveryVault: RecoveryVault {
   }
 
   private func words() async -> TomRecoveryWords? {
-    guard let client = await clientProxy(), let userId = try? client.userId,
-      let token = try? client.client.session().accessToken
+    guard let client = await clientProxy(), (try? client.userId) != nil,
+      let token = try? client.client.session().accessToken,
+      let tom = await capabilities.current().tom
     else { return nil }
-    if tom?.userId != userId {
-      guard let found = await lookup.tomServer(forUserId: userId) else { return nil }
-      tom = (userId, found.baseURL)
-    }
-    guard let tom = self.tom else { return nil }
     return TomRecoveryWords(tom: tom.baseURL, accessToken: token, session: session)
   }
 }

@@ -16,41 +16,6 @@ struct TwakeContactLookup: Sendable {
     self.session = session
   }
 
-  /// The ToM server of the user's server name (the part of the Matrix id after the colon), or `nil`.
-  func tomServer(forUserId userId: String) async -> (baseURL: URL, serverName: String)? {
-    await twakeServer(forUserId: userId).map { ($0.baseURL, $0.serverName) }
-  }
-
-  func twakeServer(forUserId userId: String) async -> TwakeServer? {
-    guard let serverName = userId.split(separator: ":", maxSplits: 1).last.map(String.init),
-      let url = URL(string: "https://\(serverName)/.well-known/matrix/client"),
-      case (let data, let response)? = try? await session.data(from: url),
-      (response as? HTTPURLResponse)?.statusCode == 200
-    else { return nil }
-    return Self.twakeServer(fromWellKnown: data, serverName: serverName)
-  }
-
-  static func twakeServer(fromWellKnown data: Data, serverName: String) -> TwakeServer? {
-    guard let wellKnown = try? JSONDecoder().decode(WellKnown.self, from: data),
-      let tom = wellKnown.tServer, let base = URL(string: tom.baseURL)
-    else { return nil }
-    return TwakeServer(
-      baseURL: base, serverName: tom.serverName ?? serverName,
-      invitationsEnabled: Self.invitationsEnabled(inWellKnown: data))
-  }
-
-  static func invitationsEnabled(inWellKnown data: Data) -> Bool {
-    let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-    let twakeChat = object?["app.twake.chat"] as? [String: Any]
-    return twakeChat?["enable_invitations"] as? Bool ?? false
-  }
-
-  struct TwakeServer: Sendable, Equatable {
-    let baseURL: URL
-    let serverName: String
-    let invitationsEnabled: Bool
-  }
-
   func search(_ text: String, limit: Int, tom: URL, serverName: String, accessToken: String)
     async throws -> [Match]
   {
@@ -102,21 +67,20 @@ struct TwakeContactLookup: Sendable {
     return (response as? HTTPURLResponse)?.statusCode == 200
   }
 
-  static func visibilityURL(_ userId: String, tom: URL) -> URL {
-    tom.appending(path: "_twake/v1/user_info").appending(path: userId).appending(path: "visibility")
+  func language(of userId: String, tom: URL, accessToken: String) async -> String? {
+    var request = URLRequest(
+      url: tom.appending(path: "_twake/v1/user_info").appending(path: userId))
+    request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    guard case (let data, let response)? = try? await session.data(for: request),
+      (response as? HTTPURLResponse)?.statusCode == 200,
+      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+      let language = object["language"] as? String, !language.isEmpty
+    else { return nil }
+    return language
   }
 
-  private struct WellKnown: Decodable {
-    struct TServer: Decodable {
-      let baseURL: String
-      let serverName: String?
-      enum CodingKeys: String, CodingKey {
-        case baseURL = "base_url"
-        case serverName = "server_name"
-      }
-    }
-    let tServer: TServer?
-    enum CodingKeys: String, CodingKey { case tServer = "t.server" }
+  static func visibilityURL(_ userId: String, tom: URL) -> URL {
+    tom.appending(path: "_twake/v1/user_info").appending(path: userId).appending(path: "visibility")
   }
 
   private struct LookupRequest: Encodable {

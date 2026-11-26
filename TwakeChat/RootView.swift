@@ -60,6 +60,9 @@ final class RootCoordinator {
   @ObservationIgnored private let accountSettings: (any AccountSettingsRepository)?
   @ObservationIgnored private let people: (any PeopleRepository)?
   @ObservationIgnored private let identity: (any IdentityRepository)?
+  @ObservationIgnored let capabilities: (any ServerCapabilitiesRepository)?
+  @ObservationIgnored private let accountDeletion: (any AccountDeletionRepository)?
+  @ObservationIgnored private let analyticsRepository: (any AnalyticsRepository)?
   @ObservationIgnored private let addressBook: (any AddressBook)?
   @ObservationIgnored private let twakeContactsRepository: (any TwakeContactsRepository)?
   /// Meet calls of the account (#92).
@@ -126,8 +129,14 @@ final class RootCoordinator {
     identity: (any IdentityRepository)? = nil, addressBook: (any AddressBook)? = nil,
     twakeContacts: (any TwakeContactsRepository)? = nil,
     gifs: (any GifRepository)? = nil,
-    signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator
+    signInConfiguration: SignInConfiguration, webAuthenticator: any WebAuthenticator,
+    capabilities: (any ServerCapabilitiesRepository)? = nil,
+    accountDeletion: (any AccountDeletionRepository)? = nil,
+    analytics: (any AnalyticsRepository)? = nil
   ) {
+    self.analyticsRepository = analytics
+    self.capabilities = capabilities
+    self.accountDeletion = accountDeletion
     self.identity = identity
     self.addressBook = addressBook
     self.twakeContactsRepository = twakeContacts
@@ -302,7 +311,12 @@ final class RootCoordinator {
     unlockedSignIn = signedIn
     isUnlockingDevice = true
     defer { isUnlockingDevice = false }
-    if case .setUpNotSaved(let key) = await deviceUnlock.run() { unsavedRecoveryKey = key }
+    switch await deviceUnlock.run() {
+    case .setUpNotSaved(let key): unsavedRecoveryKey = key
+    case .verifiedFromVault:
+      NotificationCenter.default.post(name: .encryptionKeysImported, object: nil)
+    case .alreadyVerified, .setUp, .needsKey: break
+    }
   }
 
   /// Rejoins a left chat from its read-only screen (the archive belongs to the room list proxy).
@@ -385,6 +399,22 @@ final class RootCoordinator {
       return signedIn.errorMessage == nil
     }
     viewModel.personalQR.openLink = { [weak self] url in _ = self?.links.handle(url) }
+    if let capabilities {
+      viewModel.appGrid = AppGridViewModel(capabilities: capabilities)
+      viewModel.help = HelpViewModel(capabilities: capabilities, openDirectChat: openDirectChat())
+    }
+    if let capabilities, let analyticsRepository {
+      viewModel.usageAnalytics = UsageAnalyticsViewModel(
+        analytics: Analytics(
+          capabilities: capabilities, repository: analyticsRepository,
+          appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
+            as? String ?? "0"))
+    }
+    if let capabilities, let accountDeletion {
+      viewModel.deleteAccount = DeleteAccountViewModel(
+        userId: signedIn.userId, capabilities: capabilities, repository: accountDeletion,
+        signOut: { [weak self] in await self?.accountDeleted() })
+    }
     settings = (signedIn, viewModel)
     return viewModel
   }
@@ -447,6 +477,23 @@ final class RootCoordinator {
         await self?.sessionExpired()
       }
     }
+  }
+
+  func applyCommonSettingsLanguage() async {
+    guard let accountSettings else { return }
+    let language = await accountSettings.commonSettingsLanguage()
+    if language == nil, await capabilities?.current().tom != nil { return }
+    CommonSettingsLanguage().apply(language)
+  }
+
+  func accountDeleted() async {
+    guard case .restored = state, case .signedIn? = authentication?.screen else { return }
+    await push.stop()
+    shareSuggestions.forgetAll()
+    try? await repository.logout()
+    chatList = nil
+    state = .restored(nil)
+    authentication = makeAuthentication(session: nil)
   }
 
   /// The server no longer knows this device: the saved session and its store are useless. They are removed (the
@@ -532,6 +579,12 @@ struct RootView: View {
           // Signed in: ask for notifications and register this device.
           .task { await coordinator.push.start() }
           .task { await coordinator.unlockDevice(for: signedIn) }
+          .task { await coordinator.capabilities?.refresh() }
+          .task { await coordinator.applyCommonSettingsLanguage() }
+          .usageAnalyticsPrompt(
+            coordinator.settings(for: signedIn).usageAnalytics,
+            isBlocked: coordinator.unsavedRecoveryKey != nil
+          )
           .sheet(
             isPresented: Binding(
               get: { coordinator.unsavedRecoveryKey != nil },

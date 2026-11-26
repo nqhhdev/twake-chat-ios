@@ -145,6 +145,18 @@ public struct SettingsScreen: View {
           Text(message).foregroundStyle(SysColors.error)
         }
       }
+      if let appGrid = viewModel.appGrid {
+        AppGridRow(viewModel: appGrid)
+      }
+      if let help = viewModel.help {
+        HelpSection(viewModel: help)
+      }
+      if let usageAnalytics = viewModel.usageAnalytics {
+        UsageAnalyticsSection(viewModel: usageAnalytics)
+      }
+      if let deleteAccount = viewModel.deleteAccount {
+        DeleteAccountSection(viewModel: deleteAccount)
+      }
     }
     .listStyle(.insetGrouped)
     .navigationTitle("Settings")
@@ -154,6 +166,9 @@ public struct SettingsScreen: View {
     }
     .animation(.default, value: viewModel.displayName)
     .task { await viewModel.load() }
+    .task { await viewModel.help?.load() }
+    .task { await viewModel.usageAnalytics?.load() }
+    .task { await viewModel.appGrid?.load() }
     .onChange(of: scenePhase) { _, phase in
       if phase == .active { Task { await viewModel.refreshDisplayName() } }
     }
