@@ -39,6 +39,15 @@ status: draft
 10. Gives a message the category `message` (the Flutter value), which offers Reply and Mark as read; so does the
     generic text, since neither action needs the message. An invite gets no category.
 
+## Several accounts
+With several accounts ([ADR 0039](../../../docs/adr/0039-multiple-accounts.md)) the extension reads
+`pusher_notification_client_identifier`, finds the account whose user id hashes to it in `TwakeChat/accounts.json`,
+and opens that account's slot (store directory and Keychain item). Before the app has listed any account it opens the
+legacy slot; a push without the identifier goes to the account on screen; one for an account not listed shows nothing.
+The badge is the sum of each account's last `unread_count` (`AccountBadges`, the App Group's `UserDefaults`). With more
+than one account the account's user id follows the subtitle, and every notification carries `user_id`, so a tap,
+Reply or Mark as read switches to that account first.
+
 ## Reply and Mark as read
 The actions are handled by the [App](app.md), never by the extension: iOS starts the app in the background for an
 action without the `.foreground` option. `AppDelegate` turns the response into a `NotificationAction` and

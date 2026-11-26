@@ -17,7 +17,8 @@ struct TwakeChatApp: App {
       preconditionFailure("The app's entitlements give it no App Group or Keychain access group.")
     }
     let composition = AppComposition(
-      registry: registry, accessGroup: accessGroup, appLock: AppLock())
+      registry: registry, accessGroup: accessGroup, appLock: AppLock(),
+      badges: AccountBadges.inAppGroup())
     #if DEBUG
       E2EHarness.resetIfAsked(
         storeDirectory: registry.storeDirectory(for: .legacy),
@@ -27,7 +28,7 @@ struct TwakeChatApp: App {
       initialValue: AccountsCoordinator(
         registry: registry,
         legacyUserId: try? composition.sessionStore(.legacy).load()?.userId,
-        makeRoot: composition.root(for:onSessionChange:)))
+        badges: composition.badges, makeRoot: composition.root(for:onSessionChange:)))
   }
 
   var body: some Scene {
@@ -39,7 +40,7 @@ struct TwakeChatApp: App {
         }
         .onOpenURL { url in
           if url == SharedInbox.openURL {
-            accounts.root.shares.load()
+            accounts.openShare()
           } else {
             accounts.root.links.handle(url)
           }

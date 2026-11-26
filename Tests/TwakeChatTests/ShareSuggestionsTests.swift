@@ -103,4 +103,14 @@ struct ShareSuggestionsTests {
     await suggestions.suggest(roomId: "!a:x", name: "Team", avatar: avatar, media: media)
     #expect(await media.thumbnails == 2)
   }
+
+  @Test func theIntentNamesItsAccountAsTheUser() throws {
+    let intent = ShareSuggestions.intent(
+      roomId: "!a:x", name: "Team", image: nil, accountUserId: "@me:x")
+    let sender = try #require(intent.sender)
+    #expect(sender.isMe)
+    #expect(sender.customIdentifier == "@me:x")
+    #expect(intent.conversationIdentifier == "!a:x")
+    #expect(intent.serviceName == nil)
+  }
 }

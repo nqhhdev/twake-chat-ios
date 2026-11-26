@@ -6,10 +6,11 @@ import MatrixData
 import People
 import UIKit
 
-struct AppComposition {
+struct AppComposition: Sendable {
   let registry: AccountRegistry
   let accessGroup: String
   let appLock: AppLock
+  let badges: AccountBadges?
 
   func sessionStore(_ slot: AccountSlot) -> KeychainSessionStore {
     KeychainSessionStore(
@@ -40,7 +41,7 @@ struct AppComposition {
     let recoveryVault = TomRecoveryVault(authentication: repository, capabilities: capabilities)
     let accountSettings = AccountSettingsProxy(
       authentication: repository, recoveryVault: recoveryVault, capabilities: capabilities)
-    return RootCoordinator(
+    let root = RootCoordinator(
       repository: repository, roomList: roomList, archive: roomList,
       publicRooms: PublicRoomsProxy(authentication: repository),
       spaces: SpacesProxy(authentication: repository),
@@ -83,5 +84,11 @@ struct AppComposition {
       signInConfiguration: configuration, webAuthenticator: SystemWebAuthenticator(),
       capabilities: capabilities, accountDeletion: devices,
       analytics: AnalyticsProxy(authentication: repository))
+    root.lifecycle.badgeTotal = { [registry, badges] count in
+      guard let badges else { return count }
+      badges.record(count, for: slot)
+      return badges.total(for: registry.load() ?? AccountList(), including: slot)
+    }
+    return root
   }
 }
