@@ -39,6 +39,17 @@ status: draft
 10. Gives a message the category `message` (the Flutter value), which offers Reply and Mark as read; so does the
     generic text, since neither action needs the message. An invite gets no category.
 
+## The store lock
+The app and this extension open the same store with the SDK's cross-process lock, under the holder names `app` and
+`nse` ([ADR 0007](../../../docs/adr/0007-shared-session-store-app-group.md)); the share extension never opens the SDK
+(it copies the shared items into the App Group and opens the app, which sends them), so it takes no lock. Where the
+app meets the lock held by the other process (a room timeline on a cold start, #84), MatrixData's `StoreLock` tries
+again every 250 ms for at most 20 s, then reports the lock error; any other error is reported at once, and a
+cancelled wait stops. The extension does not wait on the lock itself: the SDK's notification client takes it, and a
+failed read is retried after 1 s and 2 s (`NotificationContentProxy.retryPauses`) before the generic text stays.
+`StoreLockSharingTests` opens one store with both holder names at the same time; a run with a real push while the app
+syncs is a device check (#88).
+
 ## Several accounts
 With several accounts ([ADR 0039](../../../docs/adr/0039-multiple-accounts.md)) the extension reads
 `pusher_notification_client_identifier`, finds the account whose user id hashes to it in `TwakeChat/accounts.json`,

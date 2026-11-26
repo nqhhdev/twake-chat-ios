@@ -120,21 +120,10 @@ public actor TimelineProxy: TimelineRepository {
     return items
   }
 
-  static let storeLockRetryPause: Duration = .milliseconds(250)
-
-  static func isStoreLockTimeout(_ error: ClientError) -> Bool {
-    guard case .Generic(_, let details?) = error else { return false }
-    return details.contains("Unobtained(TimedOut)")
-  }
-
   static func timeline(in room: Room, configuration: TimelineConfiguration) async throws -> Timeline
   {
-    while true {
-      do {
-        return try await room.timelineWithConfiguration(configuration: configuration)
-      } catch let error as ClientError where isStoreLockTimeout(error) {
-        try await Task.sleep(for: storeLockRetryPause)
-      }
+    try await StoreLock.retrying {
+      try await room.timelineWithConfiguration(configuration: configuration)
     }
   }
 
