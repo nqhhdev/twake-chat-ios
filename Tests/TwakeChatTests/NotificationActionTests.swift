@@ -178,4 +178,19 @@ struct NotificationActionTests {
     #expect(PushPayload.threadId(in: content.userInfo) == "$t")
     #expect(content.categoryIdentifier.isEmpty)
   }
+
+  @Test func theAccountOfANotificationIsRead() throws {
+    var info = userInfo
+    info["user_id"] = "@me:a"
+    let action = try #require(
+      NotificationAction(
+        actionIdentifier: UNNotificationDefaultActionIdentifier, userText: nil, userInfo: info,
+        title: ""))
+    #expect(action.userId == "@me:a")
+    let without = try #require(
+      NotificationAction(
+        actionIdentifier: UNNotificationDefaultActionIdentifier, userText: nil,
+        userInfo: userInfo, title: ""))
+    #expect(without.userId == nil)
+  }
 }

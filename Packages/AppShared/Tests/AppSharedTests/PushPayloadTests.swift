@@ -40,4 +40,14 @@ struct PushPayloadTests {
     #expect(PushPayload.eventId(in: userInfo) == nil)
     #expect(PushPayload.threadId(in: userInfo) == nil)
   }
+
+  @Test func theAccountOfAPushIsRead() {
+    let userInfo: [AnyHashable: Any] = [
+      "user_id": "@me:a", "pusher_notification_client_identifier": "abc",
+    ]
+    #expect(PushPayload.userId(in: userInfo) == "@me:a")
+    #expect(PushPayload.clientIdentifier(in: userInfo) == "abc")
+    #expect(PushPayload.userId(in: [:]) == nil)
+    #expect(PushPayload.clientIdentifier(in: ["pusher_notification_client_identifier": ""]) == nil)
+  }
 }

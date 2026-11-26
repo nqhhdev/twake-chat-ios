@@ -11,6 +11,8 @@ public enum PushPayload {
   public static let roomIdKey = "room_id"
   public static let eventIdKey = "event_id"
   public static let threadIdKey = "thread_id"
+  public static let userIdKey = "user_id"
+  public static let clientIdentifierKey = "pusher_notification_client_identifier"
   public static let messageCategory = "message"
   public static let replyAction = "inline-reply"
   public static let markAsReadAction = "mark-as-read"
@@ -25,6 +27,14 @@ public enum PushPayload {
 
   public static func threadId(in userInfo: [AnyHashable: Any]) -> String? {
     nonEmpty(userInfo[threadIdKey])
+  }
+
+  public static func userId(in userInfo: [AnyHashable: Any]) -> String? {
+    nonEmpty(userInfo[userIdKey])
+  }
+
+  public static func clientIdentifier(in userInfo: [AnyHashable: Any]) -> String? {
+    nonEmpty(userInfo[clientIdentifierKey])
   }
 
   private static func nonEmpty(_ value: Any?) -> String? {

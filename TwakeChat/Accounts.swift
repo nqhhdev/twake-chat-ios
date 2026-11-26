@@ -31,19 +31,28 @@ final class AccountsCoordinator {
   @ObservationIgnored private let registry: AccountRegistry
   @ObservationIgnored private let makeRoot: MakeRoot
   @ObservationIgnored private let relay: SessionRelay
+  @ObservationIgnored private let badges: AccountBadges?
+  @ObservationIgnored private let inbox: SharedInbox?
 
-  init(registry: AccountRegistry, legacyUserId: String?, makeRoot: @escaping MakeRoot) {
+  init(
+    registry: AccountRegistry, legacyUserId: String?, badges: AccountBadges? = nil,
+    inbox: SharedInbox? = SharedInbox.inAppGroup(), makeRoot: @escaping MakeRoot
+  ) {
     let list = registry.migrate(legacyUserId: legacyUserId)
     let slot = list.active?.slot ?? list.slotForSignIn()
     let relay = SessionRelay()
     self.registry = registry
     self.makeRoot = makeRoot
     self.relay = relay
+    self.badges = badges
+    self.inbox = inbox
     self.list = list
     rootSlot = slot
     root = makeRoot(slot, relay.forward(slot))
     relay.target = self
     AppDelegate.push = root.push
+    AppDelegate.accounts = self
+    root.shareSuggestions.accountUserId = activeUserId
   }
 
   var canAddAccount: Bool { !list.isFull && adding == nil }
@@ -55,6 +64,22 @@ final class AccountsCoordinator {
     registry.update { $0.activate(userId: userId) }
     reloadList()
     install(makeRoot(record.slot, relay.forward(record.slot)), slot: record.slot)
+  }
+
+  func handle(_ action: NotificationAction) async {
+    if let userId = action.userId, userId != activeUserId, list.account(userId: userId) != nil {
+      switchTo(userId: userId)
+    }
+    await root.push.handle(action)
+  }
+
+  func openShare() {
+    if let userId = inbox?.pending()?.accountUserId, userId != activeUserId,
+      list.account(userId: userId) != nil
+    {
+      switchTo(userId: userId)
+    }
+    root.shares.load()
   }
 
   func startAddingAccount() {
@@ -79,6 +104,7 @@ final class AccountsCoordinator {
     case .signedIn(let userId):
       let result = registry.update { $0.add(userId: userId, slot: slot) }
       reloadList()
+      if slot == rootSlot { root.shareSuggestions.accountUserId = activeUserId }
       guard slot == addingSlot, let added = adding else { return }
       adding = nil
       addingSlot = nil
@@ -92,6 +118,7 @@ final class AccountsCoordinator {
       }
     case .signedOut:
       registry.update { _ = $0.remove(slot: slot) }
+      badges?.forget(slot)
       reloadList()
       guard slot == rootSlot, let next = list.active, next.slot != slot else { return }
       install(makeRoot(next.slot, relay.forward(next.slot)), slot: next.slot)
@@ -104,9 +131,12 @@ final class AccountsCoordinator {
 
   private func install(_ newRoot: RootCoordinator, slot: AccountSlot) {
     let old = root
+    let carriesShare = old.shares.pending != nil || old.shares.suggested != nil
     root = newRoot
     rootSlot = slot
     AppDelegate.push = newRoot.push
+    newRoot.shareSuggestions.accountUserId = activeUserId
+    if carriesShare { newRoot.shares.load() }
     Task { await old.retire() }
   }
 }
