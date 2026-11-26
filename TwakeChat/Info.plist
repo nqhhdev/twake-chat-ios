@@ -20,14 +20,6 @@
 	<string>$(TWAKE_PRIVACY_URL)</string>
 	<key>TwakeProxyURL</key>
 	<string>$(TWAKE_PROXY_URL)</string>
-	<key>SupportURL</key>
-	<string>$(TWAKE_SUPPORT_URL)</string>
-	<key>AppGridFile</key>
-	<string>$(TWAKE_APP_GRID_FILE)</string>
-	<key>AnalyticsEnabled</key>
-	<string>$(TWAKE_ANALYTICS_ENABLED)</string>
-	<key>AnalyticsURL</key>
-	<string>$(TWAKE_ANALYTICS_URL)</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Twake Chat uses Face ID to unlock the app when App Lock is on.</string>
 	<key>NSCameraUsageDescription</key>

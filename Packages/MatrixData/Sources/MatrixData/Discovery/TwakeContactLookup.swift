@@ -67,18 +67,6 @@ struct TwakeContactLookup: Sendable {
     return (response as? HTTPURLResponse)?.statusCode == 200
   }
 
-  func language(of userId: String, tom: URL, accessToken: String) async -> String? {
-    var request = URLRequest(
-      url: tom.appending(path: "_twake/v1/user_info").appending(path: userId))
-    request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-    guard case (let data, let response)? = try? await session.data(for: request),
-      (response as? HTTPURLResponse)?.statusCode == 200,
-      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-      let language = object["language"] as? String, !language.isEmpty
-    else { return nil }
-    return language
-  }
-
   static func visibilityURL(_ userId: String, tom: URL) -> URL {
     tom.appending(path: "_twake/v1/user_info").appending(path: userId).appending(path: "visibility")
   }

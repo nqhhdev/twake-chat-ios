@@ -169,11 +169,6 @@ public actor AccountSettingsProxy: AccountSettingsRepository {
     return ContactsVisibility(rawValue: raw)
   }
 
-  public func commonSettingsLanguage() async -> String? {
-    guard let (lookup, tom, userId, token) = await tomAccess() else { return nil }
-    return await lookup.language(of: userId, tom: tom, accessToken: token)
-  }
-
   public func setContactsVisibility(_ visibility: ContactsVisibility) async throws(SettingsError) {
     guard let (lookup, tom, userId, token) = await tomAccess() else { throw .notSignedIn }
     guard

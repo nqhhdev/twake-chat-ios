@@ -88,8 +88,6 @@ public protocol AccountSettingsRepository: Sendable {
   /// the server has no ToM or did not answer.
   func contactsVisibility() async -> ContactsVisibility?
 
-  func commonSettingsLanguage() async -> String?
-
   /// Changes who sees the user's e-mail and phone; both follow the one choice.
   func setContactsVisibility(_ visibility: ContactsVisibility) async throws(SettingsError)
 
@@ -140,7 +138,6 @@ extension AccountSettingsRepository {
   public func cancelIdentityReset() async {}
   public func linkedAddresses() async -> [LinkedAddress] { [] }
   public func contactsVisibility() async -> ContactsVisibility? { nil }
-  public func commonSettingsLanguage() async -> String? { nil }
   public func setContactsVisibility(_ visibility: ContactsVisibility) async throws(SettingsError) {
     throw .requestFailed
   }
