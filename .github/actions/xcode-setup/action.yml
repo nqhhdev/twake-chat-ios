@@ -25,7 +25,7 @@ runs:
         xcrun simctl list runtimes ios
 
     - name: Restore Swift packages
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: build/SourcePackages
         key: spm-${{ runner.os }}-xcode${{ inputs.xcode-version }}-${{ hashFiles('**/Package.resolved', '**/Package.swift', 'TwakeChat.xcodeproj/project.pbxproj') }}
@@ -41,7 +41,7 @@ runs:
         echo "key=${prefix}${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
     - name: Restore DerivedData
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v6
       with:
         path: build/DerivedData
         key: ${{ steps.dd-key.outputs.key }}
