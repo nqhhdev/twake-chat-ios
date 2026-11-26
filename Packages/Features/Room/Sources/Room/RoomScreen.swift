@@ -63,7 +63,7 @@ public struct RoomScreen: View {
             }
         }
         if geometry.size.width > 0 {
-          timeline(bubbleWidth: TwakeLayout.bubbleWidth(in: geometry.size.width))
+          timeline(screenWidth: geometry.size.width)
         } else {
           Color.clear
         }
@@ -346,7 +346,8 @@ public struct RoomScreen: View {
 
   private var presenceTaskID: String { "\(viewModel.roomId)-\(isSceneActive)" }
 
-  @ViewBuilder private func timeline(bubbleWidth: CGFloat) -> some View {
+  @ViewBuilder private func timeline(screenWidth: CGFloat) -> some View {
+    let bubbleWidth = RoomMetrics.bubbleWidth(screenWidth: screenWidth)
     switch viewModel.state {
     case .loading:
       TimelineSkeleton(bubbleWidth: bubbleWidth)
@@ -361,7 +362,9 @@ public struct RoomScreen: View {
         Button("Retry") { Task { await viewModel.start() } }
       }
     case .loaded:
-      TimelineScroll(viewModel: viewModel, bubbleWidth: bubbleWidth)
+      TimelineScroll(
+        viewModel: viewModel, bubbleWidth: bubbleWidth,
+        columnWidth: RoomMetrics.columnWidth(screenWidth: screenWidth))
     }
   }
 }

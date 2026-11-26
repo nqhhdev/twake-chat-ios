@@ -19,11 +19,11 @@ enum E2EConfig {
 
 /// Launches the app signed out on the E2E homeserver (element-x-ios `Application.launch()` pattern).
 enum E2EApp {
-  @MainActor static func launch() -> XCUIApplication {
+  @MainActor static func launch(skipsSessionPrompt: Bool = true) -> XCUIApplication {
     let app = XCUIApplication()
     app.launchEnvironment["IS_RUNNING_E2E_TESTS"] = "1"
     app.launchEnvironment["E2E_RESET_SESSION"] = "1"
-    app.launchEnvironment["E2E_SKIP_SESSION_PROMPT"] = "1"
+    if skipsSessionPrompt { app.launchEnvironment["E2E_SKIP_SESSION_PROMPT"] = "1" }
     app.launchEnvironment["E2E_HOMESERVER"] = E2EConfig.homeserver
     app.launch()
     return app
