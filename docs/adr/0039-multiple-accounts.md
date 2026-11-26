@@ -70,18 +70,21 @@ anything keep do it until I back ». The owner accepts or changes it at review.
   hashes to it in the accounts file, and opens that account's slot under its own lock name `nse`. A push with no
   identifier uses the account on screen (a push from a pusher registered before this change); a push whose identifier
   matches no account shows nothing.
-- With more than one account, a notification names its account (the user id's local part, or the display name) after
-  the text the extension writes, and carries the user id in `userInfo["user_id"]`; a tap, Reply or Mark as read switches
-  to that account first.
+- With more than one account, a notification names its account: the account's user id follows the subtitle the
+  extension writes (`Alice · @me:server`, or the user id alone in a direct chat). Every notification carries the
+  account's user id in `userInfo["user_id"]`; a tap, Reply or Mark as read switches to that account first.
 - The badge is the sum of every account's last `unread_count`. The extension keeps each account's count in the App
   Group's `UserDefaults` (`badge.<slot>`, a number, not a secret) and sets the sum; the app writes the count of the
   account on screen when it goes to the background, and removes an account's count when it signs out.
 
 ### Share extension
 - The share extension stays session-less (it copies the items and opens the app). A share suggestion names its account
-  (the donated conversation identifier is the room id, its `INInteraction` group identifier the room id, and the
-  account's user id rides in the intent's `serviceName`); the app switches to that account before opening the room.
-  Without a suggestion and with more than one account, the chat picker lets the user pick the account first.
+  in the `INPerson` that is the user (`isMe`), as its custom identifier: the sender of the suggestion the app donates
+  when the user sends, the `isMe` recipient of the one the extension donates for a notification. The conversation
+  identifier stays the room id. `serviceName` is not used: the system may show it, and it names a service, not an
+  account. The share extension writes the account into the shared items, and the app switches to it before opening the
+  room. Without a suggestion, the chat picker carries the account menu, so the user can pick the account first; the
+  pending share follows the switch.
 
 ### Signing out of one account
 - Sign out ends that account only: its pusher, its device on the server, its store directory, its Keychain item, its

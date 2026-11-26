@@ -165,3 +165,68 @@ public struct AccountRegistry: Sendable {
     return result
   }
 }
+
+extension AccountList {
+  public func slot(forPush clientIdentifier: String?, hash: (String) -> String) -> AccountSlot? {
+    guard !accounts.isEmpty else { return .legacy }
+    guard let clientIdentifier, !clientIdentifier.isEmpty else { return active?.slot }
+    return account(clientIdentifier: clientIdentifier, hash: hash)?.slot
+  }
+
+  public func notificationLabel(for slot: AccountSlot) -> String? {
+    guard accounts.count > 1 else { return nil }
+    return account(slot: slot)?.userId
+  }
+}
+
+public struct AccountBadges: Sendable {
+  private let suiteName: String
+
+  public init?(suiteName: String) {
+    guard UserDefaults(suiteName: suiteName) != nil else { return nil }
+    self.suiteName = suiteName
+  }
+
+  public static func inAppGroup() -> AccountBadges? {
+    AccountBadges(suiteName: AppGroupContainer.defaultGroupIdentifier)
+  }
+
+  private var defaults: UserDefaults {
+    UserDefaults(suiteName: suiteName) ?? .standard
+  }
+
+  static func key(_ slot: AccountSlot) -> String { "badge.\(slot.id)" }
+
+  public func record(_ count: Int, for slot: AccountSlot) {
+    defaults.set(max(0, count), forKey: Self.key(slot))
+  }
+
+  public func count(for slot: AccountSlot) -> Int {
+    defaults.integer(forKey: Self.key(slot))
+  }
+
+  public func forget(_ slot: AccountSlot) {
+    defaults.removeObject(forKey: Self.key(slot))
+  }
+
+  public func total(for list: AccountList, including slot: AccountSlot) -> Int {
+    var slots = list.accounts.map(\.slot)
+    if !slots.contains(slot) { slots.append(slot) }
+    return slots.reduce(0) { $0 + count(for: $1) }
+  }
+}
+
+public enum AccountLabel {
+  public static func subtitle(_ subtitle: String, account: String?) -> String {
+    guard let account, !account.isEmpty else { return subtitle }
+    return subtitle.isEmpty ? account : "\(subtitle) · \(account)"
+  }
+
+  public static func accountUserId(
+    senderIsMe: Bool, senderId: String?, meRecipientId: String?
+  ) -> String? {
+    let id = senderIsMe ? senderId : meRecipientId
+    guard let id, !id.isEmpty else { return nil }
+    return id
+  }
+}
