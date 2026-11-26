@@ -85,25 +85,80 @@ public enum ThreadPrefs {
   public static func muteRuleId(threadId: String) -> String { muteRulePrefix + threadId }
 }
 
-/// A thread the user follows by choice, with what the Activity shows of it.
 public struct FollowedThread: Sendable, Equatable, Identifiable {
   public let entry: ThreadPrefEntry
   public let roomName: String
   public let rootSenderName: String?
-  /// A preview of the root message; `nil` when it could not be loaded (deleted, or not decrypted yet).
   public let rootText: String?
   public let date: Date?
+  public let latestSenderName: String?
+  public let latestText: String?
+  public let replyCount: Int
   public var id: String { entry.id }
 
   public init(
     entry: ThreadPrefEntry, roomName: String, rootSenderName: String?, rootText: String?,
-    date: Date?
+    date: Date?, latestSenderName: String? = nil, latestText: String? = nil, replyCount: Int = 0
   ) {
     self.entry = entry
     self.roomName = roomName
     self.rootSenderName = rootSenderName
     self.rootText = rootText
     self.date = date
+    self.latestSenderName = latestSenderName
+    self.latestText = latestText
+    self.replyCount = replyCount
+  }
+
+  public static func merged(followed: [FollowedThread], active: [FollowedThread])
+    -> [FollowedThread]
+  {
+    let sorted = active.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+    var seen = Set<String>()
+    return (sorted + followed).filter { seen.insert($0.id).inserted }
+  }
+}
+
+public struct ThreadActivityCandidate: Sendable, Equatable {
+  public let roomId: String
+  public let threadId: String
+  public let rootIsOwn: Bool
+  public let latestIsOwn: Bool?
+
+  public init(roomId: String, threadId: String, rootIsOwn: Bool, latestIsOwn: Bool?) {
+    self.roomId = roomId
+    self.threadId = threadId
+    self.rootIsOwn = rootIsOwn
+    self.latestIsOwn = latestIsOwn
+  }
+}
+
+extension ThreadPrefs {
+  public static let subscriptionsFeature = "org.matrix.msc4306"
+
+  public static func pref(
+    of candidate: ThreadActivityCandidate, in entries: [ThreadPrefEntry]
+  ) -> ThreadPref? {
+    entries.first { $0.roomId == candidate.roomId && $0.threadId == candidate.threadId }?.pref
+  }
+
+  public static func isActive(_ candidate: ThreadActivityCandidate, entries: [ThreadPrefEntry])
+    -> Bool
+  {
+    guard candidate.latestIsOwn == false else { return false }
+    switch pref(of: candidate, in: entries) {
+    case .follow: return true
+    case .unfollow, .mute: return false
+    case nil: return candidate.rootIsOwn
+    }
+  }
+
+  public static func usesSubscriptions(_ unstableFeatures: Set<String>) -> Bool {
+    unstableFeatures.contains(subscriptionsFeature)
+  }
+
+  public static func isSubscribed(_ pref: ThreadPref) -> Bool {
+    pref == .follow
   }
 }
 
@@ -116,4 +171,9 @@ public protocol ThreadPrefsRepository: Sendable {
     async throws(TimelineError)
   /// The threads followed by choice (`follow` or `mute`), newest choice first, with their root's preview.
   func followedThreads() async -> [FollowedThread]
+  func activeThreads(inRooms roomIds: [String]) async -> [FollowedThread]
+}
+
+extension ThreadPrefsRepository {
+  public func activeThreads(inRooms roomIds: [String]) async -> [FollowedThread] { [] }
 }
