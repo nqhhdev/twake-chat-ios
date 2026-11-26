@@ -5,6 +5,7 @@ import Testing
 
 /// The long-press layer keeps the bubble whole and the menu on screen (the owner's "bubble was cut" and "more
 /// options" on the folded Duo, 678 pt tall).
+@MainActor
 struct MessageActionsLayoutTests {
   private let height: CGFloat = 678
 

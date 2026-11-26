@@ -36,9 +36,18 @@ Run every command from the repository root.
 A failure in any step stops the script before the next one. There is no iOS 18 test run (owner decision 2026-11-12).
 
 ## In CI
-The `ci` job ([Build](build.md#ci)) runs `scripts/test.sh` once, on an iOS 26 simulator, on every pull request and
-push to `main`. It then compiles the app and the test plan against the iOS 18.0 deployment target without running the
-tests again. Snapshot and integration tests do not run in CI.
+The `unit tests` job ([Build](build.md#ci), [ADR 0027](../../docs/adr/0027-ci-builds-and-tests-every-pull-request.md))
+runs on every pull request and push to `main`, on `macos-26` with Xcode 26.6:
+1. `swift test --package-path Packages/Domain`, then `Packages/AppShared`, on the host.
+2. `xcodebuild test -project TwakeChat.xcodeproj -scheme TwakeChat -testPlan TwakeChat` on
+   `platform=iOS Simulator,OS=26.5,name=iPhone 17`, with `-derivedDataPath build/DerivedData`,
+   `-clonedSourcePackagesDirPath build/SourcePackages` and `-resultBundlePath build/TestResults.xcresult`.
+
+It does not call `scripts/test.sh`: the `architecture` job already runs the architecture checks, and the script
+takes no DerivedData path to cache. The staging integration suites (`AuthenticationIntegrationTests`,
+`RoomListIntegrationTests`, `NotificationContentIntegrationTests`) run in the plan and skip, because CI has neither
+the variables nor the env file. Snapshot tests, the iOS 18.0 deployment-target build and the E2E suite do not run in
+CI.
 
 ## Test targets
 | Target | Lives in | Runs with |

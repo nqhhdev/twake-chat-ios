@@ -1,0 +1,14 @@
+[
+  {
+    "id": "mail",
+    "name": "Twake Mail",
+    "url": "https://tmail.linagora.com/",
+    "symbol": "envelope"
+  },
+  {
+    "id": "drive",
+    "name": "Twake Drive",
+    "url": "https://tdrive.linagora.com/",
+    "symbol": "externaldrive"
+  }
+]

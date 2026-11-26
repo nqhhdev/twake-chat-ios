@@ -37,6 +37,10 @@ public final class SettingsViewModel {
   /// Where the chat display settings are kept; `nil` hides the Chat page.
   @ObservationIgnored private let chatDisplayStore: (any ChatDisplaySettingsStore)?
 
+  public var deleteAccount: DeleteAccountViewModel?
+  public var help: HelpViewModel?
+  public var usageAnalytics: UsageAnalyticsViewModel?
+  public var appGrid: AppGridViewModel?
   @ObservationIgnored private let repository: any AccountSettingsRepository
   @ObservationIgnored private let logOutAction: @MainActor () async -> Bool
 

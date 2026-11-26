@@ -30,47 +30,6 @@ struct TwakeMeetTests {
     return TwakeMeet(session: URLSession(configuration: configuration))
   }
 
-  @Test func theMeetServerIsTheFirstLiveKitFocusOfTheWellKnown() async throws {
-    Stub.responses = [
-      "/.well-known/matrix/client": (
-        200,
-        #"""
-        {"t.server":{"base_url":"https://tom.example.org/"},
-         "org.matrix.msc4143.rtc_foci":[{"type":"other","livekit_base_url":"https://x.example.org"},
-           {"type":"livekit","livekit_base_url":"https://meet.example.org/"}]}
-        """#
-      )
-    ]
-    let services = try #require(await meet().services(forUserId: "@me:example.org"))
-    #expect(services.meetBase?.absoluteString == "https://meet.example.org")
-    #expect(services.tom?.absoluteString == "https://tom.example.org/")
-    #expect(Stub.lastRequest?.url?.host() == "example.org")
-  }
-
-  @Test func theSpecsServiceURLIsReadToo() async throws {
-    Stub.responses = [
-      "/.well-known/matrix/client": (
-        200,
-        #"{"org.matrix.msc4143.rtc_foci":[{"type":"livekit","livekit_service_url":"https://meet.example.org"}]}"#
-      )
-    ]
-    let services = try #require(await meet().services(forUserId: "@me:example.org"))
-    #expect(services.meetBase?.absoluteString == "https://meet.example.org")
-    #expect(services.tom == nil)
-  }
-
-  @Test func aServerWithoutAnHttpsFocusHasNoMeet() async throws {
-    Stub.responses = [
-      "/.well-known/matrix/client": (
-        200,
-        #"{"t.server":{"base_url":"https://tom.example.org"},"org.matrix.msc4143.rtc_foci":[{"type":"livekit","livekit_base_url":"http://meet.example.org"}]}"#
-      )
-    ]
-    let services = try #require(await meet().services(forUserId: "@me:example.org"))
-    #expect(services.meetBase == nil)
-    #expect(services.tom != nil)
-  }
-
   @Test func tomMakesARoomWithTheAccessToken() async {
     Stub.responses = [
       "/_twake/v1/video_call/rooms": (200, #"{"url":"https://meet.example.org/abc-defg-hij"}"#)

@@ -3,13 +3,15 @@ import Foundation
 
 public actor TomContactsProxy: TwakeContactsRepository {
   private let clientProxy: @Sendable () async -> ClientProxy?
-  private let lookup: TwakeContactLookup
+  private let capabilities: any ServerCapabilitiesRepository
   private let transport: TomContactsAPI.Transport
-  private var server: (userId: String, found: TwakeContactLookup.TwakeServer?)?
 
-  public init(authentication: MatrixAuthenticationRepository) {
+  public init(
+    authentication: MatrixAuthenticationRepository,
+    capabilities: any ServerCapabilitiesRepository
+  ) {
     clientProxy = { await authentication.clientProxy }
-    lookup = TwakeContactLookup()
+    self.capabilities = capabilities
     transport = { request in
       guard let (data, response) = try? await URLSession.shared.data(for: request),
         let http = response as? HTTPURLResponse
@@ -19,8 +21,10 @@ public actor TomContactsProxy: TwakeContactsRepository {
   }
 
   public func features() async -> TwakeContactsFeatures {
-    guard let server = await twakeServer() else { return .none }
-    return TwakeContactsFeatures(addressBook: true, invitations: server.invitationsEnabled)
+    let current = await capabilities.current()
+    guard current.tom != nil else { return .none }
+    return TwakeContactsFeatures(
+      addressBook: true, invitations: current.twakeChat.invitationsEnabled)
   }
 
   public func addressBook() async throws(TwakeContactsError) -> [AddressBookEntry] {
@@ -69,22 +73,15 @@ public actor TomContactsProxy: TwakeContactsRepository {
   }
 
   private func invitationsAPI() async throws(TwakeContactsError) -> TomContactsAPI {
-    guard await twakeServer()?.invitationsEnabled == true else { throw .unavailable }
+    let current = await capabilities.current()
+    guard current.tom != nil, current.twakeChat.invitationsEnabled else { throw .unavailable }
     return try await api()
   }
 
   private func api() async throws(TwakeContactsError) -> TomContactsAPI {
     guard let client = await clientProxy(), let token = try? client.client.session().accessToken
     else { throw .notSignedIn }
-    guard let server = await twakeServer() else { throw .unavailable }
-    return TomContactsAPI(baseURL: server.baseURL, accessToken: token, transport: transport)
-  }
-
-  private func twakeServer() async -> TwakeContactLookup.TwakeServer? {
-    guard let client = await clientProxy(), let userId = try? client.userId else { return nil }
-    if let server, server.userId == userId { return server.found }
-    let found = await lookup.twakeServer(forUserId: userId)
-    server = (userId, found)
-    return found
+    guard let tom = await capabilities.current().tom else { throw .unavailable }
+    return TomContactsAPI(baseURL: tom.baseURL, accessToken: token, transport: transport)
   }
 }
