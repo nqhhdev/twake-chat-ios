@@ -49,6 +49,8 @@ public final class RoomDetailsViewModel {
   /// Blocks a user everywhere (Matrix ignore); `nil` hides Block on a member's profile.
   @ObservationIgnored private let blockUser: (@MainActor (String) async -> Bool)?
   public private(set) var isSaving = false
+  public private(set) var channel: ChannelSettings?
+  public private(set) var isChangingChannel = false
 
   public init(
     roomId: String, repository: any RoomDetailsRepository, onLeft: @escaping @MainActor () -> Void,
@@ -155,6 +157,7 @@ public final class RoomDetailsViewModel {
       guard case .loaded = state else { continue }
       if let details = try? await repository.details(roomId: roomId) { state = .loaded(details) }
       members = (try? await repository.members(roomId: roomId)) ?? members
+      if !isChangingChannel { await loadChannel() }
     }
   }
 
@@ -166,6 +169,7 @@ public final class RoomDetailsViewModel {
       return
     }
     members = (try? await repository.members(roomId: roomId)) ?? []
+    await loadChannel()
     if let current = try? await repository.notificationMode(roomId: roomId) {
       notificationMode = current.mode
       followsDefault = current.isDefault
@@ -235,6 +239,32 @@ public final class RoomDetailsViewModel {
     return await change("Could not change the role of \(member.name). Please try again.") {
       [repository, roomId] in
       try await repository.setRole(role, userId: member.id, roomId: roomId)
+    }
+  }
+
+  public func loadChannel() async {
+    guard case .loaded(let details) = state, !details.isDirect else {
+      channel = nil
+      return
+    }
+    channel = await repository.channelSettings(roomId: roomId)
+  }
+
+  public func setGifs(_ enabled: Bool) async {
+    guard let current = channel, current.isOwner, current.gifsEnabled != enabled,
+      !isChangingChannel
+    else { return }
+    let previous = channel
+    channel = ChannelSettings(isOwner: true, gifsEnabled: enabled)
+    isChangingChannel = true
+    defer { isChangingChannel = false }
+    errorMessage = nil
+    do {
+      try await repository.setGifs(enabled, roomId: roomId)
+      await loadChannel()
+    } catch {
+      channel = previous
+      errorMessage = "Could not change the GIFs of this chat. Please try again."
     }
   }
 
