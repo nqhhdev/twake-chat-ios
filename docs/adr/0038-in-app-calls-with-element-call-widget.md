@@ -56,8 +56,13 @@ and `twake.app` list only `livekit_base_url` (Meet), which is not a token servic
   `videoChat` mode, ended from the lock screen or Control Center). Mute and hold from the system are refused, since
   the widget owns the microphone and camera. The app declares the `audio` background mode so the call's sound
   continues when the app goes to the background.
-- **Leaving.** Hanging up in Element Call (`im.vector.hangup` or `io.element.close`), the close button, or ending
-  from CallKit closes the screen and stops the driver. Element Call leaves the call itself through a delayed event,
+- **The call outlives the room (#223).** The call is held by `Room/CallCenter.swift`, not by the room's screen, and
+  shown by `CallOverlay` above every screen of the account (`TwakeChat/Accounts.swift`). The chevron minimizes it to a
+  120 × 180 pt floating window at the bottom trailing corner, with the same web view, so the call goes on while the
+  user browses other chats; a tap on the window, or "Return to call" on the room's banner, brings it back full screen.
+  Starting a call in another room ends the first one; switching accounts ends it.
+- **Leaving.** Hanging up in Element Call (`im.vector.hangup` or `io.element.close`), the red Leave button, or ending
+  from CallKit closes the call and stops the driver. Element Call leaves the call itself through a delayed event,
   so a closed app is removed from the call by the server.
 
 ## Consequences
@@ -65,8 +70,7 @@ and `twake.app` list only `livekit_base_url` (Meet), which is not a token servic
 end to end in encrypted rooms, and without a native media stack in the app. The SDK already pinned does all the
 Matrix work. Servers without a token service see nothing new.
 **Costly.** Element Call is loaded from a web server at each call; until Twake hosts its own and announces it in
-`element.json`, that is `call.element.io`. The call lives in the room's screen: leaving the room ends it (no picture in
-picture yet). The web's Meet extras on a call (recording, captions, transcription, D30) are not offered.
+`element.json`, that is `call.element.io`. Outside the app the call goes on as sound only: there is no picture in picture yet (below). The web's Meet extras on a call (recording, captions, transcription, D30) are not offered.
 **Alternatives rejected.** A native LiveKit client (`client-sdk-swift`): a second media stack, and the MatrixRTC
 membership, key sharing and ring would be written in the app instead of by Element Call and the SDK. Shipping
 Element Call's embedded build inside the app: Element Call is AGPL-3.0, which [ADR 0016](0016-source-licence-and-reuse-rule.md)
@@ -78,7 +82,12 @@ has not settled. Keeping the Meet link only: no interoperable call with the web.
    app through `CXProvider.reportNewIncomingVoIPPushPayload`, which needs a PushKit registration, the `voip`
    background mode and a decline through `Room.declineCall`. It touches the push extension and the pusher (ADR 0009,
    ADR 0017), so it is its own change: #222.
-2. Picture in picture and keeping the call while browsing other chats: #223.
+2. **Picture in picture** outside the app (#223). Keeping the call while browsing other chats is built (above); system
+   picture in picture is not. It needs `AVPictureInPictureController` with an
+   `AVPictureInPictureVideoCallViewController` content source and the call's web view moved into it while picture in
+   picture runs, as Element X does, and, on an iPhone, the `com.apple.developer.avfoundation.multitasking-camera-access`
+   entitlement for the camera to keep running in the background. Neither can be checked on the simulator, which has no
+   camera; it is a device task.
 3. Twake hosting Element Call and announcing it in `.well-known/element/element.json`.
 4. The Meet features of D30 (recording, captions, transcription) on an unencrypted call.
 5. Trying a call between iOS and the web on `linagora.com`; the simulator has no camera.

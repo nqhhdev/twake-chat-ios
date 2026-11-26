@@ -2,6 +2,7 @@ import AppShared
 import Foundation
 import MatrixData
 import Observation
+import Room
 import SwiftUI
 
 @MainActor @Observable
@@ -132,6 +133,7 @@ final class AccountsCoordinator {
 
   private func install(_ newRoot: RootCoordinator, slot: AccountSlot) {
     let old = root
+    Task { await CallCenter.shared.end() }
     let carriesShare = old.shares.pending != nil || old.shares.suggested != nil
     root = newRoot
     rootSlot = slot
@@ -159,6 +161,7 @@ struct AccountsView: View {
   var body: some View {
     RootView(coordinator: accounts.root)
       .id(ObjectIdentifier(accounts.root))
+      .overlay { CallOverlay() }
       .environment(accounts)
       .sheet(isPresented: isAdding) {
         if let adding = accounts.adding {

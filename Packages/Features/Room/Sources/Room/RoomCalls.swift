@@ -40,11 +40,13 @@ struct ActiveCallBanner: View {
           .foregroundStyle(SysColors.textSecondary)
       }
       Spacer(minLength: 8)
-      Button(localized("Join")) { Task { await calls.open(title: title) } }
-        .buttonStyle(.borderedProminent)
-        .tint(.green)
-        .controlSize(.small)
-        .disabled(calls.isOpening || calls.activeCall != nil)
+      Button(calls.activeCall == nil ? localized("Join") : localized("Return to call")) {
+        Task { await calls.open(title: title) }
+      }
+      .buttonStyle(.borderedProminent)
+      .tint(.green)
+      .controlSize(.small)
+      .disabled(calls.isOpening)
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 8)
@@ -60,28 +62,80 @@ struct ActiveCallBanner: View {
   }
 }
 
-struct ElementCallScreen: View {
-  let calls: RoomCallViewModel
-  let call: ActiveCall
+public struct CallOverlay: View {
+  static let minimizedSize = CGSize(width: 120, height: 180)
 
-  var body: some View {
-    ElementCallWebView(call: call) { message in
-      Task { await calls.fromWidget(message) }
+  let center: CallCenter
+
+  public init(center: CallCenter = .shared) {
+    self.center = center
+  }
+
+  public var body: some View {
+    if let call = center.call {
+      let minimized = center.isMinimized
+      ElementCallWebView(call: call) { message in
+        Task { await center.fromWidget(message) }
+      }
+      .id(call.id)
+      .background(Color.black)
+      .accessibilityHidden(minimized)
+      .frame(
+        width: minimized ? Self.minimizedSize.width : nil,
+        height: minimized ? Self.minimizedSize.height : nil
+      )
+      .clipShape(RoundedRectangle(cornerRadius: minimized ? 12 : 0))
+      .overlay {
+        if minimized {
+          Color.clear
+            .contentShape(Rectangle())
+            .onTapGesture { center.restore() }
+            .accessibilityElement()
+            .accessibilityLabel(localized("Return to call"))
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { center.restore() }
+        }
+      }
+      .overlay(alignment: .top) {
+        if !minimized { controls }
+      }
+      .shadow(radius: minimized ? 8 : 0)
+      .padding(.trailing, minimized ? 16 : 0)
+      .padding(.bottom, minimized ? 96 : 0)
+      .frame(
+        maxWidth: .infinity, maxHeight: .infinity,
+        alignment: minimized ? .bottomTrailing : .center
+      )
+      .ignoresSafeArea(edges: minimized ? [] : .all)
+      .animation(.spring(response: 0.35, dampingFraction: 0.85), value: minimized)
     }
-    .ignoresSafeArea(edges: .bottom)
-    .background(Color.black)
-    .overlay(alignment: .topLeading) {
+  }
+
+  private var controls: some View {
+    HStack {
       Button {
-        Task { await calls.close() }
+        center.minimize()
       } label: {
         Image(systemName: "chevron.down")
           .font(.body.weight(.semibold))
           .foregroundStyle(.white)
           .frame(width: 44, height: 44)
       }
+      .accessibilityLabel(localized("Minimize call"))
+      Spacer()
+      Button {
+        Task { await center.end() }
+      } label: {
+        Image(systemName: "phone.down.fill")
+          .font(.body.weight(.semibold))
+          .foregroundStyle(.white)
+          .frame(width: 44, height: 44)
+          .background(Circle().fill(.red))
+      }
       .accessibilityLabel(localized("Leave call"))
-      .padding(.leading, 4)
     }
+    .padding(.horizontal, 8)
+    .safeAreaPadding(.top)
   }
 }
 
@@ -202,9 +256,6 @@ struct RoomCallPresentation: ViewModifier {
         guard calls.isAvailable else { return }
         await calls.watch()
       }
-      .fullScreenCover(item: activeCall) { call in
-        if let calls { ElementCallScreen(calls: calls, call: call) }
-      }
       .alert(
         calls?.errorMessage ?? "",
         isPresented: Binding(
@@ -214,13 +265,6 @@ struct RoomCallPresentation: ViewModifier {
       }
   }
 
-  private var activeCall: Binding<ActiveCall?> {
-    Binding(
-      get: { calls?.activeCall },
-      set: { call in
-        if call == nil, let calls { Task { await calls.close() } }
-      })
-  }
 }
 
 extension View {
