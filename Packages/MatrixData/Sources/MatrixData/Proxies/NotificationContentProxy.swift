@@ -79,7 +79,7 @@ public actor NotificationContentProxy: NotificationContentRepository {
       return .show(
         Self.content(
           senderId: senderId, sender: sender ?? senderId, room: item.roomInfo.displayName,
-          isDirect: item.roomInfo.isDirect, body: "Invited you to chat"))
+          isDirect: item.roomInfo.isDirect, body: localized("Invited you to chat")))
     case .timeline(let event):
       let senderId = event.senderId()
       if Self.isOwn(senderId: senderId, ownUserId: ownUserId) { return .hide }
@@ -150,7 +150,7 @@ public actor NotificationContentProxy: NotificationContentRepository {
     switch content {
     case .roomMessage(let type, _): body(of: type)
     case .poll(let question): "📊 \(question)"
-    case .sticker: "Sent a sticker"
+    case .sticker: localized("Sent a sticker")
     default: nil
     }
   }
@@ -160,12 +160,12 @@ public actor NotificationContentProxy: NotificationContentRepository {
     case .text(let content): content.body
     case .emote(let content): "* \(content.body)"
     case .notice(let content): content.body
-    case .image: "📷 Photo"
-    case .video: "🎥 Video"
-    case .audio: "🎤 Audio"
+    case .image: localized("📷 Photo")
+    case .video: localized("🎥 Video")
+    case .audio: localized("🎤 Audio")
     case .file(let content): "📎 \(content.filename)"
-    case .gallery: "🖼️ Photos"
-    case .location: "📍 Location"
+    case .gallery: localized("🖼️ Photos")
+    case .location: localized("📍 Location")
     case .other(_, let body): body
     }
   }
