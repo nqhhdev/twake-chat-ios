@@ -25,7 +25,7 @@ public struct ConnectScreen: View {
               .font(.system(size: 20, weight: .medium))
               .frame(width: 48, height: 48)
           }
-          .accessibilityLabel("Back")
+          .accessibilityLabel(localized("Back"))
           Spacer()
         }
       }
