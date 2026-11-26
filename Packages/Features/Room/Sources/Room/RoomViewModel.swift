@@ -70,6 +70,8 @@ public final class RoomViewModel {
   var presenceDots: [String: Presence.Dot] = [:]
   public internal(set) var emotes: [Emote] = []
   public internal(set) var translations: [String: MessageTranslation] = [:]
+  public internal(set) var transcriptions: [String: MessageTranscription] = [:]
+  @ObservationIgnored var transcriber: any VoiceTranscribing = SpeechTranscriber()
   var emoteImages: [String: UIImage] = [:]
   @ObservationIgnored var emoteLoads: Set<String> = []
   @ObservationIgnored var presenceFetchedAt: [String: ContinuousClock.Instant] = [:]
