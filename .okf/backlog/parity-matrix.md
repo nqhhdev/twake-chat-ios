@@ -74,7 +74,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Voice messages (MSC3245), playback speed | `chat_audio_player_widget` | Phase 10 | Built: `Room/VoiceRecorder.swift`, `Players.swift`. Same event as web (`adapters/matrix/matrixAttachments.ts`) and Flutter (`pages/chat/chat.dart:914`): `m.audio` with `org.matrix.msc3245.voice` and `org.matrix.msc1767.audio` (`duration` in ms, `waveform` integers 0 to 1024); the received waveform and duration are drawn (`TimelineMessage.Voice`) | Matrix | #108 |
 | Transcribe a voice message | — | MSG-13 | Built: on-device `SFSpeechRecognizer` (`SpeechTranscriber.swift`) | Device | #182 |
 | Translate a message | — | MSG-15 | Built: Apple Translation on the device (`MessageTranslationViews.swift`) | Device (ADR 0026) | #181 |
-| Scribe in the composer | — | D53, D73, D215 | Not built; owner decision | Twake (Assistant) | #183 |
+| Scribe in the composer | — | D53, D73, D215 | Off: no server announces the assistant; Apple Writing Tools in the composer ([ADR 0042](../../docs/adr/0042-scribe-assistant-off-drive-on-flutter-contract.md)) | Twake (Assistant) | #183 |
 | Scheduled send | — | CMP-03, web #1185 | Built: MSC4140 called directly, hidden in encrypted rooms ([ADR 0035](../../docs/adr/0035-timeline-extras-formats.md)) | Matrix (MSC4140, detected) | #184 |
 | Link preview, none in encrypted rooms | `domain/preview_url` | Phase 11, D211 | Built: `MatrixData/Proxies/LinkPreviewProxy.swift` | Matrix | — |
 | Author removes a link preview | — | CMP-09 | Off: the web has no format ([ADR 0035](../../docs/adr/0035-timeline-extras-formats.md)) | Matrix | #185 |
@@ -82,7 +82,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Status on the author's avatar | — | NOT-04 | Built: `RoomViewModel+Presence.swift` (dot on the timeline avatar) | Matrix | #180 |
 | Hardware keyboard: Return sends, Up edits | `chat_input_row_web` | Phase 2b | Built: `ComposerKeys.swift` | Device | #142 |
 | Broadcast channels (`app.twake.chat.page`) | `newfeed` (`app.twake.chat.feed`) | Phase 3, D2, D90 | Built: `Domain/Models/Broadcast.swift`; web form kept (ADR 0023) | Matrix | — |
-| Twake Assistant in rooms | — | D74, D102, D128, D212 | Not built; owner decision | Twake (Assistant) | #190 |
+| Twake Assistant in rooms | — | D74, D102, D128, D212 | Off: no server announces the assistant ([ADR 0042](../../docs/adr/0042-scribe-assistant-off-drive-on-flutter-contract.md)) | Twake (Assistant) | #190 |
 | Public web page of a channel | — | D112, D178 | Off: not built until the owner asks (ADR 0026, ADR 0036) | Twake (side service) | #189 |
 
 ## Media and files
@@ -94,7 +94,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Upload progress, size limit from `/media/v3/config` | `send_file_dialog` | Phase 2 | Built: `MatrixData/Proxies/MediaProxy.swift` | Matrix | — |
 | Media, Files, Links tabs in chat info | `chat_details_page_view` | — | Built: `Room/RoomDetailsScreen.swift` | Matrix | — |
 | Alternative text on sent pictures | — | A11Y-04 | Built: sent as the picture's caption ([ADR 0035](../../docs/adr/0035-timeline-extras-formats.md)) | Matrix | #179 |
-| Twake Drive picker | `drive_picker` (unmerged) | D36, D200 | Not built; "+" › Files | Twake (Drive) | #175 |
+| Twake Drive picker | `drive_picker` | D36, D200 | Not built; to follow Flutter's picker behind `enable_twake_drive` ([ADR 0042](../../docs/adr/0042-scribe-assistant-off-drive-on-flutter-contract.md)); "+" › Files meanwhile | Twake (Drive) | #175 |
 | Location: shown | — | — | Built: `Domain/Models/GeoPoint.swift`, `MessageBody.swift` | Matrix | — |
 
 ## People and rooms
