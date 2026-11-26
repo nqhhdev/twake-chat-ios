@@ -49,7 +49,7 @@ struct TimelineSkeleton: View {
       if !reduceMotion { isDimmed = true }
     }
     .accessibilityElement(children: .ignore)
-    .accessibilityLabel("Loading messages")
+    .accessibilityLabel(localized("Loading messages"))
   }
 
   private func row(_ row: Row) -> some View {

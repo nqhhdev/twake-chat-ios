@@ -120,7 +120,7 @@ extension RoomViewModel {
     while rowId(containingEvent: eventId) == nil {
       // Not loaded yet: load older pages, as far as `maxPagesToFind`, as the Flutter app does for a reply.
       guard !reachedStart, pages < maxPages, await loadOlder() else {
-        showToast("Could not find that message")
+        showToast(localized("Could not find that message"))
         return
       }
       pages += 1
@@ -149,7 +149,7 @@ extension RoomViewModel {
       try? await Task.sleep(for: .milliseconds(120))
     }
     guard let target = firstMessage(onOrAfter: day), let eventId = target.eventId else {
-      showToast("No messages from that day")
+      showToast(localized("No messages from that day"))
       return
     }
     await jump(toEvent: eventId, maxPages: 0)

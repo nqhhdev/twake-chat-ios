@@ -32,7 +32,7 @@ struct ActiveCallBanner: View {
         .background(Circle().fill(.green))
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 2) {
-        Text("Call in progress")
+        Text(localized("Call in progress"))
           .textStyle(TextStyles.titleSmall)
           .foregroundStyle(SysColors.onSurface)
         Text(participants)
@@ -40,7 +40,7 @@ struct ActiveCallBanner: View {
           .foregroundStyle(SysColors.textSecondary)
       }
       Spacer(minLength: 8)
-      Button("Join") { Task { await calls.open(title: title) } }
+      Button(localized("Join")) { Task { await calls.open(title: title) } }
         .buttonStyle(.borderedProminent)
         .tint(.green)
         .controlSize(.small)
@@ -54,9 +54,8 @@ struct ActiveCallBanner: View {
 
   private var participants: String {
     switch calls.participantCount {
-    case 0: "Starting"
-    case 1: "1 person"
-    default: "\(calls.participantCount) people"
+    case 0: localized("Starting")
+    default: localized("\(calls.participantCount) people")
     }
   }
 }
@@ -80,7 +79,7 @@ struct ElementCallScreen: View {
           .foregroundStyle(.white)
           .frame(width: 44, height: 44)
       }
-      .accessibilityLabel("Leave call")
+      .accessibilityLabel(localized("Leave call"))
       .padding(.leading, 4)
     }
   }
@@ -211,7 +210,7 @@ struct RoomCallPresentation: ViewModifier {
         isPresented: Binding(
           get: { calls?.errorMessage != nil }, set: { if !$0 { calls?.errorMessage = nil } })
       ) {
-        Button("OK", role: .cancel) {}
+        Button(localized("OK"), role: .cancel) {}
       }
   }
 

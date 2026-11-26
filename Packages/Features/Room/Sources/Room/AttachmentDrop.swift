@@ -162,7 +162,7 @@ struct DropVeil: View {
       .strokeBorder(SysColors.primary, style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
       .background(SysColors.primary.opacity(0.08), in: .rect(cornerRadius: 16))
       .overlay {
-        Text("Drop to send")
+        Text(localized("Drop to send"))
           .textStyle(TextStyles.titleMedium)
           .foregroundStyle(SysColors.primary)
       }

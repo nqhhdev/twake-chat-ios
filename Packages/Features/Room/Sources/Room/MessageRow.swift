@@ -70,7 +70,7 @@ struct MessageRow: View {
           LongPressGesture(minimumDuration: 0.35).onEnded { _ in showActions() },
           isEnabled: !isPreview
         )
-        .accessibilityAction(named: "Message actions") { showActions() }
+        .accessibilityAction(named: localized("Message actions")) { showActions() }
       }
       .offset(x: swipe)
       .background(alignment: .trailing) { replyHint }
@@ -203,7 +203,8 @@ struct MessageRow: View {
           Task { await viewModel.jump(toEvent: target) }
         }
         .accessibilityAddTraits(replying.replyToEventId == nil ? [] : .isButton)
-        .accessibilityHint(replying.replyToEventId == nil ? "" : "Shows the original message")
+        .accessibilityHint(
+          replying.replyToEventId == nil ? "" : localized("Shows the original message"))
       }
       if let album {
         AlbumGrid(album: album, width: contentWidth, viewModel: viewModel)
@@ -216,7 +217,7 @@ struct MessageRow: View {
           .frame(width: contentWidth)
       } else if message.call == .threadRoot {
         // The time each reader sees is their own, as in the Flutter app.
-        Text("Meeting started at \(message.date.formatted(.dateTime.hour().minute()))")
+        Text(localized("Meeting started at \(message.date.formatted(.dateTime.hour().minute()))"))
           .textStyle(TextStyles.bodyMedium)
           .frame(maxWidth: .infinity, alignment: .leading)
       } else if let link = calls?.link(of: message.call) {
@@ -240,13 +241,13 @@ struct MessageRow: View {
       }
       HStack(spacing: 4) {
         // A deleted message has no text left to call edited.
-        if message.isEdited, message.body != .redacted { Text("edited") }
+        if message.isEdited, message.body != .redacted { Text(localized("edited")) }
         Text(message.date, format: .dateTime.hour().minute())
         if message.isOwn, message.sendState == .failed, !isPreview {
           Button {
             Task { await viewModel.retry(message) }
           } label: {
-            Label("Not sent, tap to retry", systemImage: "arrow.clockwise")
+            Label(localized("Not sent, tap to retry"), systemImage: "arrow.clockwise")
               .foregroundStyle(SysColors.error)
           }
           .buttonStyle(.plain)
@@ -300,7 +301,7 @@ struct MessageRow: View {
         Image(systemName: "checkmark").transition(.move(edge: .leading).combined(with: .opacity))
       }
       .foregroundStyle(SysColors.primary)
-      .accessibilityLabel("Read")
+      .accessibilityLabel(localized("Read"))
     } else {
       let symbol =
         switch message.sendState {
@@ -325,11 +326,11 @@ struct MessageRow: View {
           HStack(spacing: 3) {
             if reaction.key.hasPrefix("mxc://") {
               EmoteImage(source: reaction.key, viewModel: viewModel, side: 18)
-                .accessibilityLabel("Emote")
+                .accessibilityLabel(localized("Emote"))
             } else {
               Text(reaction.key)
             }
-            Text("\(reaction.count)")
+            Text(verbatim: "\(reaction.count)")
               .contentTransition(.numericText(value: Double(reaction.count)))
           }
           .textStyle(TextStyles.labelMedium)
@@ -345,7 +346,9 @@ struct MessageRow: View {
         }
         .buttonStyle(PressScaleButtonStyle())
         .contextMenu {
-          Button("See who reacted", systemImage: "person.2") { viewModel.showReactors(reaction) }
+          Button(localized("See who reacted"), systemImage: "person.2") {
+            viewModel.showReactors(reaction)
+          }
         }
         .transition(.scale(scale: 0.3).combined(with: .opacity))
         .sensoryFeedback(.selection, trigger: reaction.includesOwn)

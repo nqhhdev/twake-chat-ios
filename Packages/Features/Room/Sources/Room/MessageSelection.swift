@@ -40,28 +40,33 @@ struct MessageSelectionBar: View {
   var body: some View {
     let count = viewModel.selectedMessages.count
     HStack(spacing: 20) {
-      Button("Cancel") { viewModel.endSelecting() }
+      Button(localized("Cancel")) { viewModel.endSelecting() }
       Spacer()
-      Text(count == 1 ? "1 selected" : "\(count) selected")
+      Text(localized("\(count) selected"))
         .textStyle(TextStyles.labelLarge)
         .contentTransition(.numericText(value: Double(count)))
         .animation(.snappy, value: count)
       Spacer()
-      Button("Copy", systemImage: "doc.on.doc") { viewModel.copySelection() }
+      Button(localized("Copy"), systemImage: "doc.on.doc") { viewModel.copySelection() }
         .disabled(viewModel.selectionText.isEmpty)
-      Button("Forward", systemImage: "arrowshape.turn.up.right") {
+      Button(localized("Forward"), systemImage: "arrowshape.turn.up.right") {
         onForward(viewModel.orderedSelection)
       }
       .disabled(count == 0)
-      Button("Delete", systemImage: "trash", role: .destructive) { isConfirmingDelete = true }
-        .disabled(!viewModel.canDeleteSelection)
-        .confirmationDialog(
-          count == 1
-            ? "Delete this message for everyone?" : "Delete \(count) messages for everyone?",
-          isPresented: $isConfirmingDelete, titleVisibility: .visible
-        ) {
-          Button("Delete", role: .destructive) { Task { await viewModel.deleteSelection() } }
+      Button(localized("Delete"), systemImage: "trash", role: .destructive) {
+        isConfirmingDelete = true
+      }
+      .disabled(!viewModel.canDeleteSelection)
+      .confirmationDialog(
+        count == 1
+          ? localized("Delete this message for everyone?")
+          : localized("Delete \(count) messages for everyone?"),
+        isPresented: $isConfirmingDelete, titleVisibility: .visible
+      ) {
+        Button(localized("Delete"), role: .destructive) {
+          Task { await viewModel.deleteSelection() }
         }
+      }
     }
     .labelStyle(.iconOnly)
     .font(.system(size: 19))

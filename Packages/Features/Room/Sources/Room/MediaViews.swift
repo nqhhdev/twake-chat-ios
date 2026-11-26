@@ -46,10 +46,10 @@ struct MessageMediaView: View {
     case .image(let caption?) where !caption.trimmingCharacters(in: .whitespaces).isEmpty:
       caption
     case .video(let caption?) where !caption.trimmingCharacters(in: .whitespaces).isEmpty:
-      "Video: \(caption)"
-    case .video: "Video"
-    case .sticker(let text): "Sticker \(text)"
-    default: "Picture"
+      localized("Video: \(caption)")
+    case .video: localized("Video")
+    case .sticker(let text): localized("Sticker \(text)")
+    default: localized("Picture")
     }
   }
 
@@ -188,8 +188,8 @@ struct UploadProgressRing: View {
     .onAppear { spins = !reduceMotion }
     .transition(.scale.combined(with: .opacity))
     .accessibilityElement()
-    .accessibilityLabel("Uploading")
-    .accessibilityValue(progress.map { "\(Int($0 * 100)) percent" } ?? "")
+    .accessibilityLabel(localized("Uploading"))
+    .accessibilityValue(progress.map { $0.formatted(.percent.precision(.fractionLength(0))) } ?? "")
   }
 }
 
@@ -216,10 +216,10 @@ struct ShareSheetLink: View {
     VStack(spacing: 16) {
       Image(systemName: urls.count > 1 ? "doc.on.doc.fill" : "doc.fill")
         .font(.system(size: 44)).foregroundStyle(SysColors.primary)
-      Text(urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) files")
+      Text(urls.count == 1 ? urls[0].lastPathComponent : localized("\(urls.count) files"))
         .textStyle(TextStyles.titleMedium).multilineTextAlignment(.center)
       ShareLink(items: urls) {
-        Label("Share", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
+        Label(localized("Share"), systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
       }
       .buttonStyle(.twakePrimary)
     }
@@ -356,7 +356,7 @@ struct ImageViewer: View {
       .toolbarColorScheme(.dark, for: .bottomBar)
       .toolbar {
         ToolbarItem(placement: .topBarLeading) {
-          Button("Close", systemImage: "xmark") { dismiss() }
+          Button(localized("Close"), systemImage: "xmark") { dismiss() }
         }
         if let image = images[currentIndex] {
           ToolbarItem(placement: .bottomBar) {
@@ -366,10 +366,10 @@ struct ImageViewer: View {
             ) {
               Image(systemName: "square.and.arrow.up")
             }
-            .accessibilityLabel("Share")
+            .accessibilityLabel(localized("Share"))
           }
           ToolbarItem(placement: .bottomBar) {
-            Button("Save to Photos", systemImage: "square.and.arrow.down") {
+            Button(localized("Save to Photos"), systemImage: "square.and.arrow.down") {
               Task { await save(pictures[currentIndex]) }
             }
             .disabled(isSaving)
@@ -439,7 +439,8 @@ struct ZoomablePicture: View {
           }
           .transition(.opacity.combined(with: .scale(scale: 0.96)))
       } else if failed {
-        Label("Could not load the picture.", systemImage: "photo").foregroundStyle(.white)
+        Label(localized("Could not load the picture."), systemImage: "photo").foregroundStyle(
+          .white)
       } else {
         ProgressView().tint(.white)
       }
@@ -525,7 +526,7 @@ struct AlbumGrid: View {
       if entry.offset == Self.maxCells - 1, hidden > 0 {
         ZStack {
           Color.black.opacity(0.45)
-          Text("+\(hidden)").textStyle(TextStyles.headlineSmall).foregroundStyle(.white)
+          Text(verbatim: "+\(hidden)").textStyle(TextStyles.headlineSmall).foregroundStyle(.white)
         }
       }
     }
@@ -541,13 +542,13 @@ struct ViewerStart: Identifiable {
 
 struct HiddenGifNotice: View {
   var body: some View {
-    Label("GIF hidden", systemImage: "eye.slash")
+    Label(localized("GIF hidden"), systemImage: "eye.slash")
       .textStyle(TextStyles.bodyMedium)
       .foregroundStyle(SysColors.textSecondary)
       .padding(.horizontal, 12)
       .padding(.vertical, 10)
       .background(SysColors.surface, in: .rect(cornerRadius: 12))
       .accessibilityElement(children: .combine)
-      .accessibilityHint("The owner of this chat turned GIFs off.")
+      .accessibilityHint(localized("The owner of this chat turned GIFs off."))
   }
 }

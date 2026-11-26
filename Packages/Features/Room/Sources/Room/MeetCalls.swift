@@ -38,7 +38,7 @@ public final class MeetCallViewModel {
       // The user left the room meanwhile: there is no call to start.
       return nil
     } catch {
-      errorMessage = "Failed to start the call"
+      errorMessage = localized("Failed to start the call")
       return nil
     }
   }
@@ -59,7 +59,7 @@ struct MeetCallButton: View {
     if calls.isStarting {
       ProgressView()
     } else {
-      Button("Start video call", systemImage: "video") {
+      Button(localized("Start video call"), systemImage: "video") {
         Task {
           if let link = await calls.start() { openURL(link) }
         }
@@ -81,9 +81,11 @@ struct CallLinkCard: View {
         .textStyle(TextStyles.bodyMedium)
         .foregroundStyle(SysColors.onSurface)
       HStack(spacing: 8) {
-        Button("Copy link", systemImage: "doc.on.doc") { UIPasteboard.general.url = link }
-          .buttonStyle(.bordered)
-        Button("Join call", systemImage: "video") { openURL(link) }
+        Button(localized("Copy link"), systemImage: "doc.on.doc") {
+          UIPasteboard.general.url = link
+        }
+        .buttonStyle(.bordered)
+        Button(localized("Join call"), systemImage: "video") { openURL(link) }
           .buttonStyle(.borderedProminent)
       }
       .controlSize(.small)

@@ -26,7 +26,8 @@ struct PinnedBanner: View {
           VStack(alignment: .leading, spacing: 0) {
             Text(
               viewModel.pinned.count > 1
-                ? "Pinned message #\(viewModel.pinnedIndex + 1)" : "Pinned message"
+                ? localized("Pinned message #\(viewModel.pinnedIndex + 1)")
+                : localized("Pinned message")
             )
             .textStyle(TextStyles.labelMedium)
             .foregroundStyle(SysColors.primary)
@@ -51,7 +52,7 @@ struct PinnedBanner: View {
       }
       .buttonStyle(.plain)
       .transition(.move(edge: .top).combined(with: .opacity))
-      .accessibilityLabel("Pinned message")
+      .accessibilityLabel(localized("Pinned message"))
     }
   }
 }
@@ -109,11 +110,12 @@ struct ForwardSheet: View {
         if rooms.isEmpty { ContentUnavailableView.search(text: query) }
       }
       .searchable(
-        text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search"
+        text: $query, placement: .navigationBarDrawer(displayMode: .always),
+        prompt: localized("Search")
       )
-      .twakeTitle("Forward to")
+      .twakeTitle(localized("Forward to"))
       .toolbar {
-        ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+        ToolbarItem(placement: .cancellationAction) { Button(localized("Cancel")) { dismiss() } }
       }
     }
     .presentationDetents([.medium, .large])
@@ -146,7 +148,7 @@ struct PeopleListSheet: View {
       }
       .overlay {
         if sheet.userIds.isEmpty {
-          ContentUnavailableView("No one yet", systemImage: "person.2")
+          ContentUnavailableView(localized("No one yet"), systemImage: "person.2")
         }
       }
       .navigationTitle(sheet.title)
@@ -173,18 +175,18 @@ struct PinnedListSheet: View {
         } label: {
           VStack(alignment: .leading, spacing: 2) {
             Text(message.senderName).font(.subheadline.weight(.semibold))
-            Text(RoomViewModel.text(of: message.body) ?? "Attachment")
+            Text(RoomViewModel.text(of: message.body) ?? localized("Attachment"))
               .lineLimit(2)
               .foregroundStyle(SysColors.textSecondary)
           }
         }
         .swipeActions {
-          Button("Unpin", systemImage: "pin.slash") {
+          Button(localized("Unpin"), systemImage: "pin.slash") {
             Task { await viewModel.togglePin(message) }
           }
         }
       }
-      .navigationTitle("Pinned messages")
+      .navigationTitle(localized("Pinned messages"))
       .navigationBarTitleDisplayMode(.inline)
     }
     .presentationDetents([.medium, .large])
@@ -207,12 +209,12 @@ struct EditHistorySheet: View {
           ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         case .some(.none):
           ContentUnavailableView(
-            "Not available", systemImage: "lock",
-            description: Text("The edit history of an encrypted chat cannot be shown."))
+            localized("Not available"), systemImage: "lock",
+            description: Text(localized("The edit history of an encrypted chat cannot be shown.")))
         case .some(.some(let list)):
           List(Array(list.enumerated()), id: \.element.id) { index, version in
             VStack(alignment: .leading, spacing: 4) {
-              Text(index == 0 ? "Original" : "Edit \(index)")
+              Text(index == 0 ? localized("Original") : localized("Edit \(index)"))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(
                   index == list.count - 1 ? SysColors.primary : SysColors.textSecondary)
@@ -225,9 +227,9 @@ struct EditHistorySheet: View {
           }
         }
       }
-      .twakeTitle("Edit History")
+      .twakeTitle(localized("Edit History"))
       .toolbar {
-        ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+        ToolbarItem(placement: .confirmationAction) { Button(localized("Done")) { dismiss() } }
       }
     }
     .presentationDetents([.medium, .large])
@@ -247,7 +249,7 @@ struct MessageInfoSheet: View {
   var body: some View {
     NavigationStack {
       List {
-        LabeledContent("Sender") {
+        LabeledContent(localized("Sender")) {
           VStack(alignment: .trailing, spacing: 2) {
             Text(message.senderName)
             if message.senderName != message.senderId {
@@ -255,20 +257,20 @@ struct MessageInfoSheet: View {
             }
           }
         }
-        LabeledContent("Sent") {
+        LabeledContent(localized("Sent")) {
           Text(message.date, format: .dateTime.day().month(.wide).year().hour().minute().second())
         }
-        LabeledContent("Type", value: Self.kind(of: message.body))
-        if message.isEdited { LabeledContent("Edited", value: "Yes") }
+        LabeledContent(localized("Type"), value: Self.kind(of: message.body))
+        if message.isEdited { LabeledContent(localized("Edited"), value: localized("Yes")) }
         if let eventId = message.eventId {
-          Section("Event ID") {
+          Section(localized("Event ID")) {
             Text(eventId).font(.footnote.monospaced()).textSelection(.enabled)
           }
         }
       }
-      .twakeTitle("Message Info")
+      .twakeTitle(localized("Message Info"))
       .toolbar {
-        ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+        ToolbarItem(placement: .confirmationAction) { Button(localized("Done")) { dismiss() } }
       }
     }
     .presentationDetents([.medium, .large])
@@ -277,19 +279,19 @@ struct MessageInfoSheet: View {
   /// What kind of message it is, in words.
   static func kind(of body: TimelineMessage.Body) -> String {
     switch body {
-    case .text: "Text"
-    case .emote: "Emote"
-    case .notice: "Notice"
-    case .image: "Picture"
-    case .video: "Video"
-    case .audio: "Audio"
-    case .file: "File"
-    case .location: "Location"
-    case .sticker: "Sticker"
-    case .poll: "Poll"
-    case .redacted: "Deleted message"
-    case .unableToDecrypt: "Encrypted message"
-    case .unsupported: "Unsupported message"
+    case .text: localized("Text")
+    case .emote: localized("Emote")
+    case .notice: localized("Notice")
+    case .image: localized("Picture")
+    case .video: localized("Video")
+    case .audio: localized("Audio")
+    case .file: localized("File")
+    case .location: localized("Location")
+    case .sticker: localized("Sticker")
+    case .poll: localized("Poll")
+    case .redacted: localized("Deleted message")
+    case .unableToDecrypt: localized("Encrypted message")
+    case .unsupported: localized("Unsupported message")
     }
   }
 }

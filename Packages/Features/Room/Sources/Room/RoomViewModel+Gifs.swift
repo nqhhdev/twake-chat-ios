@@ -47,8 +47,8 @@ extension RoomViewModel {
       uploadCount -= 1
       errorMessage =
         error == .expired
-        ? "This GIF is no longer available. Search again."
-        : "Could not download the GIF. Please try again."
+        ? localized("This GIF is no longer available. Search again.")
+        : localized("Could not download the GIF. Please try again.")
       return
     }
     uploadCount -= 1

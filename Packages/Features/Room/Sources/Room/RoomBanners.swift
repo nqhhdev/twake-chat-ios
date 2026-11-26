@@ -11,13 +11,13 @@ struct SuccessorRoomBar: View {
   var body: some View {
     VStack(spacing: 8) {
       Label(
-        "This chat has been replaced and is no longer active.",
+        localized("This chat has been replaced and is no longer active."),
         systemImage: "arrow.up.forward.square"
       )
       .font(.subheadline)
       .foregroundStyle(SysColors.textSecondary)
       .multilineTextAlignment(.center)
-      Button("Go to the new chat") { openURL(link) }
+      Button(localized("Go to the new chat")) { openURL(link) }
         .buttonStyle(.borderedProminent)
     }
     .frame(maxWidth: .infinity)
@@ -33,7 +33,7 @@ struct BlockedPersonBar: View {
 
   var body: some View {
     VStack(spacing: 8) {
-      Label("You blocked this person.", systemImage: "hand.raised")
+      Label(localized("You blocked this person."), systemImage: "hand.raised")
         .font(.subheadline)
         .foregroundStyle(SysColors.textSecondary)
       Button {
@@ -43,7 +43,7 @@ struct BlockedPersonBar: View {
           isWorking = false
         }
       } label: {
-        Group { if isWorking { ProgressView() } else { Text("Unblock") } }
+        Group { if isWorking { ProgressView() } else { Text(localized("Unblock")) } }
           .frame(maxWidth: 280)
       }
       .buttonStyle(.bordered)
@@ -74,14 +74,17 @@ struct IdentityWarningBanner: View {
       VStack(alignment: .leading, spacing: 6) {
         Text(
           warning.kind == .verifiedChanged
-            ? "\(warning.name)'s verified identity was reset."
-            : "\(warning.name)'s identity was reset."
+            ? localized("\(warning.name)'s verified identity was reset.")
+            : localized("\(warning.name)'s identity was reset.")
         )
         .font(.subheadline.weight(.semibold))
-        Text("Check with them another way before trusting new messages.")
+        Text(localized("Check with them another way before trusting new messages."))
           .font(.footnote)
           .foregroundStyle(SysColors.textSecondary)
-        Button(warning.kind == .verifiedChanged ? "Withdraw verification" : "OK, I understand") {
+        Button(
+          warning.kind == .verifiedChanged
+            ? localized("Withdraw verification") : localized("OK, I understand")
+        ) {
           onAccept()
         }
         .font(.footnote.weight(.semibold))
@@ -102,14 +105,14 @@ struct ArchivedRoomBar: View {
 
   var body: some View {
     VStack(spacing: 8) {
-      Text("You left this chat.")
+      Text(localized("You left this chat."))
         .font(.subheadline)
         .foregroundStyle(SysColors.textSecondary)
       Button {
         Task { await viewModel.rejoin() }
       } label: {
         Group {
-          if viewModel.isRejoining { ProgressView() } else { Text("Rejoin") }
+          if viewModel.isRejoining { ProgressView() } else { Text(localized("Rejoin")) }
         }
         .frame(maxWidth: 280)
       }
@@ -141,7 +144,8 @@ struct SessionWarningBanner: View {
         .fixedSize(horizontal: false, vertical: true)
       Spacer(minLength: 4)
       Button(action: onFix) {
-        Text(warning == .unverified ? "Verify" : "Enter Key").font(.subheadline.weight(.semibold))
+        Text(warning == .unverified ? localized("Verify") : localized("Enter Key")).font(
+          .subheadline.weight(.semibold))
       }
       .buttonStyle(.bordered)
       .buttonBorderShape(.capsule)
@@ -156,8 +160,9 @@ struct SessionWarningBanner: View {
 
   private var message: String {
     switch warning {
-    case .unverified: "Encrypted messages may not show until this device is verified."
-    case .recoveryIncomplete: "Encrypted messages may not show until you enter your recovery key."
+    case .unverified: localized("Encrypted messages may not show until this device is verified.")
+    case .recoveryIncomplete:
+      localized("Encrypted messages may not show until you enter your recovery key.")
     }
   }
 }

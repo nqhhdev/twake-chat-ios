@@ -36,7 +36,8 @@ extension RoomViewModel {
 
   func cancelScheduled(_ message: ScheduledMessage) async {
     guard await repository.cancelScheduled(id: message.id) else {
-      errorMessage = "Could not cancel the scheduled message. It may have been sent already."
+      errorMessage = localized(
+        "Could not cancel the scheduled message. It may have been sent already.")
       scheduled = await repository.scheduledMessages()
       return
     }
@@ -45,7 +46,8 @@ extension RoomViewModel {
 
   func sendScheduledNow(_ message: ScheduledMessage) async {
     guard await repository.sendScheduledNow(id: message.id) else {
-      errorMessage = "Could not send the scheduled message. It may have been sent already."
+      errorMessage = localized(
+        "Could not send the scheduled message. It may have been sent already.")
       scheduled = await repository.scheduledMessages()
       return
     }
@@ -54,7 +56,8 @@ extension RoomViewModel {
 
   func editScheduled(_ message: ScheduledMessage) async {
     guard await repository.cancelScheduled(id: message.id) else {
-      errorMessage = "Could not change the scheduled message. It may have been sent already."
+      errorMessage = localized(
+        "Could not change the scheduled message. It may have been sent already.")
       scheduled = await repository.scheduledMessages()
       return
     }
@@ -64,14 +67,16 @@ extension RoomViewModel {
 
   static func scheduleMessage(_ error: ScheduleError) -> String {
     switch error {
-    case .unsupported: "This server cannot schedule messages."
-    case .encryptedRoom: "Messages cannot be scheduled in an encrypted chat."
+    case .unsupported: localized("This server cannot schedule messages.")
+    case .encryptedRoom: localized("Messages cannot be scheduled in an encrypted chat.")
     case .delayTooLong(let maxDelay):
       maxDelay.map {
-        "The server cannot hold a message that long (at most \(Int(($0 / 3600).rounded(.down))) hours)."
-      } ?? "The server cannot hold a message that long."
-    case .tooMany: "Too many messages are scheduled. Cancel one first."
-    case .failed: "Could not schedule your message. Please try again."
+        localized(
+          "The server cannot hold a message that long (at most \(Int(($0 / 3600).rounded(.down))) hours)."
+        )
+      } ?? localized("The server cannot hold a message that long.")
+    case .tooMany: localized("Too many messages are scheduled. Cancel one first.")
+    case .failed: localized("Could not schedule your message. Please try again.")
     }
   }
 }

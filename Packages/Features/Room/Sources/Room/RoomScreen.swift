@@ -58,7 +58,9 @@ public struct RoomScreen: View {
           PinnedBanner(viewModel: viewModel)
             .contextMenu {
               if !viewModel.pinned.isEmpty {
-                Button("All pinned messages", systemImage: "pin") { showsPinnedList = true }
+                Button(localized("All pinned messages"), systemImage: "pin") {
+                  showsPinnedList = true
+                }
               }
             }
         }
@@ -85,7 +87,7 @@ public struct RoomScreen: View {
           SuccessorRoomBar(link: link)
             .transition(.move(edge: .bottom).combined(with: .opacity))
         } else if !viewModel.canSendMessages {
-          Label("Only admins and moderators can post here.", systemImage: "megaphone")
+          Label(localized("Only admins and moderators can post here."), systemImage: "megaphone")
             .font(.subheadline)
             .foregroundStyle(SysColors.textSecondary)
             .frame(maxWidth: .infinity)
@@ -139,7 +141,7 @@ public struct RoomScreen: View {
           .controlSize(.large)
           .padding(24)
           .background(.regularMaterial, in: .rect(cornerRadius: 16))
-          .accessibilityLabel("Preparing to share")
+          .accessibilityLabel(localized("Preparing to share"))
           .transition(.opacity)
       }
     }
@@ -161,29 +163,29 @@ public struct RoomScreen: View {
       }
     }
     .alert(
-      "Report this message?",
+      localized("Report this message?"),
       isPresented: Binding(get: { reporting != nil }, set: { if !$0 { reporting = nil } })
     ) {
-      TextField("Reason (optional)", text: $reportReason)
-      Button("Cancel", role: .cancel) {}
-      Button("Report", role: .destructive) {
+      TextField(localized("Reason (optional)"), text: $reportReason)
+      Button(localized("Cancel"), role: .cancel) {}
+      Button(localized("Report"), role: .destructive) {
         if let message = reporting {
           Task { await viewModel.report(message, reason: reportReason) }
         }
       }
     } message: {
-      Text("The server's moderators will see it.")
+      Text(localized("The server's moderators will see it."))
     }
     .confirmationDialog(
-      blocking.map { "Block \($0.senderName)?" } ?? "",
+      blocking.map { localized("Block \($0.senderName)?") } ?? "",
       isPresented: Binding(get: { blocking != nil }, set: { if !$0 { blocking = nil } }),
       titleVisibility: .visible
     ) {
-      Button("Block", role: .destructive) {
+      Button(localized("Block"), role: .destructive) {
         if let message = blocking { Task { await viewModel.block(message) } }
       }
     } message: {
-      Text("You will no longer see their messages or invitations, in any chat.")
+      Text(localized("You will no longer see their messages or invitations, in any chat."))
     }
     .sensoryFeedback(.impact(weight: .medium), trigger: viewModel.focus != nil) { _, shown in shown
     }
@@ -212,15 +214,15 @@ public struct RoomScreen: View {
       isPresented: Binding(
         get: { calls?.errorMessage != nil }, set: { if !$0 { calls?.errorMessage = nil } })
     ) {
-      Button("OK", role: .cancel) {}
+      Button(localized("OK"), role: .cancel) {}
     }
-    .navigationTitle(viewModel.threadRootId == nil ? viewModel.roomName : "Thread")
+    .navigationTitle(viewModel.threadRootId == nil ? viewModel.roomName : localized("Thread"))
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       if viewModel.threadRootId != nil {
         ToolbarItem(placement: .principal) {
           VStack(spacing: 0) {
-            Text("Thread").textStyle(TextStyles.titleMedium)
+            Text(localized("Thread")).textStyle(TextStyles.titleMedium)
             Text(viewModel.roomName)
               .textStyle(TextStyles.labelSmall)
               .foregroundStyle(SysColors.textSecondary)
@@ -250,14 +252,14 @@ public struct RoomScreen: View {
                     Image(systemName: "lock.fill")
                       .font(.caption2)
                       .foregroundStyle(SysColors.textSecondary)
-                      .accessibilityLabel("Encrypted")
+                      .accessibilityLabel(localized("Encrypted"))
                   }
                 }
                 if let presence = viewModel.headerSubtitle {
                   Text(presence)
                     .textStyle(TextStyles.labelSmall)
                     .foregroundStyle(
-                      presence == "Online"
+                      presence == Presence(isOnline: true).line
                         ? AnyShapeStyle(.green) : AnyShapeStyle(SysColors.textSecondary)
                     )
                     .lineLimit(1)
@@ -267,7 +269,7 @@ public struct RoomScreen: View {
             }
           }
           .buttonStyle(.plain)
-          .accessibilityHint("Shows the chat details")
+          .accessibilityHint(localized("Shows the chat details"))
         }
         // As in the Flutter chat: a call needs a Meet server and the right to post, since it is a message.
         if let roomCall, roomCall.isAvailable, !viewModel.isArchived {
@@ -279,20 +281,22 @@ public struct RoomScreen: View {
           ToolbarItem(placement: .topBarTrailing) { MeetCallButton(calls: calls) }
         }
         ToolbarItem(placement: .topBarTrailing) {
-          Menu("More", systemImage: "ellipsis.circle") {
+          Menu(localized("More"), systemImage: "ellipsis.circle") {
             if viewModel.canSearch {
-              Button("Search", systemImage: "magnifyingglass") { search = viewModel.makeSearch() }
+              Button(localized("Search"), systemImage: "magnifyingglass") {
+                search = viewModel.makeSearch()
+              }
             }
             if viewModel.canOpenThreads {
-              Button("Threads", systemImage: "bubble.left.and.text.bubble.right") {
+              Button(localized("Threads"), systemImage: "bubble.left.and.text.bubble.right") {
                 showsThreads = true
               }
             }
-            Button("Go to Date", systemImage: "calendar") { isPickingDate = true }
-            Button("Jump to Start", systemImage: "arrow.up.to.line") {
+            Button(localized("Go to Date"), systemImage: "calendar") { isPickingDate = true }
+            Button(localized("Jump to Start"), systemImage: "arrow.up.to.line") {
               Task { await viewModel.jumpToStart() }
             }
-            Button("Select Messages", systemImage: "checkmark.circle") {
+            Button(localized("Select Messages"), systemImage: "checkmark.circle") {
               if let last = viewModel.rows.reversed().lazy.compactMap(\.selectableMessage).first {
                 viewModel.startSelecting(last)
               }
@@ -320,23 +324,25 @@ public struct RoomScreen: View {
     }
     .sheet(isPresented: $isPickingDate) {
       NavigationStack {
-        DatePicker("Date", selection: $pickedDate, in: ...Date(), displayedComponents: .date)
-          .datePickerStyle(.graphical)
-          .padding()
-          .navigationTitle("Go to Date")
-          .navigationBarTitleDisplayMode(.inline)
-          .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-              Button("Cancel") { isPickingDate = false }
-            }
-            ToolbarItem(placement: .confirmationAction) {
-              Button("Go") {
-                isPickingDate = false
-                let date = pickedDate
-                Task { await viewModel.jump(toDate: date) }
-              }
+        DatePicker(
+          localized("Date"), selection: $pickedDate, in: ...Date(), displayedComponents: .date
+        )
+        .datePickerStyle(.graphical)
+        .padding()
+        .navigationTitle(localized("Go to Date"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+          ToolbarItem(placement: .cancellationAction) {
+            Button(localized("Cancel")) { isPickingDate = false }
+          }
+          ToolbarItem(placement: .confirmationAction) {
+            Button(localized("Go")) {
+              isPickingDate = false
+              let date = pickedDate
+              Task { await viewModel.jump(toDate: date) }
             }
           }
+        }
       }
       .presentationDetents([.medium, .large])
     }
@@ -357,9 +363,9 @@ public struct RoomScreen: View {
       ContentUnavailableView {
         Label(message, systemImage: "exclamationmark.triangle")
       } description: {
-        Text("The chat may still be syncing. Try again in a moment.")
+        Text(localized("The chat may still be syncing. Try again in a moment."))
       } actions: {
-        Button("Retry") { Task { await viewModel.start() } }
+        Button(localized("Retry")) { Task { await viewModel.start() } }
       }
     case .loaded:
       TimelineScroll(

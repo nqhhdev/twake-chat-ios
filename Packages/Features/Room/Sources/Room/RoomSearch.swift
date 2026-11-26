@@ -68,7 +68,7 @@ public final class RoomSearchViewModel {
     do {
       items = try await textTimeline.open()
     } catch {
-      errorMessage = "Could not search this chat."
+      errorMessage = localized("Could not search this chat.")
       return
     }
     isOpen = true
@@ -104,7 +104,7 @@ public final class RoomSearchViewModel {
       results += page.results
       nextBatch = page.nextBatch
     } catch {
-      errorMessage = "Could not search. Please try again."
+      errorMessage = localized("Could not search. Please try again.")
     }
   }
 
@@ -165,7 +165,7 @@ public final class RoomSearchViewModel {
       nextBatch = page.nextBatch
     } catch {
       results = []
-      errorMessage = "Could not search. Please try again."
+      errorMessage = localized("Could not search. Please try again.")
     }
   }
 
@@ -262,7 +262,7 @@ struct RoomSearchScreen: View {
       if viewModel.mode == .onDevice, viewModel.hasMore {
         HStack(spacing: 8) {
           ProgressView()
-          Text("Searching older messages…").font(.footnote).foregroundStyle(
+          Text(localized("Searching older messages…")).font(.footnote).foregroundStyle(
             SysColors.textSecondary)
         }
         .frame(maxWidth: .infinity)
@@ -277,9 +277,9 @@ struct RoomSearchScreen: View {
     .searchable(
       text: $viewModel.query, isPresented: $isFieldPresented,
       placement: .navigationBarDrawer(displayMode: .always),
-      prompt: "Search messages"
+      prompt: localized("Search messages")
     )
-    .navigationTitle("Search")
+    .navigationTitle(localized("Search"))
     .navigationBarTitleDisplayMode(.inline)
     .task { await viewModel.start() }
   }
@@ -288,10 +288,10 @@ struct RoomSearchScreen: View {
     let query = RoomSearchViewModel.trimmed(viewModel.query)
     if query.isEmpty {
       ContentUnavailableView {
-        Label("Search this chat", systemImage: "magnifyingglass")
+        Label(localized("Search this chat"), systemImage: "magnifyingglass")
       } description: {
         if viewModel.mode == .onDevice {
-          Text("This chat is encrypted, so its messages are searched on this device.")
+          Text(localized("This chat is encrypted, so its messages are searched on this device."))
         }
       }
     } else if viewModel.results.isEmpty, viewModel.isSearching {
