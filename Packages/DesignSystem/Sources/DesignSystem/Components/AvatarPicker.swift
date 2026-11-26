@@ -67,7 +67,7 @@ public struct AvatarPicker: View {
           Button("Remove Photo", systemImage: "trash", role: .destructive, action: onRemove)
         }
       } label: {
-        Text("Edit").font(.subheadline.weight(.semibold))
+        Text(localized("Edit")).font(.subheadline.weight(.semibold))
           .padding(.horizontal, 14)
           .padding(.vertical, 5)
           .background(.fill.tertiary, in: .capsule)

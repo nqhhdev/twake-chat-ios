@@ -6,9 +6,9 @@ public enum TypingText {
   public static func line(for names: [String]) -> String? {
     switch names.count {
     case 0: nil
-    case 1: "\(names[0]) is typing…"
-    case 2: "\(names[0]) and \(names[1]) are typing…"
-    default: "\(names[0]) and \(names.count - 1) others are typing…"
+    case 1: localized("\(names[0]) is typing…")
+    case 2: localized("\(names[0]) and \(names[1]) are typing…")
+    default: localized("\(names[0]) and \(names.count - 1) others are typing…")
     }
   }
 }

@@ -21,7 +21,7 @@ public struct AvatarPresenceDot: View {
       .padding(2)
       .background(SysColors.background, in: Circle())
       .accessibilityElement()
-      .accessibilityLabel(presence == .online ? "Online" : "Away")
+      .accessibilityLabel(presence == .online ? localized("Online") : localized("Away"))
   }
 }
 
