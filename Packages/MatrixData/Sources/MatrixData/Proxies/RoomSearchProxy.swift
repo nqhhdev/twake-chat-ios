@@ -11,10 +11,12 @@ public actor RoomSearchProxy: RoomSearchRepository {
 
   private let clientProxy: @Sendable () async -> ClientProxy?
   private let session: URLSession
+  private let index: MessageIndex?
 
-  public init(authentication: MatrixAuthenticationRepository) {
+  public init(authentication: MatrixAuthenticationRepository, index: MessageIndex? = nil) {
     clientProxy = { await authentication.clientProxy }
     session = .shared
+    self.index = index
   }
 
   public func search(_ term: String, roomId: String, from nextBatch: String?)
@@ -26,7 +28,29 @@ public actor RoomSearchProxy: RoomSearchRepository {
   public func searchEverywhere(_ term: String, from nextBatch: String?)
     async throws(RoomSearchError) -> RoomSearchPage
   {
-    try await run(term: term, roomId: nil, from: nextBatch)
+    guard nextBatch == nil, let index else {
+      return try await run(term: term, roomId: nil, from: nextBatch)
+    }
+    let local = await index.search(term, roomId: nil)
+    do {
+      let server = try await run(term: term, roomId: nil, from: nil)
+      return RoomSearchPage(
+        results: Self.merged(server.results, local), nextBatch: server.nextBatch)
+    } catch {
+      guard !local.isEmpty else { throw error }
+      return RoomSearchPage(results: local, nextBatch: nil)
+    }
+  }
+
+  public func searchOnDevice(_ term: String, roomId: String) async -> [RoomSearchResult] {
+    await index?.search(term, roomId: roomId) ?? []
+  }
+
+  static func merged(_ server: [RoomSearchResult], _ local: [RoomSearchResult])
+    -> [RoomSearchResult]
+  {
+    let known = Set(server.map(\.eventId))
+    return (server + local.filter { !known.contains($0.eventId) }).sorted { $0.date > $1.date }
   }
 
   private func run(term: String, roomId: String?, from nextBatch: String?)

@@ -40,6 +40,7 @@ public final class RoomSearchViewModel {
   /// The chat's text messages loaded so far, newest first.
   @ObservationIgnored private var messages: [TimelineMessage] = []
   @ObservationIgnored private var isOpen = false
+  @ObservationIgnored private var indexHits: [RoomSearchResult] = []
   @ObservationIgnored private var isLoadingOlder = false
 
   public init(
@@ -129,6 +130,11 @@ public final class RoomSearchViewModel {
     switch mode {
     case .onDevice:
       filterOnDevice()
+      searchTask = Task { [weak self] in
+        try? await Task.sleep(for: Self.debounce)
+        guard !Task.isCancelled else { return }
+        await self?.searchIndex()
+      }
     case .server:
       // Searching from the first key: the pause before asking must not read as "no results".
       isSearching = !Self.serverTerm(query).isEmpty
@@ -163,13 +169,25 @@ public final class RoomSearchViewModel {
     }
   }
 
+  func searchIndex() async {
+    let term = Self.trimmed(query)
+    guard term.count >= Self.minimumOnDeviceLength, let server else {
+      indexHits = []
+      return
+    }
+    let hits = await server.searchOnDevice(term, roomId: roomId)
+    guard term == Self.trimmed(query), mode == .onDevice else { return }
+    indexHits = hits
+    filterOnDevice()
+  }
+
   private func filterOnDevice() {
     let words = Self.words(in: query)
     guard Self.trimmed(query).count >= Self.minimumOnDeviceLength, !words.isEmpty else {
       results = []
       return
     }
-    results = messages.compactMap { message in
+    let loaded = messages.compactMap { message -> RoomSearchResult? in
       guard let eventId = message.eventId, let text = RoomViewModel.text(of: message.body),
         Self.matches(text, words: words)
       else { return nil }
@@ -177,6 +195,15 @@ public final class RoomSearchViewModel {
         eventId: eventId, senderId: message.senderId, senderName: message.senderName,
         date: message.date, text: text)
     }
+    let shown = Set(loaded.map(\.eventId))
+    let indexed = indexHits.filter {
+      !shown.contains($0.eventId) && Self.matches($0.text, words: words)
+    }.map {
+      RoomSearchResult(
+        eventId: $0.eventId, senderId: $0.senderId, senderName: $0.senderName, date: $0.date,
+        text: $0.text)
+    }
+    results = indexed.isEmpty ? loaded : (loaded + indexed).sorted { $0.date > $1.date }
   }
 
   static func trimmed(_ text: String) -> String {

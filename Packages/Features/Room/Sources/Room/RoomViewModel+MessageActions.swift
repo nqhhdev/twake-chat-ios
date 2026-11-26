@@ -280,14 +280,7 @@ extension RoomViewModel {
     bytes.map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) }
   }
 
-  /// The text a message's Copy action copies, or `nil` for a message without text.
   public static func text(of body: TimelineMessage.Body) -> String? {
-    switch body {
-    case .text(let text), .emote(let text), .notice(let text), .location(let text, _): text
-    case .image(let caption), .video(let caption), .audio(let caption): caption
-    case .file(let name): name
-    case .poll(let question): question
-    case .sticker, .redacted, .unableToDecrypt, .unsupported: nil
-    }
+    body.plainText
   }
 }
