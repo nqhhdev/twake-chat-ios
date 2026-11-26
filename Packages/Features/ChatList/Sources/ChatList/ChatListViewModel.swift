@@ -30,12 +30,12 @@ public final class ChatListViewModel {
     public var id: Self { self }
     public var title: String {
       switch self {
-      case .all: "All"
-      case .unread: "Unread"
-      case .favourites: "Favourites"
-      case .people: "People"
-      case .groups: "Groups"
-      case .broadcasts: "Broadcasts"
+      case .all: localized("All")
+      case .unread: localized("Unread")
+      case .favourites: localized("Favourites")
+      case .people: localized("People")
+      case .groups: localized("Groups")
+      case .broadcasts: localized("Broadcasts")
       }
     }
 
@@ -131,7 +131,7 @@ public final class ChatListViewModel {
   /// Opens the direct chat with someone the search found, creating it when needed.
   public func open(_ person: Person) async {
     guard let openPerson else { return }
-    if await !openPerson(person.id) { actionErrorMessage = "Could not open the chat." }
+    if await !openPerson(person.id) { actionErrorMessage = localized("Could not open the chat.") }
   }
 
   /// Reading and turning off the account's do not disturb, given by the app from the account settings.
@@ -162,7 +162,7 @@ public final class ChatListViewModel {
     if await doNotDisturb.turnOff() {
       withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { isDoNotDisturbOn = false }
     } else {
-      actionErrorMessage = "Could not turn off Do Not Disturb."
+      actionErrorMessage = localized("Could not turn off Do Not Disturb.")
     }
   }
   /// The messages the server found for the search text, in rooms the list knows.
@@ -283,7 +283,9 @@ public final class ChatListViewModel {
         try await repository.decline(roomId: room.id)
       }
     } catch {
-      inviteErrorMessage = accept ? "Could not join the room." : "Could not decline the invitation."
+      inviteErrorMessage =
+        accept
+        ? localized("Could not join the room.") : localized("Could not decline the invitation.")
     }
   }
 
@@ -303,7 +305,7 @@ public final class ChatListViewModel {
     do {
       rooms = try await repository.start()
     } catch {
-      if thisStart == startCount { state = .failed("Could not load your rooms.") }
+      if thisStart == startCount { state = .failed(localized("Could not load your rooms.")) }
       return
     }
     for await list in rooms where thisStart == startCount {
@@ -318,7 +320,7 @@ public final class ChatListViewModel {
     defer { isLoggingOut = false }
     logOutErrorMessage = nil
     if await !logOutAction() {
-      logOutErrorMessage = "Could not log out. Please try again."
+      logOutErrorMessage = localized("Could not log out. Please try again.")
     }
   }
 
@@ -346,7 +348,8 @@ public final class ChatListViewModel {
 
   /// Puts a room in low priority, or takes it out.
   public func setLowPriority(_ lowPriority: Bool, room: RoomSummary) async {
-    await act("Could not update the chat.") { [repository] () async throws(RoomListError) in
+    await act(localized("Could not update the chat.")) {
+      [repository] () async throws(RoomListError) in
       try await repository.setLowPriority(lowPriority, roomId: room.id)
     }
   }
@@ -356,21 +359,23 @@ public final class ChatListViewModel {
 
   /// Marks a room as unread, or as read.
   public func setUnread(_ unread: Bool, room: RoomSummary) async {
-    await act("Could not update the chat.") { [repository] () async throws(RoomListError) in
+    await act(localized("Could not update the chat.")) {
+      [repository] () async throws(RoomListError) in
       try await repository.setUnread(unread, roomId: room.id)
     }
   }
 
   /// Adds a room to the favourites, or takes it out.
   public func setFavourite(_ favourite: Bool, room: RoomSummary) async {
-    await act("Could not update the favourites.") { [repository] () async throws(RoomListError) in
+    await act(localized("Could not update the favourites.")) {
+      [repository] () async throws(RoomListError) in
       try await repository.setFavourite(favourite, roomId: room.id)
     }
   }
 
   /// Mutes a room, or goes back to the default notifications.
   public func setMuted(_ muted: Bool, room: RoomSummary) async {
-    await act("Could not change the notifications.") {
+    await act(localized("Could not change the notifications.")) {
       [repository] () async throws(RoomListError) in
       try await repository.setMuted(muted, roomId: room.id)
     }
@@ -409,7 +414,8 @@ public final class ChatListViewModel {
 
   /// Leaves a room.
   public func leave(_ room: RoomSummary) async {
-    await act("Could not leave the chat.") { [repository] () async throws(RoomListError) in
+    await act(localized("Could not leave the chat.")) {
+      [repository] () async throws(RoomListError) in
       try await repository.leave(roomId: room.id)
     }
   }
@@ -466,11 +472,11 @@ public final class ChatListViewModel {
     guard let body = body(of: room) else { return nil }
     // An emote reads as a sentence: "Alice waves" (web `roomRowText.ts`).
     if room.lastMessageKind == .emote {
-      let name = room.isLastMessageOwn ? "You" : room.lastMessageSender
+      let name = room.isLastMessageOwn ? localized("You") : room.lastMessageSender
       return name.map { "\($0) \(body)" } ?? body
     }
     // "You:" on the user's own message; no name in a direct chat, where only one person writes to the user.
-    if room.isLastMessageOwn { return "You: \(body)" }
+    if room.isLastMessageOwn { return localized("You: \(body)") }
     guard !room.isDirect, let sender = room.lastMessageSender else { return body }
     return "\(sender): \(body)"
   }
@@ -479,7 +485,7 @@ public final class ChatListViewModel {
   /// the names in a group.
   public static func typingLine(of room: RoomSummary) -> String? {
     guard !room.typingNames.isEmpty else { return nil }
-    return room.isDirect ? "typing…" : TypingText.line(for: room.typingNames)
+    return room.isDirect ? localized("typing…") : TypingText.line(for: room.typingNames)
   }
 
   /// The last message as the row names it: its text, or what it is when it has none to show (a picture without a
@@ -488,16 +494,16 @@ public final class ChatListViewModel {
     let text = room.lastMessageText
     return switch room.lastMessageKind {
     case nil, .text, .emote, .notice: text
-    case .picture: text ?? "Photo"
-    case .video: text ?? "Video"
-    case .audio: "Audio"
-    case .voice: "Voice message"
-    case .file: text ?? "File"
-    case .location: "Location"
-    case .sticker: "Sticker"
-    case .poll: text.map { "Poll: \($0)" } ?? "Poll"
-    case .deleted: "Message deleted"
-    case .encrypted: "Encrypted message"
+    case .picture: text ?? localized("Photo")
+    case .video: text ?? localized("Video")
+    case .audio: localized("Audio")
+    case .voice: localized("Voice message")
+    case .file: text ?? localized("File")
+    case .location: localized("Location")
+    case .sticker: localized("Sticker")
+    case .poll: text.map { localized("Poll: \($0)") } ?? localized("Poll")
+    case .deleted: localized("Message deleted")
+    case .encrypted: localized("Encrypted message")
     }
   }
 

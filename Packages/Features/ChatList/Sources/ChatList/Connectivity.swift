@@ -34,10 +34,10 @@ struct DoNotDisturbBanner: View {
     HStack(spacing: 8) {
       Image(systemName: "moon.fill").foregroundStyle(.indigo)
         .symbolEffect(.bounce, options: .nonRepeating)
-      Text("Do Not Disturb is on. You get no notifications.")
+      Text(localized("Do Not Disturb is on. You get no notifications."))
         .textStyle(TextStyles.labelMedium)
       Spacer(minLength: 4)
-      Button("Turn Off", action: onTurnOff)
+      Button(localized("Turn Off"), action: onTurnOff)
         .font(.footnote.weight(.semibold))
         .buttonStyle(.bordered)
         .controlSize(.mini)
@@ -60,7 +60,7 @@ struct OfflineBanner: View {
     HStack(spacing: 8) {
       Image(systemName: "wifi.slash")
         .symbolEffect(.pulse, options: .repeating, isActive: !reduceMotion)
-      Text("No connection. Messages will be sent when you are back online.")
+      Text(localized("No connection. Messages will be sent when you are back online."))
         .textStyle(TextStyles.labelMedium)
         .fixedSize(horizontal: false, vertical: true)
     }

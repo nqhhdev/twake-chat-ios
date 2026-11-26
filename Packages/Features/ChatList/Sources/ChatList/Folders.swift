@@ -83,7 +83,7 @@ extension ChatListViewModel {
       try await repository.save(shown)
       try await repository.apply(changes)
     } catch {
-      actionErrorMessage = "Could not update the folders."
+      actionErrorMessage = localized("Could not update the folders.")
       await loadFolders()
       return false
     }
@@ -142,7 +142,7 @@ public final class FolderEditorViewModel: Identifiable {
 
   public var nameError: String? {
     let taken = list.userFolders.contains { $0.name == trimmedName && $0.id != previous?.id }
-    return taken ? "A folder has this name already." : nil
+    return taken ? localized("A folder has this name already.") : nil
   }
 
   public var canSave: Bool { !trimmedName.isEmpty && nameError == nil && !isSaving }
@@ -176,7 +176,7 @@ public final class FolderEditorViewModel: Identifiable {
     if await list.saveFolder(folder, previous: previous, picked: picked, chats: list.allChats) {
       onDone()
     } else {
-      errorMessage = "Could not save the folder."
+      errorMessage = localized("Could not save the folder.")
     }
   }
 }
@@ -188,10 +188,10 @@ extension ChatListViewModel {
 extension Folder.ChatType {
   var title: String {
     switch self {
-    case .direct: "Direct chats"
-    case .group: "Groups"
-    case .broadcast: "Broadcasts"
-    case .bot: "Bots"
+    case .direct: localized("Direct chats")
+    case .group: localized("Groups")
+    case .broadcast: localized("Broadcasts")
+    case .bot: localized("Bots")
     }
   }
 }
