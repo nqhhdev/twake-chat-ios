@@ -71,7 +71,7 @@ Server: **Matrix** (spec or an MSC, any homeserver), **ToM** (Twake's `/_twake` 
 | Threads: list, reply, thread screen | — | Phase 2 | Built: `Room/Threads.swift`, `ThreadPrefsProxy.swift` | Matrix | #93 (notifications) |
 | Polls (MSC3381) | — | Phase 10 | Built: `Room/Polls.swift`, `Domain/Models/Poll.swift` | Matrix | — |
 | Checklists next to polls | — | THR-11 | Off: no event format defined ([ADR 0028](../../docs/adr/0028-gifs-stickers-checklists.md)) | Matrix | #105 |
-| Voice messages (MSC3245), playback speed | `chat_audio_player_widget` | Phase 10 | Built: `Room/VoiceRecorder.swift`, `Players.swift`; interop to verify | Matrix | #108 |
+| Voice messages (MSC3245), playback speed | `chat_audio_player_widget` | Phase 10 | Built: `Room/VoiceRecorder.swift`, `Players.swift`. Same event as web (`adapters/matrix/matrixAttachments.ts`) and Flutter (`pages/chat/chat.dart:914`): `m.audio` with `org.matrix.msc3245.voice` and `org.matrix.msc1767.audio` (`duration` in ms, `waveform` integers 0 to 1024); the received waveform and duration are drawn (`TimelineMessage.Voice`) | Matrix | #108 |
 | Transcribe a voice message | — | MSG-13 | Built: on-device `SFSpeechRecognizer` (`SpeechTranscriber.swift`) | Device | #182 |
 | Translate a message | — | MSG-15 | Built: Apple Translation on the device (`MessageTranslationViews.swift`) | Device (ADR 0026) | #181 |
 | Scribe in the composer | — | D53, D73, D215 | Not built; owner decision | Twake (Assistant) | #183 |
