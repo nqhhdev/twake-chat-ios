@@ -52,6 +52,7 @@ public enum A11yIdentifiers {
     public func reaction(_ key: String) -> String { "room.reaction.\(key)" }
     public let attach = "room.attach"
     public let pastePicture = "room.attach.pastePicture"
+    public let addFromDrive = "room.attach.addFromDrive"
     public let sendAttachments = "room.attach.send"
     public let attachmentCaption = "room.attach.caption"
   }

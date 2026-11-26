@@ -21,6 +21,9 @@ struct WorkplaceAPI: Sendable {
       "id_token": idToken, "exchange_type": "app",
     ])
     guard let (status, data) = await transport(request) else { throw .drive(.exchangeRejected) }
+    if status == 400, String(decoding: data, as: UTF8.self).lowercased().contains("not installed") {
+      throw .drive(.chatAppMissing)
+    }
     guard status == 200,
       let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
       let token = object["access_token"] as? String, !token.isEmpty
@@ -55,7 +58,7 @@ struct WorkplaceAPI: Sendable {
       "theme": ["type": options.isDark ? "dark" : "light"],
     ]
     if let attach = options.attachLabel {
-      var download: [String: Any] = ["label": attach]
+      var download: [String: Any] = ["label": attach, "allowFolder": false]
       if let max = options.maxAttachmentBytes { download["maxFileSize"] = max }
       config["downloadLink"] = download
     }
