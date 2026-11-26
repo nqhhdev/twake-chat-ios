@@ -177,7 +177,9 @@ struct NotificationAction: Sendable, Equatable {
   }
 }
 
-final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+final class AppDelegate: NSObject, UIApplicationDelegate,
+  @preconcurrency UNUserNotificationCenterDelegate
+{
   @MainActor static var push: PushCenter?
 
   func application(
@@ -200,15 +202,16 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
   ) {
   }
 
-  nonisolated func userNotificationCenter(
+  func userNotificationCenter(
     _ center: UNUserNotificationCenter, willPresent notification: UNNotification
   ) async -> UNNotificationPresentationOptions {
     let roomId = PushPayload.roomId(in: notification.request.content.userInfo)
-    let shows = await MainActor.run { Self.push?.showsBanner(forRoom: roomId) ?? true }
+    NotificationCenter.default.post(name: .encryptionKeysImported, object: nil)
+    let shows = Self.push?.showsBanner(forRoom: roomId) ?? true
     return shows ? [.banner, .list, .sound, .badge] : []
   }
 
-  nonisolated func userNotificationCenter(
+  func userNotificationCenter(
     _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
   ) async {
     let content = response.notification.request.content
@@ -218,8 +221,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         userText: (response as? UNTextInputNotificationResponse)?.userText,
         userInfo: content.userInfo, title: content.title)
     else { return }
-    let push = await Self.push
-    await push?.handle(action)
+    await Self.push?.handle(action)
   }
 }
 

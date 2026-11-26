@@ -31,7 +31,7 @@ jobs:
     runs-on: macos-15-intel
     timeout-minutes: 50
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Show runner and Xcode apps
         run: |
@@ -45,7 +45,7 @@ jobs:
           xcodebuild -version
 
       - name: Set up Docker (Colima)
-        uses: docker/setup-docker-action@v4
+        uses: docker/setup-docker-action@v5
 
       - name: Run E2E suite
         run: scripts/e2e.sh all
@@ -54,7 +54,7 @@ jobs:
 
       - name: Upload xcresult and log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-xcresult
           path: |

@@ -71,6 +71,14 @@ public final class FakeRoomListRepository: RoomListRepository, @unchecked Sendab
     lock.withLock { _decisions.append("decline \(roomId)") }
   }
 
+  private var _retriedDecryption: [[String]] = []
+
+  public var retriedDecryption: [[String]] { lock.withLock { _retriedDecryption } }
+
+  public func retryDecryption(roomIds: [String]) async {
+    lock.withLock { _retriedDecryption.append(roomIds) }
+  }
+
   public func start() async throws(RoomListError) -> AsyncStream<[RoomSummary]> {
     let error = lock.withLock {
       _startCallCount += 1
