@@ -10,7 +10,7 @@ public enum DeviceUnlockMethod: Sendable, Equatable {
     case .faceID: "Face ID"
     case .touchID: "Touch ID"
     case .opticID: "Optic ID"
-    case .passcode: "Passcode"
+    case .passcode: localized("Passcode")
     }
   }
 }

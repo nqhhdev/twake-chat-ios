@@ -20,21 +20,24 @@ public enum UndecryptableReason: Sendable, Equatable {
   public func help(isDeviceVerified: Bool) -> String {
     switch self {
     case .sentBeforeJoining:
-      "This message was sent before you joined this chat, so no key exists for it."
-    case .withheld: "The sender did not share the key for this message with this device."
+      localized("This message was sent before you joined this chat, so no key exists for it.")
+    case .withheld: localized("The sender did not share the key for this message with this device.")
     case .withheldFromUnverifiedDevice:
       isDeviceVerified
-        ? "The sender did not share the key for this message with this device."
-        : "Verify this device with your recovery key to read it."
+        ? localized("The sender did not share the key for this message with this device.")
+        : localized("Verify this device with your recovery key to read it.")
     case .untrustedSender:
-      "The device of the sender cannot be trusted, so this message stays hidden."
+      localized("The device of the sender cannot be trusted, so this message stays hidden.")
     case .historical:
-      "This message was sent before this device existed, and your backup does not hold its key."
-    case .historicalUnverified: "Verify this device with your recovery key to read it."
+      localized(
+        "This message was sent before this device existed, and your backup does not hold its key.")
+    case .historicalUnverified: localized("Verify this device with your recovery key to read it.")
     case .unknown:
       isDeviceVerified
-        ? "No key for this message has reached this device. It was probably sent before this device could receive it."
-        : "Verify this device with your recovery key to read it."
+        ? localized(
+          "No key for this message has reached this device. It was probably sent before this device could receive it."
+        )
+        : localized("Verify this device with your recovery key to read it.")
     }
   }
 }

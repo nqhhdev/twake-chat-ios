@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
   name: "Domain",
+  defaultLocalization: "en",
   platforms: [.iOS(.v18), .macOS(.v15)],
   products: [
     .library(name: "Domain", targets: ["Domain"])
@@ -12,6 +13,7 @@ let package = Package(
     .target(
       name: "Domain",
       dependencies: [],
+      resources: [.process("Localizable.xcstrings")],
       swiftSettings: [.treatAllWarnings(as: .error)]
     ),
     .testTarget(
