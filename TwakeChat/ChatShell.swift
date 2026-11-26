@@ -63,8 +63,7 @@ struct ChatShell: View {
   @State private var settingsPage: SettingsPage? = .security
   /// Privacy & Security over the chat, from the banner that warns encrypted messages may not show.
   @State private var isFixingSession = false
-  /// What the prompt after sign-in asks the user to do, as the Flutter app asks for recovery right after login.
-  @State private var sessionPrompt: SessionWarning?
+  @State private var sessionPrompt = SessionPrompt()
   @State private var quickSwitcher: QuickSwitcherViewModel?
   @Environment(\.scenePhase) private var scenePhase
 
@@ -165,27 +164,13 @@ struct ChatShell: View {
           open(summary)
         }
       }
-      .task { await promptForSessionFix() }
-      .alert(
-        "Unlock your encrypted messages",
-        isPresented: Binding(
-          get: { sessionPrompt != nil }, set: { if !$0 { sessionPrompt = nil } }),
-        presenting: sessionPrompt
-      ) { warning in
-        Button(warning == .unverified ? "Verify this device" : "Enter recovery key") {
-          isFixingSession = true
-        }
-        Button("Later", role: .cancel) {}
-      } message: { warning in
-        Text(
-          warning == .unverified
-            ? "Verify this device with another one, or with your recovery key, to read your encrypted messages."
-            : "Enter your recovery key to read the encrypted messages sent before you signed in here."
-        )
-      }
+      .task { await sessionPrompt.start(checking: checkSession) }
       .sheet(
         isPresented: $isFixingSession,
-        onDismiss: { Task { await room?.refreshSessionWarning() } }
+        onDismiss: {
+          Task { await room?.refreshSessionWarning() }
+          Task { await sessionPrompt.refresh(checking: checkSession) }
+        }
       ) {
         NavigationStack {
           SettingsPageView(page: .security, viewModel: settings)
@@ -342,6 +327,12 @@ struct ChatShell: View {
     // Beside the chat the list does not reach the trailing edge, yet it is handed the inset of the side strip and the
     // system tab bar there, which left an empty band on the unfolded Duo; the chat column keeps that inset.
     .ignoresSafeArea(.container, edges: isBesideChat ? .trailing : [])
+    .safeAreaInset(edge: .top, spacing: 0) {
+      if let warning = sessionPrompt.warning {
+        SessionPromptBanner(
+          warning: warning, onFix: { isFixingSession = true }, onLater: { sessionPrompt.dismiss() })
+      }
+    }
     .sheet(item: $newChat) { search in NewChatScreen(viewModel: search) }
   }
 
@@ -390,20 +381,5 @@ struct ChatShell: View {
       room = made
     }
     isRoomPushed = true
-  }
-
-  /// Once per sign-in: asks, shortly after the first sync had time to report it, whether this session can read
-  /// encrypted messages, and offers Privacy & Security when it cannot. The banner in a chat stays for those who
-  /// choose Later.
-  private func promptForSessionFix() async {
-    guard let checkSession else { return }
-    for pause in [Duration.seconds(3), .seconds(10)] {
-      try? await Task.sleep(for: pause)
-      if Task.isCancelled { return }
-      if let warning = await checkSession() {
-        sessionPrompt = warning
-        return
-      }
-    }
   }
 }
