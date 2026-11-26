@@ -62,12 +62,16 @@ public struct RoomScreen: View {
               }
             }
         }
-        timeline(bubbleWidth: TwakeLayout.bubbleWidth(in: geometry.size.width))
+        if geometry.size.width > 0 {
+          timeline(bubbleWidth: TwakeLayout.bubbleWidth(in: geometry.size.width))
+        } else {
+          Color.clear
+        }
         if let message = viewModel.errorMessage {
           Text(message)
             .textStyle(TextStyles.bodySmall)
             .foregroundStyle(SysColors.error)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, RoomMetrics.barInset)
             .padding(.vertical, 4)
         }
         if viewModel.isSelectingMessages {
@@ -345,9 +349,8 @@ public struct RoomScreen: View {
   @ViewBuilder private func timeline(bubbleWidth: CGFloat) -> some View {
     switch viewModel.state {
     case .loading:
-      // The same insets as the timeline's rows (`TimelineScroll`).
       TimelineSkeleton(bubbleWidth: bubbleWidth)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, RoomMetrics.gutter)
         .padding(.vertical, 8)
     case .failed(let message):
       ContentUnavailableView {

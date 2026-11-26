@@ -9,6 +9,7 @@ struct TimelineSkeleton: View {
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var isDimmed = false
+  @State private var isShown = false
 
   /// One stand-in message: whether it is one's own, its share of `bubbleWidth`, and its height.
   private struct Row {
@@ -28,8 +29,7 @@ struct TimelineSkeleton: View {
     Row(isOwn: true, widthRatio: 0.55, height: 52),
   ]
 
-  /// The avatar beside others' messages, as `MessageRow` draws it.
-  private static let avatarSize: CGFloat = 32
+  private static let avatarSize = RoomMetrics.avatarSize
 
   var body: some View {
     VStack(spacing: 12) {
@@ -38,17 +38,22 @@ struct TimelineSkeleton: View {
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-    .opacity(isDimmed ? 0.45 : 1)
-    .onAppear {
-      guard !reduceMotion else { return }
-      withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { isDimmed = true }
+    .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
+      $0.opacity(isDimmed ? 0.45 : 1)
+    }
+    .animation(.easeIn(duration: 0.2)) { $0.opacity(isShown ? 1 : 0) }
+    .task {
+      try? await Task.sleep(for: RoomMetrics.skeletonDelay)
+      guard !Task.isCancelled else { return }
+      isShown = true
+      if !reduceMotion { isDimmed = true }
     }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("Loading messages")
   }
 
   private func row(_ row: Row) -> some View {
-    HStack(alignment: .bottom, spacing: 8) {
+    HStack(alignment: .bottom, spacing: RoomMetrics.avatarSpacing) {
       if row.isOwn {
         Spacer(minLength: 0)
       } else {
