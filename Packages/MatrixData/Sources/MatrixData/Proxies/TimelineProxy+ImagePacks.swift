@@ -40,7 +40,7 @@ extension TimelineProxy {
     if let user = ImagePackMapper.eventContent(
       try? await client.accountData(eventType: ImagePackMapper.userPackType))
     {
-      packs.append(PackContent(id: "user", content: user, fallbackName: "My stickers"))
+      packs.append(PackContent(id: "user", content: user, fallbackName: localized("My stickers")))
     }
     let room = ClientServerRequest.encode(roomId)
     if let request = ClientServerRequest.make(client: client, path: "rooms/\(room)/state"),
@@ -54,7 +54,7 @@ extension TimelineProxy {
         packs.append(
           PackContent(
             id: "room:\(roomId):\(key)", content: content,
-            fallbackName: key.isEmpty ? "Chat stickers" : key))
+            fallbackName: key.isEmpty ? localized("Chat stickers") : key))
       }
     }
     let packRooms = ImagePackMapper.eventContent(
