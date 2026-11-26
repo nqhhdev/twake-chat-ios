@@ -179,15 +179,20 @@ extension AccountList {
   }
 }
 
-public struct AccountBadges {
-  private let defaults: UserDefaults
+public struct AccountBadges: Sendable {
+  private let suiteName: String
 
-  public init(defaults: UserDefaults) {
-    self.defaults = defaults
+  public init?(suiteName: String) {
+    guard UserDefaults(suiteName: suiteName) != nil else { return nil }
+    self.suiteName = suiteName
   }
 
   public static func inAppGroup() -> AccountBadges? {
-    UserDefaults(suiteName: AppGroupContainer.defaultGroupIdentifier).map(AccountBadges.init)
+    AccountBadges(suiteName: AppGroupContainer.defaultGroupIdentifier)
+  }
+
+  private var defaults: UserDefaults {
+    UserDefaults(suiteName: suiteName) ?? .standard
   }
 
   static func key(_ slot: AccountSlot) -> String { "badge.\(slot.id)" }

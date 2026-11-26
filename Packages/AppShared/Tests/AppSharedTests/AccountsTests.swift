@@ -225,9 +225,8 @@ struct AccountsTests {
 
   @Test func theBadgeSumsEveryAccountsLastCount() throws {
     let suite = "AccountsTests-\(UUID().uuidString)"
-    let defaults = try #require(UserDefaults(suiteName: suite))
-    defer { defaults.removePersistentDomain(forName: suite) }
-    let badges = AccountBadges(defaults: defaults)
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let badges = try #require(AccountBadges(suiteName: suite))
     let list = twoAccounts()
     badges.record(3, for: .legacy)
     badges.record(4, for: AccountSlot(id: "b"))
@@ -240,9 +239,8 @@ struct AccountsTests {
 
   @Test func theBadgeCountsTheSlotOfAPushNotListedYet() throws {
     let suite = "AccountsTests-\(UUID().uuidString)"
-    let defaults = try #require(UserDefaults(suiteName: suite))
-    defer { defaults.removePersistentDomain(forName: suite) }
-    let badges = AccountBadges(defaults: defaults)
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let badges = try #require(AccountBadges(suiteName: suite))
     badges.record(5, for: .legacy)
     #expect(badges.total(for: AccountList(), including: .legacy) == 5)
   }

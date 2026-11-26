@@ -6,7 +6,7 @@ import MatrixData
 import People
 import UIKit
 
-struct AppComposition {
+struct AppComposition: Sendable {
   let registry: AccountRegistry
   let accessGroup: String
   let appLock: AppLock

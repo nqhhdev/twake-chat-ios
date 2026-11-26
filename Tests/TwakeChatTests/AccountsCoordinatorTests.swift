@@ -46,7 +46,7 @@ struct AccountsCoordinatorTests {
     root = FileManager.default.temporaryDirectory.appending(
       path: "AccountsCoordinatorTests-\(UUID().uuidString)", directoryHint: .isDirectory)
     registry = AccountRegistry(containerURL: root)
-    badges = AccountBadges(defaults: try #require(UserDefaults(suiteName: suite)))
+    badges = try #require(AccountBadges(suiteName: suite))
     inbox = SharedInbox(root: root.appending(path: "Inbox", directoryHint: .isDirectory))
   }
 
