@@ -29,9 +29,11 @@ the language of the Twake common settings, analytics with consent, and the app g
    (MatrixData). The well-known is read at the user's server name, as before. The answer is kept in memory per
    account; `current()` loads it once, concurrent calls share one load, and the signed-in screen calls `refresh()` at
    each launch and sign-in. Signed out, only the build services are returned, and nothing is requested.
-3. Contacts lookup, contacts visibility, the recovery vault and Meet take ToM and the call foci from it. Their
+3. Contacts lookup, contacts visibility, the recovery vault, Meet and the ToM address book and invitations (ADR 0037)
+   take ToM, `enable_invitations` and the call foci from it. Their
    behaviour does not change, except that the newer `app.twake.tom` key is read before `t.server`, as the web does.
-   The identity service keeps its own discovery (ADR 0029, owned by another change).
+   The identity service (ADR 0029) and the Element Call discovery (ADR 0038) still read the well-known themselves;
+   moving them is follow-up work.
 4. **Delete account (#170).** When `common_settings.application_url` holds `{username}`, the row opens that page with
    the user's localpart, as Flutter's `completedApplicationUrl`. Otherwise the app asks for a destructive
    confirmation and calls `POST /_matrix/client/v3/account/deactivate` with `erase: false`, using the same

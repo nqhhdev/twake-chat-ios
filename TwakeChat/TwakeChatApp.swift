@@ -15,18 +15,31 @@ struct TwakeChatApp: App {
   /// The composition root (ADR 0004): builds the session store and the repositories, and passes them down.
   init() {
     MatrixPlatform.setUp()
-    guard let storeDirectory = AppGroupContainer().sdkStoreDirectory(),
+    guard let registry = AccountRegistry.inAppGroup(),
       let accessGroup = Bundle.main.object(forInfoDictionaryKey: "KeychainAccessGroup") as? String
     else {
       preconditionFailure("The app's entitlements give it no App Group or Keychain access group.")
     }
-    let sessionStore = KeychainSessionStore(service: "app.twake.ios.chat", accessGroup: accessGroup)
+    func sessionStore(_ slot: AccountSlot) -> KeychainSessionStore {
+      KeychainSessionStore(
+        service: "app.twake.ios.chat", accessGroup: accessGroup, account: slot.keychainAccount)
+    }
     #if DEBUG
-      // UI tests start signed out, whatever an earlier failed test left behind.
-      E2EHarness.resetIfAsked(storeDirectory: storeDirectory, sessionStore: sessionStore)
+      E2EHarness.resetIfAsked(
+        storeDirectory: registry.storeDirectory(for: .legacy), sessionStore: sessionStore(.legacy),
+        registry: registry)
     #endif
+    let accounts = registry.migrate(legacyUserId: try? sessionStore(.legacy).load()?.userId)
+    let slot = accounts.active?.slot ?? accounts.slotForSignIn()
     let repository = MatrixAuthenticationRepository(
-      storeDirectory: storeDirectory, sessionStore: sessionStore, signsOutWithoutStore: true)
+      storeDirectory: registry.storeDirectory(for: slot), sessionStore: sessionStore(slot),
+      signsOutWithoutStore: true,
+      onSessionChange: { change in
+        switch change {
+        case .signedIn(let userId): registry.update { _ = $0.add(userId: userId, slot: slot) }
+        case .signedOut: registry.update { _ = $0.remove(slot: slot) }
+        }
+      })
     // The build configuration sets the sign-in URLs: staging in Debug, Twake SaaS in Release. None is a secret.
     func url(_ key: String) -> URL? {
       (Bundle.main.object(forInfoDictionaryKey: key) as? String).flatMap {
@@ -49,6 +62,7 @@ struct TwakeChatApp: App {
         repository: repository, roomList: roomList, archive: roomList,
         publicRooms: PublicRoomsProxy(authentication: repository),
         spaces: SpacesProxy(authentication: repository),
+        folders: FoldersProxy(authentication: repository),
         linkPreviews: LinkPreviewProxy(authentication: repository),
         makeTimeline: { TimelineProxy(roomId: $0, authentication: repository, only: $1) },
         makeThreadTimeline: {
@@ -74,8 +88,12 @@ struct TwakeChatApp: App {
         devices: devices, chatDisplay: ChatDisplayDefaults(),
         appLock: AppLock(), sync: repository, sessionExpiry: repository,
         meetCalls: MeetCallProxy(authentication: repository, capabilities: capabilities),
+        roomCalls: ElementCallProxy(
+          authentication: repository, fallbackURL: url("ElementCallURL"),
+          clientId: Bundle.main.bundleIdentifier ?? "app.twake.ios.chat"),
         identity: IdentityServerProxy(authentication: repository),
         addressBook: SystemAddressBook(),
+        twakeContacts: TomContactsProxy(authentication: repository, capabilities: capabilities),
         gifs: url("TwakeProxyURL").map { GifProxy(baseURL: $0, authentication: repository) },
         signInConfiguration: configuration, webAuthenticator: SystemWebAuthenticator(),
         capabilities: capabilities, accountDeletion: devices,

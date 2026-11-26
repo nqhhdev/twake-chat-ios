@@ -108,6 +108,17 @@ struct ServerCapabilitiesProxyTests {
         == .init(baseURL: URL(string: "https://new.example.org")!, serverName: "example.org"))
   }
 
+  @Test func invitationsAreOffUnlessTheWellKnownTurnsThemOn() async {
+    Stub.responses = [
+      "example.org/.well-known/matrix/client": (
+        200, #"{"t.server":{"base_url":"https://tom.example.org"},"app.twake.chat":"weird"}"#
+      )
+    ]
+    let capabilities = await makeProxy(Accounts()).current()
+    #expect(!capabilities.twakeChat.invitationsEnabled)
+    #expect(capabilities.tom?.serverName == "example.org")
+  }
+
   @Test func disabledCommonSettingsAndMalformedEntriesAreIgnored() async {
     Stub.responses = [
       "example.org/.well-known/matrix/client": (

@@ -79,6 +79,7 @@ struct IdentityConsentSheet: View {
 struct PhoneContactsSections: View {
   let contacts: PhoneContactsViewModel
   let search: PeopleSearchViewModel
+  var twake: TwakeContactsViewModel?
   @State private var isAskingConsent = false
   @Environment(\.openURL) private var openURL
 
@@ -164,9 +165,7 @@ struct PhoneContactsSections: View {
                 .foregroundStyle(SysColors.textSecondary).lineLimit(1)
             }
             Spacer()
-            Button("Invite") { Task { await search.tap(entry.address) } }
-              .buttonStyle(.bordered)
-              .disabled(search.isCreating)
+            inviteButton(entry.address)
           }
         }
       } header: {
@@ -174,6 +173,25 @@ struct PhoneContactsSections: View {
       } footer: {
         Text("They get an invitation and join you once they sign up.")
       }
+    }
+  }
+
+  @ViewBuilder private func inviteButton(_ address: ContactAddress) -> some View {
+    if let twake, twake.features.invitations {
+      if twake.invited[address] != nil {
+        Label("Invited", systemImage: "checkmark")
+          .labelStyle(.titleAndIcon)
+          .textStyle(TextStyles.labelSmall)
+          .foregroundStyle(SysColors.textSecondary)
+      } else {
+        Button("Invite") { Task { _ = await twake.invite(address) } }
+          .buttonStyle(.bordered)
+          .disabled(twake.isWorking)
+      }
+    } else {
+      Button("Invite") { Task { await search.tap(address) } }
+        .buttonStyle(.bordered)
+        .disabled(search.isCreating)
     }
   }
 

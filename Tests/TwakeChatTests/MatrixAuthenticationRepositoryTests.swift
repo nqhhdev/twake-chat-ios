@@ -20,7 +20,9 @@ struct MatrixAuthenticationRepositoryTests {
       service: "app.twake.ios.chat.tests.matrix-authentication-repository", accessGroup: group)
     try sessionStore.delete()
     storeDirectory = FileManager.default.temporaryDirectory
-      .appending(path: "MatrixAuthenticationRepositoryTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+      .appending(
+        path: "MatrixAuthenticationRepositoryTests-\(UUID().uuidString)",
+        directoryHint: .isDirectory)
   }
 
   private func repository() -> MatrixAuthenticationRepository {
@@ -31,7 +33,8 @@ struct MatrixAuthenticationRepositoryTests {
   private func savedSession(slidingSyncVersion: String? = "native") -> StoredSession {
     StoredSession(
       userId: "@alice:example.org", deviceId: "DEVICE", homeserverURL: Self.unreachable,
-      accessToken: "access-token", refreshToken: "refresh-token", slidingSyncVersion: slidingSyncVersion)
+      accessToken: "access-token", refreshToken: "refresh-token",
+      slidingSyncVersion: slidingSyncVersion)
   }
 
   private func cleanUp() {
@@ -203,14 +206,46 @@ struct MatrixAuthenticationRepositoryTests {
   private static let loginAnswer = (
     status: "200 OK",
     body: """
-      {"user_id":"@alice:example.org","access_token":"fixture-access","device_id":"NEWDEVICE",\
-      "refresh_token":"fixture-refresh"}
-      """
+    {"user_id":"@alice:example.org","access_token":"fixture-access","device_id":"NEWDEVICE",\
+    "refresh_token":"fixture-refresh"}
+    """
   )
   private static let logoutAnswer = (status: "200 OK", body: "{}")
 
   /// Card: a plain username and a full `@user:server` are both sent to the server unchanged as the user identifier
   /// (login.dart), and login returns and saves the session, sliding sync version included, and keeps the client.
+  @Test(.timeLimit(.minutes(1)))
+  func signInAndSignOutAreReportedForTheAccountRegistry() async throws {
+    defer { cleanUp() }
+    let server = try FakeHomeserver(responses: ["/login": Self.loginAnswer])
+    defer { server.stop() }
+    let changes = SessionChanges()
+    let repository = MatrixAuthenticationRepository(
+      storeDirectory: storeDirectory, sessionStore: sessionStore, lockHolderName: "tests",
+      onSessionChange: { changes.append($0) })
+
+    _ = try await repository.login(
+      homeserver: server.url, username: "alice", password: "fixture-password")
+    #expect(changes.all == [.signedIn(userId: "@alice:example.org")])
+
+    try? await repository.logout()
+    #expect(
+      changes.all == [
+        .signedIn(userId: "@alice:example.org"), .signedOut(userId: "@alice:example.org"),
+      ])
+  }
+
+  @Test(.timeLimit(.minutes(1)))
+  func aSignOutWithNothingSavedReportsNothing() async throws {
+    defer { cleanUp() }
+    let changes = SessionChanges()
+    let repository = MatrixAuthenticationRepository(
+      storeDirectory: storeDirectory, sessionStore: sessionStore, lockHolderName: "tests",
+      onSessionChange: { changes.append($0) })
+    try await repository.logout()
+    #expect(changes.all.isEmpty)
+  }
+
   @Test(.timeLimit(.minutes(1)), arguments: ["alice", "@alice:example.org"])
   func loginSendsTheUsernameUnchangedAndSavesTheSession(username: String) async throws {
     defer { cleanUp() }
@@ -253,7 +288,8 @@ struct MatrixAuthenticationRepositoryTests {
     defer { cleanUp() }
     let server = try FakeHomeserver(responses: [
       "/login": (
-        status: "403 Forbidden", body: #"{"errcode":"M_FORBIDDEN","error":"Invalid username or password"}"#
+        status: "403 Forbidden",
+        body: #"{"errcode":"M_FORBIDDEN","error":"Invalid username or password"}"#
       )
     ])
     defer { server.stop() }
@@ -378,10 +414,12 @@ final class FakeHomeserver: @unchecked Sendable {
       let contentLength =
         head.components(separatedBy: "\r\n")
         .first { $0.lowercased().hasPrefix("content-length:") }
-        .flatMap { Int($0.dropFirst("content-length:".count).trimmingCharacters(in: .whitespaces)) } ?? 0
+        .flatMap { Int($0.dropFirst("content-length:".count).trimmingCharacters(in: .whitespaces)) }
+        ?? 0
       guard buffer.count - headerEnd.upperBound >= contentLength else { continue }
       let body = String(
-        decoding: buffer[headerEnd.upperBound..<(headerEnd.upperBound + contentLength)], as: UTF8.self)
+        decoding: buffer[headerEnd.upperBound..<(headerEnd.upperBound + contentLength)],
+        as: UTF8.self)
       let response = Data(respond(to: head, body: body).utf8)
       _ = response.withUnsafeBytes { write(client, $0.baseAddress, response.count) }
       return
@@ -418,7 +456,19 @@ final class FakeHomeserver: @unchecked Sendable {
       status = "404 Not Found"
       body = #"{"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}"#
     }
-    return "HTTP/1.1 \(status)\r\nContent-Type: application/json\r\nContent-Length: \(body.utf8.count)\r\n"
+    return
+      "HTTP/1.1 \(status)\r\nContent-Type: application/json\r\nContent-Length: \(body.utf8.count)\r\n"
       + "Connection: close\r\n\r\n\(body)"
+  }
+}
+
+private final class SessionChanges: @unchecked Sendable {
+  private let lock = NSLock()
+  private var changes: [SessionChange] = []
+
+  var all: [SessionChange] { lock.withLock { changes } }
+
+  func append(_ change: SessionChange) {
+    lock.withLock { changes.append(change) }
   }
 }

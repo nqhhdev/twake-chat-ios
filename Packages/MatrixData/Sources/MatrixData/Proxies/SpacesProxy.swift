@@ -84,4 +84,35 @@ public actor SpacesProxy: SpacesRepository {
       throw .requestFailed
     }
   }
+
+  public func createSpace(_ space: NewSpace, picture: PictureUpload?) async throws(SpacesError)
+    -> String
+  {
+    guard let client = await clientProxy()?.client else { throw .notSignedIn }
+    var avatarURL: String?
+    if let picture {
+      avatarURL = try? await client.uploadMedia(
+        mimeType: picture.mimeType, data: picture.data, progressWatcher: nil)
+    }
+    let ownServer = (try? client.userId()).flatMap { id in
+      id.firstIndex(of: ":").map { String(id[id.index(after: $0)...]) }
+    }
+    guard
+      let request = ClientServerRequest.make(
+        client: client, path: "createRoom", method: "POST",
+        json: space.createRoomBody(ownServer: ownServer, avatarURL: avatarURL)),
+      let (status, data) = await ClientServerRequest.answer(request), status == 200,
+      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+      let roomId = object["room_id"] as? String
+    else { throw .requestFailed }
+    if let parentId = space.parentId {
+      do {
+        try await client.spaceService().addChildToSpace(childId: roomId, spaceId: parentId)
+      } catch {
+        DebugLog.failure("addChildToSpace", error)
+        throw .requestFailed
+      }
+    }
+    return roomId
+  }
 }

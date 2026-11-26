@@ -27,7 +27,8 @@ struct UsageAnalyticsViewModelTests {
     twakeChat: .init(sideService: URL(string: "https://side.example.org")),
     build: BuildServices(analyticsEnabled: true))
 
-  private func makeModel(_ store: Store, _ capabilities: ServerCapabilities) -> UsageAnalyticsViewModel
+  private func makeModel(_ store: Store, _ capabilities: ServerCapabilities)
+    -> UsageAnalyticsViewModel
   {
     UsageAnalyticsViewModel(
       analytics: Analytics(

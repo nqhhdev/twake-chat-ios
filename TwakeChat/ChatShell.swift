@@ -37,7 +37,9 @@ struct ChatShell: View {
   var checkSession: (@Sendable () async -> SessionWarning?)?
   /// Meet calls of the account (#92); without it a room offers no call and shows call links as plain text.
   var meetCalls: (any MeetCallRepository)?
+  var roomCalls: (any RoomCallRepository)?
   var makePhoneContacts: (() -> PhoneContactsViewModel?)?
+  var makeTwakeContacts: (() -> TwakeContactsViewModel?)?
 
   /// How the shell lays out a screen of `width` points (safe areas included, as Flutter measures).
   struct Layout: Equatable {
@@ -57,6 +59,7 @@ struct ChatShell: View {
   @State private var draftChat: PeopleSearchViewModel?
   @State private var contacts: PeopleSearchViewModel?
   @State private var phoneContacts: PhoneContactsViewModel?
+  @State private var twakeContacts: TwakeContactsViewModel?
   @State private var settingsPage: SettingsPage? = .security
   /// Privacy & Security over the chat, from the banner that warns encrypted messages may not show.
   @State private var isFixingSession = false
@@ -252,7 +255,8 @@ struct ChatShell: View {
   private var contactsContent: some View {
     Group {
       if let contacts {
-        ContactsScreen(viewModel: contacts, phoneContacts: phoneContacts)
+        ContactsScreen(
+          viewModel: contacts, phoneContacts: phoneContacts, twakeContacts: twakeContacts)
       } else {
         Color.clear
       }
@@ -260,6 +264,7 @@ struct ChatShell: View {
     .task {
       guard contacts == nil else { return }
       phoneContacts = makePhoneContacts?()
+      twakeContacts = makeTwakeContacts?()
       contacts = makePeopleSearch(.direct) { roomId, name in
         destination = .chats
         open(
@@ -280,7 +285,8 @@ struct ChatShell: View {
         Rectangle().fill(SysColors.surface).frame(width: 1)
         NavigationStack {
           if let room {
-            RoomScreen(viewModel: room, meetCalls: meetCalls).id(room.roomId)
+            RoomScreen(viewModel: room, meetCalls: meetCalls, roomCalls: roomCalls)
+              .id(room.roomId)
               .onAppear { push.openRoomId = room.roomId }
               .onDisappear { if push.openRoomId == room.roomId { push.openRoomId = nil } }
           } else {
@@ -299,7 +305,8 @@ struct ChatShell: View {
           .navigationDestination(isPresented: $isRoomPushed) {
             if let room {
               // The composer takes the bottom of the screen, so the tab bar steps aside, as in Messages.
-              RoomScreen(viewModel: room, meetCalls: meetCalls).id(room.roomId)
+              RoomScreen(viewModel: room, meetCalls: meetCalls, roomCalls: roomCalls)
+                .id(room.roomId)
                 .onAppear { push.openRoomId = room.roomId }
                 .onDisappear { if push.openRoomId == room.roomId { push.openRoomId = nil } }
                 .toolbar(.hidden, for: .tabBar)
